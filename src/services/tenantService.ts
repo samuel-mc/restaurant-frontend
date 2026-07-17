@@ -36,8 +36,11 @@ export async function registerRestaurant(
 /** Mensaje amigable ante fallos de registro. */
 export function getRegisterErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    if (error.statusText === "Configuration Error") {
+      return error.message;
+    }
     if (error.isNetworkError) {
-      return "No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.";
+      return "No pudimos conectar con el servidor. ¿Está el backend en http://localhost:8080 y NEXT_PUBLIC_API_URL configurada?";
     }
     if (error.status === 400 || error.status === 409) {
       return (

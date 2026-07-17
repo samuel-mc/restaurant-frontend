@@ -112,8 +112,11 @@ export async function clearToken(): Promise<void> {
 /** Mensaje amigable ante fallos de login (credenciales / tenant / red). */
 export function getLoginErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    if (error.statusText === "Configuration Error") {
+      return error.message;
+    }
     if (error.isNetworkError) {
-      return "No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.";
+      return "No pudimos conectar con el servidor. Verifica que el backend esté en http://localhost:8080 y que CORS permita tu subdominio (*.localhost).";
     }
     if (error.status === 401) {
       return "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.";

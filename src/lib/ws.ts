@@ -32,3 +32,8 @@ export function resolveOrdersWsUrl(): string {
 export function orderTrackingTopic(orderUuid: string): string {
   return `/topic/order/${orderUuid}`;
 }
+
+/** Canal STOMP del monitor de cocina/caja por slug de tenant. */
+export function adminKitchenTopic(tenantSlug: string): string {
+  return `/topic/admin/${tenantSlug}/orders`;
+}

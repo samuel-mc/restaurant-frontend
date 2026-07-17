@@ -129,6 +129,49 @@ export async function createOrder(
   return toOrder(response);
 }
 
+/**
+ * Obtiene un pedido público por UUID para la pantalla de tracking.
+ *
+ * @param orderUuid UUID público del pedido.
+ * @param tenantSlug Subdominio del restaurante. Si se omite, se infiere del host.
+ */
+export async function getOrderByUuid(
+  orderUuid: string,
+  tenantSlug?: string | null,
+): Promise<Order> {
+  const uuid = orderUuid.trim();
+  if (!uuid) {
+    throw new ApiError({
+      message: "Se requiere el identificador del pedido.",
+      status: 0,
+      statusText: "Bad Request",
+      url: ORDERS_PATH,
+    });
+  }
+
+  let slug: string;
+  try {
+    slug = resolveTenantSlug(tenantSlug);
+  } catch (error) {
+    throw new ApiError({
+      message:
+        error instanceof Error
+          ? error.message
+          : "No se pudo identificar el restaurante.",
+      status: 0,
+      statusText: "Bad Request",
+      url: `${ORDERS_PATH}/${uuid}`,
+    });
+  }
+
+  const response = await apiClient.get<OrderResponse>(`${ORDERS_PATH}/${uuid}`, {
+    headers: { [TENANT_HEADER]: slug },
+    cache: "no-store",
+  });
+
+  return toOrder(response);
+}
+
 /** Mensaje amigable a partir de un fallo al crear el pedido. */
 export function getCreateOrderErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {

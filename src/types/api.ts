@@ -49,6 +49,44 @@ export interface ProductResponse {
   createdAt: string;
 }
 
+/** Línea de creación de pedido hacia el backend (`OrderDetailRequest.java`). */
+export interface OrderDetailRequest {
+  productUuid: string;
+  quantity: number;
+  notes?: string | null;
+}
+
+/**
+ * Payload de creación hacia el backend (`OrderRequest.java`).
+ * El total lo calcula el servidor a partir de los precios vigentes.
+ */
+export interface OrderRequest {
+  customerName: string;
+  customerPhone?: string | null;
+  orderType: OrderType;
+  tableNumber?: string | null;
+  deliveryAddress?: string | null;
+  details: OrderDetailRequest[];
+}
+
+/**
+ * DTO de aplicación para confirmar el carrito.
+ * Se mapea a `OrderRequest` en `orderService` antes del POST.
+ */
+export interface CreateOrderDTO {
+  /** Productos del carrito (UUID público + cantidad). */
+  items: Array<{ productUuid: string; quantity: number; notes?: string | null }>;
+  /** Número de mesa (pedidos en salón). */
+  tableNumber?: string | null;
+  /** Nombre del comensal; el backend lo exige, el servicio aplica un fallback. */
+  customerName?: string | null;
+  /** Total calculado en cliente (informativo; el backend lo recalcula). */
+  total: number;
+  /** Modalidad; por defecto `IN_TABLE` en el menú digital. */
+  orderType?: OrderType;
+  customerPhone?: string | null;
+}
+
 /** Respuesta cruda de una línea de pedido (`OrderDetailResponse.java`). */
 export interface OrderDetailResponse {
   productUuid: string;

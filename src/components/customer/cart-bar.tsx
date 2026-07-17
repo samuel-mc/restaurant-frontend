@@ -3,11 +3,12 @@
 /**
  * Botón flotante del carrito + drawer inferior (bottom sheet) con el resumen.
  *
- * Visible solo si `totalItems > 0`. Al abrirlo muestra el desglose del pedido
- * y el CTA destacado "Confirmar pedido".
+ * Visible solo si `totalItems > 0`. Al confirmar, publica el pedido vía
+ * `orderService.createOrder`, limpia el carrito y redirige al tracking.
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
 import {
   useCartCount,
@@ -15,15 +16,31 @@ import {
   useCartSubtotal,
 } from "@/store/cartStore";
 import { QuantityStepper } from "@/components/customer/quantity-stepper";
+import {
+  createOrder,
+  getCreateOrderErrorMessage,
+} from "@/services/orderService";
+import type { CreateOrderDTO } from "@/types/api";
 
-export function CartBar() {
+interface CartBarProps {
+  /** Slug del restaurante (desde la ruta `[tenant]`). */
+  tenantSlug: string;
+}
+
+export function CartBar({ tenantSlug }: CartBarProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [tableNumber, setTableNumber] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const count = useCartCount();
   const subtotal = useCartSubtotal();
   const lines = useCartStore((state) => state.lines);
   const addItem = useCartStore((state) => state.addItem);
   const decrementItem = useCartStore((state) => state.decrementItem);
-  const clear = useCartStore((state) => state.clear);
+  const clearCart = useCartStore((state) => state.clear);
 
   const orderedLines = useMemo(() => Object.values(lines), [lines]);
   const itemLabel = count === 1 ? "1 ítem" : `${count} ítems`;
@@ -38,6 +55,35 @@ export function CartBar() {
     };
   }, [isOpen]);
 
+  async function handleConfirmOrder() {
+    if (isSubmitting || orderedLines.length === 0) return;
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    const orderData: CreateOrderDTO = {
+      items: orderedLines.map(({ product, quantity }) => ({
+        productUuid: product.uuid,
+        quantity,
+      })),
+      tableNumber: tableNumber.trim() || null,
+      customerName: customerName.trim() || null,
+      total: subtotal,
+      orderType: "IN_TABLE",
+    };
+
+    try {
+      const order = await createOrder(orderData, tenantSlug);
+      clearCart();
+      setIsOpen(false);
+      // URL pública (el proxy reescribe `/orders/:uuid` → `/[tenant]/orders/:uuid`).
+      router.push(`/orders/${order.uuid}`);
+    } catch (error) {
+      setErrorMessage(getCreateOrderErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   if (count === 0) return null;
 
   return (
@@ -46,7 +92,10 @@ export function CartBar() {
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            setErrorMessage(null);
+            setIsOpen(true);
+          }}
           className="pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl bg-amber-500 px-5 py-4 font-semibold text-white shadow-lg shadow-amber-500/30 transition-transform active:scale-[0.98]"
         >
           <span className="flex min-w-0 items-center gap-2">
@@ -72,8 +121,9 @@ export function CartBar() {
           <button
             type="button"
             aria-label="Cerrar resumen"
+            disabled={isSubmitting}
             onClick={() => setIsOpen(false)}
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm disabled:cursor-wait"
           />
 
           <div className="sheet-enter relative z-10 flex max-h-[80vh] w-full max-w-md flex-col rounded-t-3xl bg-background shadow-2xl">
@@ -86,11 +136,12 @@ export function CartBar() {
               <h2 className="text-lg font-bold">Tu pedido</h2>
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => {
                   setIsOpen(false);
-                  clear();
+                  clearCart();
                 }}
-                className="text-sm font-medium text-red-500 transition-transform active:scale-95"
+                className="text-sm font-medium text-red-500 transition-transform active:scale-95 disabled:opacity-40"
               >
                 Vaciar
               </button>
@@ -122,15 +173,64 @@ export function CartBar() {
             </ul>
 
             <div className="space-y-3 border-t border-black/5 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:border-white/10">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-black/50 dark:text-white/50">
+                    Tu nombre
+                  </span>
+                  <input
+                    type="text"
+                    name="customerName"
+                    autoComplete="name"
+                    maxLength={100}
+                    placeholder="Opcional"
+                    value={customerName}
+                    disabled={isSubmitting}
+                    onChange={(event) => setCustomerName(event.target.value)}
+                    className="rounded-xl bg-black/5 px-3 py-2.5 text-sm outline-none ring-amber-500/40 focus:ring-2 disabled:opacity-50 dark:bg-white/10"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-black/50 dark:text-white/50">
+                    Mesa
+                  </span>
+                  <input
+                    type="text"
+                    name="tableNumber"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="Opcional"
+                    value={tableNumber}
+                    disabled={isSubmitting}
+                    onChange={(event) => setTableNumber(event.target.value)}
+                    className="rounded-xl bg-black/5 px-3 py-2.5 text-sm outline-none ring-amber-500/40 focus:ring-2 disabled:opacity-50 dark:bg-white/10"
+                  />
+                </label>
+              </div>
+
               <div className="flex items-center justify-between text-base font-bold">
                 <span>Subtotal</span>
                 <span className="tabular-nums">{formatCurrency(subtotal)}</span>
               </div>
+
+              {errorMessage ? (
+                <p
+                  role="alert"
+                  className="rounded-xl bg-red-500/10 px-3 py-2.5 text-sm leading-snug text-red-600 dark:text-red-400"
+                >
+                  {errorMessage}
+                </p>
+              ) : null}
+
               <button
                 type="button"
-                className="w-full rounded-2xl bg-amber-500 px-5 py-4 font-semibold text-white shadow-lg shadow-amber-500/30 transition-transform active:scale-[0.98]"
+                disabled={isSubmitting}
+                onClick={() => {
+                  void handleConfirmOrder();
+                }}
+                className="w-full rounded-2xl bg-amber-500 px-5 py-4 font-semibold text-white shadow-lg shadow-amber-500/30 transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
               >
-                Confirmar pedido
+                {isSubmitting ? "Procesando..." : "Confirmar pedido"}
               </button>
             </div>
           </div>

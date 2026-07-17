@@ -27,9 +27,11 @@ interface MenuSection {
 
 interface MenuViewProps {
   products: Product[];
+  /** Slug del restaurante para crear el pedido en el tenant correcto. */
+  tenantSlug: string;
 }
 
-export function MenuView({ products }: MenuViewProps) {
+export function MenuView({ products, tenantSlug }: MenuViewProps) {
   const sections = useMemo<MenuSection[]>(() => {
     const byCategory = new Map<string, MenuSection>();
     for (const product of products) {
@@ -146,7 +148,7 @@ export function MenuView({ products }: MenuViewProps) {
         ))}
       </div>
 
-      <CartBar />
+      <CartBar tenantSlug={tenantSlug} />
     </>
   );
 }

@@ -85,7 +85,7 @@ export default async function TenantMenuPage({ params }: TenantMenuPageProps) {
       </header>
 
       {menu.status === "ok" ? (
-        <MenuView products={menu.products} />
+        <MenuView products={menu.products} tenantSlug={tenant} />
       ) : (
         <MenuUnavailableState
           title="Menú no disponible"

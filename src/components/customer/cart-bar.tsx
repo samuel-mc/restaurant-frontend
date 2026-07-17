@@ -62,7 +62,7 @@ export function CartBar({ tenantSlug }: CartBarProps) {
 
     const orderData: CreateOrderDTO = {
       items: orderedLines.map(({ product, quantity }) => ({
-        productUuid: product.uuid,
+        productId: product.uuid,
         quantity,
       })),
       tableNumber: tableNumber.trim() || null,
@@ -75,7 +75,8 @@ export function CartBar({ tenantSlug }: CartBarProps) {
       const order = await createOrder(orderData, tenantSlug);
       clearCart();
       setIsOpen(false);
-      // URL pública (el proxy reescribe `/orders/:uuid` → `/[tenant]/orders/:uuid`).
+      // Ruta pública: el proxy reescribe `/orders/:uuid` → `/(public)/[tenant]/orders/:uuid`.
+      // No prefijar el tenant en el path (provocaría `/mario/mario/orders/...`).
       router.push(`/orders/${order.uuid}`);
     } catch (error) {
       setErrorMessage(getCreateOrderErrorMessage(error));
@@ -230,7 +231,7 @@ export function CartBar({ tenantSlug }: CartBarProps) {
                 }}
                 className="w-full rounded-2xl bg-amber-500 px-5 py-4 font-semibold text-white shadow-lg shadow-amber-500/30 transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
               >
-                {isSubmitting ? "Procesando..." : "Confirmar pedido"}
+                {isSubmitting ? "Procesando pedido..." : "Confirmar pedido"}
               </button>
             </div>
           </div>

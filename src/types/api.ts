@@ -72,16 +72,22 @@ export interface OrderRequest {
 /**
  * DTO de aplicación para confirmar el carrito.
  * Se mapea a `OrderRequest` en `orderService` antes del POST.
+ *
+ * `productId` es el UUID público del producto (identificador expuesto al comensal).
  */
 export interface CreateOrderDTO {
-  /** Productos del carrito (UUID público + cantidad). */
-  items: Array<{ productUuid: string; quantity: number; notes?: string | null }>;
-  /** Número de mesa (pedidos en salón). */
-  tableNumber?: string | null;
-  /** Nombre del comensal; el backend lo exige, el servicio aplica un fallback. */
-  customerName?: string | null;
+  items: Array<{
+    /** UUID público del producto (`Product.uuid`). */
+    productId: string;
+    quantity: number;
+    notes?: string | null;
+  }>;
   /** Total calculado en cliente (informativo; el backend lo recalcula). */
   total: number;
+  /** Nombre del comensal; el backend lo exige, el servicio aplica un fallback. */
+  customerName?: string | null;
+  /** Número de mesa (pedidos en salón). */
+  tableNumber?: string | null;
   /** Modalidad; por defecto `IN_TABLE` en el menú digital. */
   orderType?: OrderType;
   customerPhone?: string | null;

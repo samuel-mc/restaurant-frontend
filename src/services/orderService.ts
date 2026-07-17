@@ -1,8 +1,12 @@
 /**
  * Servicio de pedidos del comensal.
  *
- * Publica órdenes vía `POST /api/v1/orders` identificando el restaurante con
- * la cabecera `X-Tenant` (misma convención que el catálogo de menú).
+ * Publica órdenes vía `POST /api/v1/orders` (fetch encapsulado en `apiClient`).
+ *
+ * Aislamiento multi-tenant hacia Spring Boot:
+ * - Cabecera `X-Tenant` = slug del restaurante (lo que lee `TenantFilter`).
+ * - NO confundir con `x-tenant-slug`, cabecera interna del proxy Next.js
+ *   (`src/proxy.ts`) usada solo entre el edge y los Server Components.
  */
 
 import type {
@@ -15,10 +19,13 @@ import { formatCurrency } from "@/lib/format";
 import { resolveTenantSlug } from "@/lib/tenant";
 import { apiClient, ApiError } from "@/services/apiClient";
 
-/** Cabecera que el backend (`TenantFilter`) usa para identificar al restaurante. */
+/**
+ * Cabecera que el backend (`TenantFilter`) usa para identificar al restaurante.
+ * Debe coincidir con la allowlist CORS del backend (`X-Tenant`).
+ */
 const TENANT_HEADER = "X-Tenant";
 
-/** Endpoint público de creación de pedidos. */
+/** Endpoint público de creación / consulta de pedidos. */
 const ORDERS_PATH = "/api/v1/orders";
 
 /** Nombre por defecto cuando el comensal no lo indica (el backend exige `@NotBlank`). */
@@ -51,7 +58,8 @@ function toOrder(dto: OrderResponse): Order {
 
 /**
  * Mapea el DTO de aplicación al contrato `OrderRequest` del backend.
- * El total del cliente no se envía: Spring lo recalcula con precios vigentes.
+ * `productId` (app) → `productUuid` (wire). El total del cliente no se envía:
+ * Spring lo recalcula con los precios vigentes.
  */
 function toOrderRequest(orderData: CreateOrderDTO): OrderRequest {
   const customerName =
@@ -65,18 +73,35 @@ function toOrderRequest(orderData: CreateOrderDTO): OrderRequest {
     tableNumber,
     deliveryAddress: null,
     details: orderData.items.map((item) => ({
-      productUuid: item.productUuid,
+      productUuid: item.productId,
       quantity: item.quantity,
       notes: item.notes ?? null,
     })),
   };
 }
 
+function requireTenantSlug(tenantSlug?: string | null, url = ORDERS_PATH): string {
+  try {
+    return resolveTenantSlug(tenantSlug);
+  } catch (error) {
+    throw new ApiError({
+      message:
+        error instanceof Error
+          ? error.message
+          : "No se pudo identificar el restaurante.",
+      status: 0,
+      statusText: "Bad Request",
+      url,
+    });
+  }
+}
+
 /**
  * Crea un pedido en el restaurante del tenant indicado.
  *
- * @param orderData Datos del carrito (ítems, mesa, nombre, total informativo).
- * @param tenantSlug Subdominio del restaurante. Si se omite, se infiere del host.
+ * @param orderData Datos tipados del carrito (`CreateOrderDTO`).
+ * @param tenantSlug Subdominio del restaurante (ruta/`params`). Si se omite,
+ *                   se infiere del hostname (subdominio actual).
  * @returns Pedido normalizado con el `uuid` público para tracking.
  * @throws {ApiError} Ante validación, tenant inválido o fallo de red/backend.
  */
@@ -93,26 +118,11 @@ export async function createOrder(
     });
   }
 
-  let slug: string;
-  try {
-    slug = resolveTenantSlug(tenantSlug);
-  } catch (error) {
-    throw new ApiError({
-      message:
-        error instanceof Error
-          ? error.message
-          : "No se pudo identificar el restaurante.",
-      status: 0,
-      statusText: "Bad Request",
-      url: ORDERS_PATH,
-    });
-  }
-
+  const slug = requireTenantSlug(tenantSlug);
   const body = toOrderRequest(orderData);
 
   const response = await apiClient.post<OrderResponse>(ORDERS_PATH, body, {
     headers: { [TENANT_HEADER]: slug },
-    // Mutación: nunca cachear.
     cache: "no-store",
   });
 
@@ -131,9 +141,6 @@ export async function createOrder(
 
 /**
  * Obtiene un pedido público por UUID para la pantalla de tracking.
- *
- * @param orderUuid UUID público del pedido.
- * @param tenantSlug Subdominio del restaurante. Si se omite, se infiere del host.
  */
 export async function getOrderByUuid(
   orderUuid: string,
@@ -149,20 +156,7 @@ export async function getOrderByUuid(
     });
   }
 
-  let slug: string;
-  try {
-    slug = resolveTenantSlug(tenantSlug);
-  } catch (error) {
-    throw new ApiError({
-      message:
-        error instanceof Error
-          ? error.message
-          : "No se pudo identificar el restaurante.",
-      status: 0,
-      statusText: "Bad Request",
-      url: `${ORDERS_PATH}/${uuid}`,
-    });
-  }
+  const slug = requireTenantSlug(tenantSlug, `${ORDERS_PATH}/${uuid}`);
 
   const response = await apiClient.get<OrderResponse>(`${ORDERS_PATH}/${uuid}`, {
     headers: { [TENANT_HEADER]: slug },

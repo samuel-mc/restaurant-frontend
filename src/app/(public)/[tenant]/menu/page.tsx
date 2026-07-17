@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClipboardList } from "lucide-react";
 import { getMenuByTenant } from "@/services/menuService";
 import { ApiError } from "@/services/apiClient";
 import type { Product } from "@/types/api";
@@ -114,9 +115,9 @@ function MenuUnavailableState({
     >
       <div
         aria-hidden
-        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-2xl"
+        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400"
       >
-        📋
+        <ClipboardList className="size-7 stroke-[1.5]" />
       </div>
       <h2 className="text-lg font-bold text-foreground">{title}</h2>
       <p className="max-w-xs text-sm leading-relaxed text-black/55 dark:text-white/55">

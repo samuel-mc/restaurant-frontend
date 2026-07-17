@@ -4,13 +4,13 @@
  * Vista interactiva del menú del comensal.
  *
  * Recibe el catálogo ya cargado en el Server Component y gestiona en cliente:
- * - Derivación de categorías (con opción "Todos").
- * - Barra sticky horizontal de categorías.
- * - Feed vertical filtrado de productos.
+ * - Derivación de categorías y agrupación de productos.
+ * - Barra sticky horizontal con scroll-spy al navegar el feed.
+ * - Feed vertical por secciones (scroll automático al tocar una categoría).
  * - Barra flotante del carrito + drawer de confirmación.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Product } from "@/types/api";
 import {
   CategoryBar,
@@ -19,54 +19,132 @@ import {
 import { ProductCard } from "@/components/customer/product-card";
 import { CartBar } from "@/components/customer/cart-bar";
 
-const ALL_CATEGORY_ID = "ALL";
+interface MenuSection {
+  id: string;
+  name: string;
+  products: Product[];
+}
 
 interface MenuViewProps {
   products: Product[];
 }
 
 export function MenuView({ products }: MenuViewProps) {
-  const categories = useMemo<CategoryTab[]>(() => {
-    const seen = new Map<string, string>();
+  const sections = useMemo<MenuSection[]>(() => {
+    const byCategory = new Map<string, MenuSection>();
     for (const product of products) {
       const id = String(product.categoryId);
-      if (!seen.has(id)) seen.set(id, product.categoryName);
+      const existing = byCategory.get(id);
+      if (existing) {
+        existing.products.push(product);
+      } else {
+        byCategory.set(id, {
+          id,
+          name: product.categoryName,
+          products: [product],
+        });
+      }
     }
-    return [
-      { id: ALL_CATEGORY_ID, name: "Todos" },
-      ...Array.from(seen, ([id, name]) => ({ id, name })),
-    ];
+    return Array.from(byCategory.values());
   }, [products]);
 
-  const [activeId, setActiveId] = useState<string>(ALL_CATEGORY_ID);
+  const categories = useMemo<CategoryTab[]>(
+    () => sections.map(({ id, name }) => ({ id, name })),
+    [sections],
+  );
 
-  const visibleProducts = useMemo(() => {
-    if (activeId === ALL_CATEGORY_ID) return products;
-    return products.filter((product) => String(product.categoryId) === activeId);
-  }, [products, activeId]);
+  const [activeId, setActiveId] = useState<string>(sections[0]?.id ?? "");
+  const scrollingToRef = useRef<string | null>(null);
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
+
+  // Scroll-spy: marca la categoría visible mientras el usuario desliza el feed.
+  useEffect(() => {
+    if (sections.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (scrollingToRef.current) return;
+
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort(
+            (a, b) =>
+              a.boundingClientRect.top - b.boundingClientRect.top,
+          );
+
+        const top = visible[0];
+        if (top?.target.id) {
+          setActiveId(top.target.id.replace(/^cat-/, ""));
+        }
+      },
+      {
+        // Compensa la barra sticky de categorías (~56px) + un margen de lectura.
+        rootMargin: "-72px 0px -55% 0px",
+        threshold: [0, 0.25, 0.5],
+      },
+    );
+
+    for (const section of sections) {
+      const el = sectionRefs.current.get(section.id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [sections]);
+
+  function handleSelectCategory(id: string) {
+    setActiveId(id);
+    scrollingToRef.current = id;
+
+    const el = sectionRefs.current.get(id);
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    // Libera el spy tras el scroll programático.
+    window.setTimeout(() => {
+      if (scrollingToRef.current === id) scrollingToRef.current = null;
+    }, 600);
+  }
 
   return (
     <>
       <CategoryBar
         categories={categories}
         activeId={activeId}
-        onSelect={setActiveId}
+        onSelect={handleSelectCategory}
       />
 
-      <section
+      <div
         aria-label="Platillos del menú"
-        className="flex flex-col gap-3 pb-28 pt-4"
+        className="flex flex-col gap-8 pb-28 pt-4"
       >
-        {visibleProducts.length > 0 ? (
-          visibleProducts.map((product) => (
-            <ProductCard key={product.uuid} product={product} />
-          ))
-        ) : (
-          <p className="rounded-2xl bg-white py-12 text-center text-sm text-black/50 shadow-sm ring-1 ring-black/5 dark:bg-neutral-900 dark:text-white/50 dark:ring-white/10">
-            No hay platillos en esta categoría por ahora.
-          </p>
-        )}
-      </section>
+        {sections.map((section) => (
+          <section
+            key={section.id}
+            id={`cat-${section.id}`}
+            ref={(node) => {
+              if (node) sectionRefs.current.set(section.id, node);
+              else sectionRefs.current.delete(section.id);
+            }}
+            // Offset para que el título no quede bajo la barra sticky.
+            className="scroll-mt-20"
+            aria-labelledby={`heading-${section.id}`}
+          >
+            <h2
+              id={`heading-${section.id}`}
+              className="mb-3 px-0.5 text-sm font-bold uppercase tracking-wider text-black/45 dark:text-white/45"
+            >
+              {section.name}
+            </h2>
+            <ul className="flex flex-col gap-3">
+              {section.products.map((product) => (
+                <li key={product.uuid}>
+                  <ProductCard product={product} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
 
       <CartBar />
     </>

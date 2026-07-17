@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { UtensilsCrossed } from "lucide-react";
 import type { Product } from "@/types/api";
 import { useCartStore, useProductQuantity } from "@/store/cartStore";
 import { QuantityStepper } from "@/components/customer/quantity-stepper";
@@ -40,9 +41,9 @@ function ProductImage({
       ) : (
         <div
           aria-hidden
-          className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-amber-700/70 dark:text-amber-300/70"
+          className="flex h-full w-full flex-col items-center justify-center gap-1 text-amber-700/60 dark:text-amber-300/60"
         >
-          <span className="text-xl leading-none">🍽</span>
+          <UtensilsCrossed className="size-6 stroke-[1.5]" />
           <span className="text-[9px] font-medium uppercase tracking-wider">
             Sin foto
           </span>

@@ -3,18 +3,19 @@
 /**
  * Tracking en vivo del pedido del comensal.
  *
- * Recibe el snapshot inicial (REST) y se suscribe a `/topic/order/{uuid}`
- * para reflejar los cambios de cocina sin refrescar.
+ * Snapshot inicial (SSR/REST) + suscripción STOMP/SockJS a `/topic/order/{uuid}`.
+ * Stepper: Recibido → En Cocina → Listo → Entregado.
  */
 
 import { useState } from "react";
-import { Check, ChefHat, Clock, UtensilsCrossed, XCircle } from "lucide-react";
+import { Check, ChefHat, Clock, Sparkles, XCircle } from "lucide-react";
 import type { Order, OrderStatus } from "@/types/api";
 import {
   getStatusDescription,
   getStatusIndex,
   getStatusLabel,
   getStatusTheme,
+  toTrackingStepKey,
   TRACKING_STEPS,
 } from "@/lib/order-status";
 import {
@@ -44,13 +45,17 @@ export function OrderTracker({
 
   const theme = getStatusTheme(order.status);
   const currentIndex = getStatusIndex(order.status);
+  const stepKey = toTrackingStepKey(order.status);
   const isCancelled = order.status === "CANCELLED";
   const isDelivered = order.status === "DELIVERED";
+  const isReady = stepKey === "READY";
+  const isPreparing = stepKey === "IN_PREPARATION";
 
   return (
     <div className="flex flex-col gap-6 pb-10">
       {/* Hero de estado */}
       <section
+        aria-live="polite"
         className={`-mx-4 bg-linear-to-br px-6 pb-10 pt-10 text-white shadow-sm transition-[background] duration-700 ${theme.hero}`}
       >
         <p className="text-xs font-medium uppercase tracking-widest text-white/80">
@@ -64,7 +69,7 @@ export function OrderTracker({
         </p>
 
         <div className="mt-8 flex flex-col items-center text-center">
-          <StatusGlyph status={order.status} />
+          <StatusGlyph status={order.status} highlight={isReady || isDelivered} />
           <p
             key={order.status}
             className="mt-4 animate-[fade-up_0.45s_ease-out] text-2xl font-extrabold tracking-tight"
@@ -74,6 +79,18 @@ export function OrderTracker({
           <p className="mt-1 max-w-xs text-sm text-white/85">
             {getStatusDescription(order.status)}
           </p>
+
+          {isPreparing ? (
+            <span className="mt-4 rounded-full bg-yellow-300/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-yellow-950 animate-pulse">
+              En preparación
+            </span>
+          ) : null}
+          {isReady ? (
+            <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700 shadow-sm">
+              <Check className="size-3.5 stroke-[2.5]" aria-hidden />
+              Listo para entregar
+            </span>
+          ) : null}
         </div>
 
         <ConnectionHint state={connection} terminal={isDelivered || isCancelled} />
@@ -81,20 +98,27 @@ export function OrderTracker({
 
       {/* Stepper */}
       {!isCancelled ? (
-        <ol className="flex items-start justify-between gap-1 px-1" aria-label="Progreso del pedido">
+        <ol
+          className="flex items-start justify-between gap-1 px-1"
+          aria-label="Progreso del pedido"
+        >
           {TRACKING_STEPS.map((step, index) => {
-            const done = index < currentIndex || isDelivered;
+            const complete = index < currentIndex || isDelivered;
             const active = index === currentIndex && !isDelivered;
-            const complete = done || (isDelivered && index === currentIndex);
+            const showCheck =
+              complete || (active && (step.key === "READY" || step.key === "DELIVERED"));
 
             return (
-              <li key={step.status} className="flex flex-1 flex-col items-center gap-2">
+              <li
+                key={step.key}
+                className="flex flex-1 flex-col items-center gap-2"
+              >
                 <div className="flex w-full items-center">
                   {index > 0 ? (
                     <span
                       aria-hidden
                       className={`h-0.5 flex-1 rounded-full transition-colors duration-500 ${
-                        index <= currentIndex || isDelivered
+                        index <= currentIndex
                           ? "bg-emerald-500"
                           : "bg-black/10 dark:bg-white/15"
                       }`}
@@ -102,17 +126,13 @@ export function OrderTracker({
                   ) : (
                     <span className="flex-1" />
                   )}
-                  <span
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-500 ${
-                      complete
-                        ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/30 scale-100"
-                        : active
-                          ? `bg-white text-foreground ring-4 ${theme.ring}/30 scale-110 shadow-md`
-                          : "bg-black/5 text-black/35 dark:bg-white/10 dark:text-white/35"
-                    }`}
-                  >
-                    {complete ? <Check className="size-4 stroke-[2.5]" /> : index + 1}
-                  </span>
+                  <StepDot
+                    index={index}
+                    active={active}
+                    showCheck={showCheck}
+                    preparing={active && step.key === "IN_PREPARATION"}
+                    ringClass={theme.ring}
+                  />
                   {index < TRACKING_STEPS.length - 1 ? (
                     <span
                       aria-hidden
@@ -141,7 +161,7 @@ export function OrderTracker({
         </ol>
       ) : null}
 
-      {/* Resumen */}
+      {/* Resumen de la comanda */}
       <section
         aria-label="Resumen del pedido"
         className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10"
@@ -198,22 +218,65 @@ export function OrderTracker({
   );
 }
 
-function StatusGlyph({ status }: { status: OrderStatus }) {
+function StepDot({
+  index,
+  active,
+  showCheck,
+  preparing,
+  ringClass,
+}: {
+  index: number;
+  active: boolean;
+  showCheck: boolean;
+  preparing: boolean;
+  ringClass: string;
+}) {
+  return (
+    <span
+      className={`flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-500 ${
+        showCheck
+          ? "scale-100 bg-emerald-500 text-white shadow-md shadow-emerald-500/30"
+          : active
+            ? `scale-110 bg-white text-foreground shadow-md ring-4 ${ringClass}/30 ${
+                preparing ? "animate-pulse" : ""
+              }`
+            : "bg-black/5 text-black/35 dark:bg-white/10 dark:text-white/35"
+      }`}
+    >
+      {showCheck ? (
+        <Check className="size-4 stroke-[2.5]" aria-hidden />
+      ) : (
+        index + 1
+      )}
+    </span>
+  );
+}
+
+function StatusGlyph({
+  status,
+  highlight,
+}: {
+  status: OrderStatus;
+  highlight: boolean;
+}) {
+  const key = toTrackingStepKey(status);
   const Icon =
-    status === "CANCELLED"
+    key === "CANCELLED"
       ? XCircle
-      : status === "DELIVERED"
+      : key === "DELIVERED"
         ? Check
-        : status === "IN_KITCHEN"
-          ? ChefHat
-          : status === "ACCEPTED"
-            ? UtensilsCrossed
+        : key === "READY"
+          ? Sparkles
+          : key === "IN_PREPARATION"
+            ? ChefHat
             : Clock;
 
   return (
     <div
       key={status}
-      className="flex size-20 items-center justify-center rounded-3xl bg-white/20 shadow-inner backdrop-blur-sm transition-transform duration-500 animate-[pop_0.4s_ease-out]"
+      className={`flex size-20 items-center justify-center rounded-3xl bg-white/20 shadow-inner backdrop-blur-sm transition-transform duration-500 animate-[pop_0.4s_ease-out] ${
+        highlight ? "ring-4 ring-white/40" : ""
+      }`}
     >
       <Icon className="size-10 stroke-[1.5]" aria-hidden />
     </div>

@@ -66,8 +66,9 @@ async function loadOrder(
 /**
  * Tracking del pedido en tiempo real (Módulo Pedidos).
  *
- * Server Component: carga el snapshot inicial por REST.
- * Client Component hijo: se suscribe a `/topic/order/{uuid}` vía STOMP.
+ * Server Component: `GET /api/v1/orders/{uuid}` pinta el estado inicial (SSR).
+ * Client (`OrderTracker`): STOMP + SockJS sobre `NEXT_PUBLIC_WS_URL`,
+ * suscrito a `/topic/order/{uuid}` con reconexión automática.
  */
 export default async function OrderTrackingPage({
   params,

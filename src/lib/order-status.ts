@@ -1,105 +1,139 @@
 /**
- * Presentación de estados de pedido para la UI del comensal.
- * Los valores canónicos coinciden con `OrderStatus` del backend.
+ * Presentación del flujo de tracking del comensal.
+ *
+ * UI (producto): PENDING → IN_PREPARATION → READY → DELIVERED
+ * Backend:       PENDING → ACCEPTED → IN_KITCHEN → DELIVERED
+ *
+ * El mapeo mantiene el contrato Spring Boot sin romper la UX pedida.
  */
 
 import type { OrderStatus } from "@/types/api";
 
+/** Claves del stepper visibles en la UI del comensal. */
+export type TrackingStepKey =
+  | "PENDING"
+  | "IN_PREPARATION"
+  | "READY"
+  | "DELIVERED";
+
 export interface TrackingStep {
-  /** Estado canónico del backend. */
-  status: Exclude<OrderStatus, "CANCELLED">;
-  /** Etiqueta visible (español). */
+  key: TrackingStepKey;
   label: string;
-  /** Descripción corta bajo el paso. */
   description: string;
 }
 
-/** Pasos del stepper (excluye CANCELLED). */
 export const TRACKING_STEPS: TrackingStep[] = [
   {
-    status: "PENDING",
-    label: "Pendiente",
-    description: "Tu pedido llegó a cocina",
+    key: "PENDING",
+    label: "Recibido",
+    description: "Tu pedido ya llegó al restaurante",
   },
   {
-    status: "ACCEPTED",
-    label: "Aceptado",
-    description: "El restaurante lo confirmó",
+    key: "IN_PREPARATION",
+    label: "En Cocina",
+    description: "Estamos preparando tu orden",
   },
   {
-    status: "IN_KITCHEN",
-    label: "En preparación",
-    description: "Se está cocinando tu orden",
+    key: "READY",
+    label: "Listo",
+    description: "Listo para entregar",
   },
   {
-    status: "DELIVERED",
+    key: "DELIVERED",
     label: "Entregado",
     description: "¡Buen provecho!",
   },
 ];
 
-const STATUS_INDEX: Record<OrderStatus, number> = {
+/** Traduce el enum del backend al paso visual del stepper. */
+export function toTrackingStepKey(
+  status: OrderStatus,
+): TrackingStepKey | "CANCELLED" {
+  switch (status) {
+    case "PENDING":
+      return "PENDING";
+    case "ACCEPTED":
+      return "IN_PREPARATION";
+    case "IN_KITCHEN":
+      return "READY";
+    case "DELIVERED":
+      return "DELIVERED";
+    case "CANCELLED":
+      return "CANCELLED";
+  }
+}
+
+const STEP_INDEX: Record<TrackingStepKey, number> = {
   PENDING: 0,
-  ACCEPTED: 1,
-  IN_KITCHEN: 2,
+  IN_PREPARATION: 1,
+  READY: 2,
   DELIVERED: 3,
-  CANCELLED: -1,
 };
 
 export function getStatusIndex(status: OrderStatus): number {
-  return STATUS_INDEX[status] ?? 0;
+  const key = toTrackingStepKey(status);
+  if (key === "CANCELLED") return -1;
+  return STEP_INDEX[key];
 }
 
 export function getStatusLabel(status: OrderStatus): string {
   if (status === "CANCELLED") return "Cancelado";
-  return TRACKING_STEPS.find((step) => step.status === status)?.label ?? status;
+  const key = toTrackingStepKey(status);
+  return TRACKING_STEPS.find((step) => step.key === key)?.label ?? status;
 }
 
 export function getStatusDescription(status: OrderStatus): string {
   if (status === "CANCELLED") {
     return "Este pedido fue cancelado. Habla con el personal si necesitas ayuda.";
   }
-  return (
-    TRACKING_STEPS.find((step) => step.status === status)?.description ?? ""
-  );
+  const key = toTrackingStepKey(status);
+  return TRACKING_STEPS.find((step) => step.key === key)?.description ?? "";
 }
 
-/** Clases Tailwind según el estado actual (hero + acentos). */
 export function getStatusTheme(status: OrderStatus): {
   hero: string;
   badge: string;
   ring: string;
+  badgePulse: boolean;
 } {
-  switch (status) {
+  const key = toTrackingStepKey(status);
+
+  switch (key) {
     case "PENDING":
       return {
         hero: "from-amber-500 to-orange-600",
         badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
         ring: "ring-amber-500",
+        badgePulse: false,
       };
-    case "ACCEPTED":
+    case "IN_PREPARATION":
       return {
-        hero: "from-sky-500 to-blue-600",
-        badge: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-        ring: "ring-sky-500",
+        hero: "from-amber-400 to-yellow-500",
+        badge:
+          "bg-yellow-400/20 text-yellow-800 dark:text-yellow-200 animate-pulse",
+        ring: "ring-yellow-400",
+        badgePulse: true,
       };
-    case "IN_KITCHEN":
-      return {
-        hero: "from-orange-500 to-rose-500",
-        badge: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-        ring: "ring-orange-500",
-      };
-    case "DELIVERED":
+    case "READY":
       return {
         hero: "from-emerald-500 to-green-600",
         badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
         ring: "ring-emerald-500",
+        badgePulse: false,
       };
-    case "CANCELLED":
+    case "DELIVERED":
+      return {
+        hero: "from-emerald-600 to-teal-700",
+        badge: "bg-emerald-600/15 text-emerald-800 dark:text-emerald-200",
+        ring: "ring-emerald-600",
+        badgePulse: false,
+      };
+    default:
       return {
         hero: "from-neutral-500 to-neutral-700",
         badge: "bg-neutral-500/15 text-neutral-600 dark:text-neutral-300",
         ring: "ring-neutral-500",
+        badgePulse: false,
       };
   }
 }

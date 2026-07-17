@@ -3,12 +3,13 @@
 /**
  * Suscripción STOMP al canal de un pedido.
  *
- * Conecta a `/ws-orders`, escucha `/topic/order/{uuid}` y reconecta con
- * backoff ante caídas de red. Solo corre en el navegador.
+ * Usa SockJS como transport factory (`NEXT_PUBLIC_WS_URL`) y reconecta con
+ * backoff automático si el usuario pierde señal.
  */
 
 import { useEffect, useRef } from "react";
-import { Client, type IMessage } from "@stomp/stompjs";
+import { Client, type IMessage, type IStompSocket } from "@stomp/stompjs";
+import SockJS from "sockjs-client";
 import type { Order, OrderResponse } from "@/types/api";
 import { formatCurrency } from "@/lib/format";
 import { orderTrackingTopic, resolveOrdersWsUrl } from "@/lib/ws";
@@ -60,7 +61,7 @@ interface UseOrderStatusSubscriptionOptions {
 }
 
 /**
- * Mantiene una suscripción en vivo al estado del pedido.
+ * Mantiene una suscripción en vivo a `/topic/order/{uuid}`.
  */
 export function useOrderStatusSubscription({
   orderUuid,
@@ -76,7 +77,7 @@ export function useOrderStatusSubscription({
   useEffect(() => {
     if (!enabled || !orderUuid) return;
 
-    // @stomp/stompjs espera `global` en algunos empaquetados del browser.
+    // Polyfill que esperan sockjs-client / stompjs en algunos bundles.
     if (typeof globalThis !== "undefined" && !("global" in globalThis)) {
       (globalThis as typeof globalThis & { global: typeof globalThis }).global =
         globalThis;
@@ -84,12 +85,15 @@ export function useOrderStatusSubscription({
 
     let client: Client;
     try {
-      const brokerURL = resolveOrdersWsUrl();
+      const sockJsUrl = resolveOrdersWsUrl();
+
       client = new Client({
-        brokerURL,
+        // SockJS (HTTP/HTTPS) — no usar brokerURL nativo en este modo.
+        webSocketFactory: () => new SockJS(sockJsUrl) as unknown as IStompSocket,
         reconnectDelay: 3000,
         heartbeatIncoming: 10000,
         heartbeatOutgoing: 10000,
+        connectionTimeout: 8000,
         onConnect: () => {
           onConnectionChangeRef.current?.("connected");
           client.subscribe(orderTrackingTopic(orderUuid), (message) => {
@@ -104,6 +108,9 @@ export function useOrderStatusSubscription({
           onConnectionChangeRef.current?.("disconnected");
         },
         onWebSocketClose: () => {
+          onConnectionChangeRef.current?.("disconnected");
+        },
+        onWebSocketError: () => {
           onConnectionChangeRef.current?.("disconnected");
         },
       });

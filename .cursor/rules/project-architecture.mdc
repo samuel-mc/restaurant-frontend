@@ -1,0 +1,28 @@
+---
+description: Arquitectura general del SaaS multi-tenant de restaurantes (estructura, tenants, stack)
+alwaysApply: true
+---
+
+# Arquitectura del proyecto
+
+SaaS multi-tenant para restaurantes. Stack: Next.js 16 (App Router), React 19, TypeScript estricto, Tailwind CSS v4. Backend Spring Boot vía REST + WebSockets. Referencia completa: `architecture_reference.md`.
+
+## Next.js 16
+Esta versión tiene breaking changes respecto a versiones previas. Antes de escribir código de Next.js, consulta la guía correspondiente en `node_modules/next/dist/docs/` y respeta los avisos de deprecación.
+
+## Multi-tenant (subdominios dinámicos)
+- El tenant se resuelve por URL en `src/middleware.ts`, leyendo el host desde `x-forwarded-host` o `host`.
+- Subdominios válidos (distintos de `www`, `app` o el dominio principal) hacen `NextResponse.rewrite` interno hacia `/_tenants/[tenant]/...`, manteniendo la URL limpia en el navegador.
+- `/admin/*` → `/_tenants/[tenant]/admin/*`; el resto → `/_tenants/[tenant]/customer/*`.
+
+## Estructura de directorios (bajo `src/`)
+- `app/(marketing)/` — dominio principal (landing/registro).
+- `app/_tenants/[tenant]/` — rutas reescritas por el middleware.
+  - `customer/` — menú digital del comensal (QR, carrito).
+  - `admin/` — panel privado (login, dashboard, kitchen, menu-management).
+- `components/` — `ui/` genéricos, `customer/`, `admin/`.
+- `hooks/`, `context/`, `store/` (Zustand opcional), `lib/` (API clients), `types/` (tipos del backend).
+
+## Precios y moneda
+- En cliente los precios se operan como `number`; para cálculos críticos o envío al backend se conserva precisión decimal.
+- Formatea moneda siempre con utilidades globales (`Intl.NumberFormat`), nunca ad-hoc.

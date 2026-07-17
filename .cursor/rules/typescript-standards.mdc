@@ -1,0 +1,24 @@
+---
+description: Tipado TypeScript estricto para el frontend
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+
+# Tipado estricto
+
+- Prohibido `any`. Si el tipo es desconocido usa `unknown` y estrecha con type guards.
+- Todo dato proveniente del backend (Spring Boot) debe tener su interface en `src/types/`.
+- Tipa explícitamente payloads de API y eventos de WebSocket.
+
+```typescript
+// ❌ MAL
+async function getPlatillos(): Promise<any> {
+  return (await api.get("/menu")).data;
+}
+
+// ✅ BIEN
+import type { Platillo } from "@/types/menu";
+async function getPlatillos(): Promise<Platillo[]> {
+  return (await api.get<Platillo[]>("/menu")).data;
+}
+```

@@ -1,0 +1,19 @@
+---
+description: Estilos con Tailwind CSS (mobile-first) para comensal y admin
+globs: src/**/*.tsx
+alwaysApply: false
+---
+
+# Estilos Tailwind (Mobile-First)
+
+- Diseña siempre mobile-first: clases base para móvil y `sm:`/`md:`/`lg:` para escalar.
+- **Comensal (`customer/`):** enfoque exclusivo en móvil. Interfaz táctil, botones de acción rápida accesibles con el pulgar, carga ultra rápida.
+- **Admin (`admin/`):** layout responsivo apto para tablets (cocina/camareros) y desktop.
+- Paleta armoniosa, gradients sutiles y micro-animaciones en acciones táctiles (p. ej. agregar al carrito).
+
+```tsx
+// ✅ base = móvil, se escala hacia arriba
+<button className="w-full py-3 text-lg active:scale-95 transition-transform md:w-auto md:py-2">
+  Agregar al carrito
+</button>
+```

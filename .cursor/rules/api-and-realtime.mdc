@@ -1,0 +1,21 @@
+---
+description: Consumo stateless de API, seguridad JWT y WebSockets en tiempo real
+globs: src/lib/**/*.ts,src/hooks/**/*.ts,src/app/_tenants/**/admin/**/*.tsx
+alwaysApply: false
+---
+
+# API stateless, seguridad y tiempo real
+
+## API REST (stateless)
+- Toda petición al backend es stateless vía REST. Centraliza las llamadas en un cliente fetch/axios en `src/lib/` con interceptores.
+- Los interceptores manejan expiración/renovación de token (respuestas `401`).
+- No disperses URLs ni headers por los componentes; consúmelos desde el cliente y funciones de `src/lib/`.
+
+## Seguridad (rutas admin)
+- El JWT del login se envía siempre en `Authorization: Bearer <token>`.
+- Almacénalo de forma segura: preferir cookies HTTP-only para mitigar XSS; usar `localStorage` solo si es imprescindible.
+
+## WebSockets (cocina/caja)
+- Conexión persistente por WebSocket nativo o STOMP sobre WebSockets, según el backend Spring Boot.
+- Reconexión automática con backoff exponencial ante caídas de red.
+- Mutaciones optimistas en cliente para cambios de estado de platillos (agotado/activo), revirtiendo si el servidor rechaza.

@@ -1,0 +1,25 @@
+---
+description: Server vs Client Components (RSC) en el App Router
+globs: src/app/**/*.tsx
+alwaysApply: false
+---
+
+# Server vs Client Components
+
+- **Server Components por defecto.** La carga inicial de datos del menú (categorías, platillos) va en RSC para SEO y rendimiento.
+- Usa `'use client'` SOLO en componentes con interactividad real:
+  - Botones "Agregar al carrito" y modal del carrito.
+  - Panel de pedidos de cocina (WebSocket).
+  - Formularios de login y de gestión.
+- No marques `'use client'` en layouts/páginas que solo obtienen datos. Extrae la parte interactiva a un componente cliente hijo.
+
+```tsx
+// page.tsx (Server Component) obtiene datos
+import { getPlatillos } from "@/lib/menu";
+import { AddToCartButton } from "@/components/customer/add-to-cart-button"; // 'use client'
+
+export default async function MenuPage() {
+  const platillos = await getPlatillos();
+  return platillos.map((p) => <AddToCartButton key={p.id} platillo={p} />);
+}
+```

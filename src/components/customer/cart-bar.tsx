@@ -1,11 +1,10 @@
 "use client";
 
 /**
- * Botón flotante del carrito + hoja inferior (bottom sheet) con el resumen.
+ * Botón flotante del carrito + drawer inferior (bottom sheet) con el resumen.
  *
- * El botón solo aparece si hay al menos un producto. Al pulsarlo abre un modal
- * inferior con las líneas, permite ajustar cantidades y muestra el subtotal en
- * tiempo real antes de confirmar el pedido.
+ * Visible solo si `totalItems > 0`. Al abrirlo muestra el desglose del pedido
+ * y el CTA destacado "Confirmar pedido".
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -27,8 +26,9 @@ export function CartBar() {
   const clear = useCartStore((state) => state.clear);
 
   const orderedLines = useMemo(() => Object.values(lines), [lines]);
+  const itemLabel = count === 1 ? "1 ítem" : `${count} ítems`;
 
-  // Evita el scroll del fondo mientras la hoja está abierta.
+  // Evita el scroll del fondo mientras el drawer está abierto.
   useEffect(() => {
     if (!isOpen) return;
     const previous = document.body.style.overflow;
@@ -43,23 +43,25 @@ export function CartBar() {
   return (
     <>
       {/* Botón flotante inferior */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md p-4">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="pointer-events-auto flex w-full items-center justify-between rounded-2xl bg-amber-500 px-5 py-4 font-semibold text-white shadow-lg shadow-amber-500/30 transition-transform active:scale-[0.98]"
+          className="pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl bg-amber-500 px-5 py-4 font-semibold text-white shadow-lg shadow-amber-500/30 transition-transform active:scale-[0.98]"
         >
-          <span className="flex items-center gap-2">
-            <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-white/25 px-1.5 text-sm tabular-nums">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white/25 px-2 text-sm tabular-nums">
               {count}
             </span>
-            Ver pedido
+            <span className="truncate">Ver Pedido · {itemLabel}</span>
           </span>
-          <span className="tabular-nums">{formatCurrency(subtotal)}</span>
+          <span className="shrink-0 tabular-nums">
+            {formatCurrency(subtotal)}
+          </span>
         </button>
       </div>
 
-      {/* Hoja inferior con el resumen */}
+      {/* Drawer inferior con el resumen */}
       {isOpen ? (
         <div
           role="dialog"
@@ -75,14 +77,19 @@ export function CartBar() {
           />
 
           <div className="sheet-enter relative z-10 flex max-h-[80vh] w-full max-w-md flex-col rounded-t-3xl bg-background shadow-2xl">
-            <div className="flex items-center justify-between px-5 pb-2 pt-4">
+            <div
+              aria-hidden
+              className="mx-auto mt-3 h-1 w-10 rounded-full bg-black/15 dark:bg-white/20"
+            />
+
+            <div className="flex items-center justify-between px-5 pb-2 pt-3">
               <h2 className="text-lg font-bold">Tu pedido</h2>
               <button
                 type="button"
-              onClick={() => {
-                setIsOpen(false);
-                clear();
-              }}
+                onClick={() => {
+                  setIsOpen(false);
+                  clear();
+                }}
                 className="text-sm font-medium text-red-500 transition-transform active:scale-95"
               >
                 Vaciar
@@ -97,7 +104,7 @@ export function CartBar() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{product.name}</p>
-                    <p className="text-xs text-black/50 dark:text-white/50">
+                    <p className="text-xs tabular-nums text-black/50 dark:text-white/50">
                       {formatCurrency(product.price * quantity)}
                     </p>
                   </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent, ReactNode } from "react";
 import {
   Search, ChevronDown, ChevronUp, Star, MapPin, Phone, Mail,
@@ -9,6 +9,30 @@ import {
   ShoppingBag, Calendar, Users, ChefHat, Award, Gift,
   Music, Coffee, Cake, BookOpen, Send, CheckCircle, ExternalLink, Play
 } from "lucide-react";
+
+// ─── Brand (multi-tenant) ────────────────────────────────────────────────────
+
+/** Identidad mínima del restaurante para la plantilla institucional. */
+export type RestaurantBrand = {
+  /** Nombre comercial visible (ej. "La Trattoria"). */
+  name: string;
+  /** Subtítulo / categoría (ej. "Ristorante Italiano"). */
+  tagline?: string;
+  /** Slug del subdominio (ej. "mario"). */
+  slug?: string;
+};
+
+const DEFAULT_BRAND: RestaurantBrand = {
+  name: "La Trattoria",
+  tagline: "Ristorante Italiano",
+  slug: "la-trattoria",
+};
+
+const BrandContext = createContext<RestaurantBrand>(DEFAULT_BRAND);
+
+function useBrand(): RestaurantBrand {
+  return useContext(BrandContext);
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -232,6 +256,7 @@ function StarRow({ rating }: { rating: number }) {
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 
 function Navbar() {
+  const brand = useBrand();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -251,8 +276,10 @@ function Navbar() {
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#1a3d2b] shadow-lg" : "bg-transparent"}`}>
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-16">
         <button onClick={() => scrollTo("inicio")} className="flex flex-col leading-none">
-          <span className="font-['Pinyon_Script'] text-2xl text-[#d4a853]">La Trattoria</span>
-          <span className="font-['Nunito_Sans'] text-[9px] tracking-[0.3em] uppercase text-[#f7f3eb] opacity-70">Ristorante Italiano</span>
+          <span className="font-['Pinyon_Script'] text-2xl text-[#d4a853]">{brand.name}</span>
+          <span className="font-['Nunito_Sans'] text-[9px] tracking-[0.3em] uppercase text-[#f7f3eb] opacity-70">
+            {brand.tagline ?? "Restaurante"}
+          </span>
         </button>
         <nav className="hidden lg:flex items-center gap-7">
           {links.map(l => (
@@ -287,11 +314,12 @@ function Navbar() {
 // ─── Hero ────────────────────────────────────────────────────────────────────
 
 function Hero() {
+  const brand = useBrand();
   return (
     <section id="inicio" className="relative min-h-screen flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-[#0e1f16]">
         <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1600&h=900&fit=crop&auto=format"
-          alt="Interior de La Trattoria"
+          alt={`Interior de ${brand.name}`}
           className="w-full h-full object-cover opacity-45" />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0e1f16]/60 via-[#0e1f16]/30 to-[#0e1f16]/80" />
       </div>
@@ -579,6 +607,7 @@ function Ordenar() {
 // ─── Reservaciones ────────────────────────────────────────────────────────────
 
 function Reservaciones() {
+  const brand = useBrand();
   const [form, setForm] = useState({ nombre: "", personas: "2", fecha: "", hora: "20:00", telefono: "", notas: "" });
   const [sent, setSent] = useState(false);
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -595,7 +624,7 @@ function Reservaciones() {
           <p className="font-['Nunito_Sans'] text-xs tracking-[0.25em] uppercase text-accent mb-3">Reservaciones</p>
           <h2 className="font-['Playfair_Display'] text-4xl md:text-5xl font-bold text-foreground leading-tight">Reserva tu Mesa</h2>
           <p className="mt-5 text-muted-foreground font-['Nunito_Sans'] leading-relaxed">
-            Asegura tu lugar en La Trattoria. Para grupos de 8+ personas contáctanos directamente por WhatsApp para atención especial.
+            Asegura tu lugar en {brand.name}. Para grupos de 8+ personas contáctanos directamente por WhatsApp para atención especial.
           </p>
           <div className="mt-8 space-y-4">
             {[
@@ -791,6 +820,7 @@ function Opiniones() {
 // ─── Ubicación ────────────────────────────────────────────────────────────────
 
 function Ubicacion() {
+  const brand = useBrand();
   const horarios = [
     ["Lunes – Viernes", "13:00 – 23:00"],
     ["Sábado", "12:00 – 00:00"],
@@ -834,7 +864,7 @@ function Ubicacion() {
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3762.1234!2d-99.1532!3d19.4326!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTnCsDI1JzU3LjQiTiA5OcKwMDknMTEuNSJX!5e0!3m2!1ses!2smx!4v1234567890"
               width="100%" height="100%" style={{ border: 0, minHeight: "320px" }} allowFullScreen loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade" title="Mapa La Trattoria" className="w-full h-full" />
+              referrerPolicy="no-referrer-when-downgrade" title={`Mapa ${brand.name}`} className="w-full h-full" />
           </div>
         </div>
       </div>
@@ -845,11 +875,12 @@ function Ubicacion() {
 // ─── Contacto ────────────────────────────────────────────────────────────────
 
 function Contacto() {
+  const brand = useBrand();
   const socials = [
-    { icon: <Camera size={20} />, label: "@latrattoria_mx", href: "#" },
-    { icon: <Share2 size={20} />, label: "La Trattoria México", href: "#" },
-    { icon: <Radio size={20} />, label: "@trattoria_mx", href: "#" },
-    { icon: <Video size={20} />, label: "La Trattoria Cocina", href: "#" },
+    { icon: <Camera size={20} />, label: `@${brand.slug ?? "restaurante"}`, href: "#" },
+    { icon: <Share2 size={20} />, label: `${brand.name}`, href: "#" },
+    { icon: <Radio size={20} />, label: `@${brand.slug ?? "restaurante"}`, href: "#" },
+    { icon: <Video size={20} />, label: `${brand.name} Cocina`, href: "#" },
   ];
   return (
     <section id="contacto" className="py-24 bg-[#1a3d2b]">
@@ -922,6 +953,7 @@ function FAQ() {
 // ─── Extras: Lealtad, Eventos, Blog, Newsletter ───────────────────────────────
 
 function ExtrasSection() {
+  const brand = useBrand();
   const [email, setEmail] = useState("");
   const [subbed, setSubbed] = useState(false);
 
@@ -968,7 +1000,7 @@ function ExtrasSection() {
       {/* Eventos */}
       <section id="eventos" className="py-20 bg-background">
         <div className="max-w-5xl mx-auto px-6">
-          <SectionHeader eyebrow="Agenda" title="Eventos Especiales" subtitle="La Trattoria no es solo un restaurante — es un punto de encuentro cultural en el corazón de la ciudad." />
+          <SectionHeader eyebrow="Agenda" title="Eventos Especiales" subtitle={`${brand.name} no es solo un restaurante — es un punto de encuentro cultural en el corazón de la ciudad.`} />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {events.map(ev => (
               <div key={ev.title} className="bg-card border border-border rounded-sm p-5 text-center hover:border-accent/40 hover:shadow-sm transition-all group">
@@ -1033,13 +1065,18 @@ function ExtrasSection() {
 // ─── Footer ──────────────────────────────────────────────────────────────────
 
 function Footer() {
+  const brand = useBrand();
   return (
     <footer className="bg-[#0e1f16] text-white/60 py-14">
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
         <div className="md:col-span-2">
-          <div className="font-['Pinyon_Script'] text-3xl text-[#d4a853] mb-1">La Trattoria</div>
-          <p className="font-['Nunito_Sans'] text-[9px] tracking-[0.35em] uppercase opacity-50 mb-4">Ristorante Italiano · Desde 1987</p>
-          <p className="font-['Nunito_Sans'] text-xs leading-relaxed max-w-xs">Autenticidad italiana en el corazón de la Ciudad de México. Ingredientes importados, recetas heredadas, amor en cada plato.</p>
+          <div className="font-['Pinyon_Script'] text-3xl text-[#d4a853] mb-1">{brand.name}</div>
+          <p className="font-['Nunito_Sans'] text-[9px] tracking-[0.35em] uppercase opacity-50 mb-4">
+            {brand.tagline ?? "Restaurante"}
+          </p>
+          <p className="font-['Nunito_Sans'] text-xs leading-relaxed max-w-xs">
+            El sitio oficial de {brand.name}. Menú, reservaciones y experiencia gastronómica.
+          </p>
         </div>
         <div>
           <p className="font-['Nunito_Sans'] text-[9px] tracking-[0.25em] uppercase text-[#d4a853] mb-4 font-semibold">Navegación</p>
@@ -1064,7 +1101,7 @@ function Footer() {
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-6 pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-3">
-        <p className="font-['Nunito_Sans'] text-[10px]">© 2025 La Trattoria Ristorante Italiano. Todos los derechos reservados.</p>
+        <p className="font-['Nunito_Sans'] text-[10px]">© {new Date().getFullYear()} {brand.name}. Todos los derechos reservados.</p>
         <p className="font-['Nunito_Sans'] text-[10px]">Aviso de Privacidad · Términos y Condiciones</p>
       </div>
     </footer>
@@ -1096,24 +1133,37 @@ const restaurantTheme = {
   "--ring": "#c9612a",
 } as CSSProperties;
 
-export function RestaurantLanding() {
+type RestaurantLandingProps = {
+  /** Identidad del restaurante. Si no se pasa, usa la demo "La Trattoria". */
+  brand?: RestaurantBrand;
+};
+
+/**
+ * Sitio institucional exclusivo de La Trattoria.
+ *
+ * No es una plantilla genérica para todos los tenants. Otros restaurantes
+ * tendrán su propio website (creado bajo demanda) con otra plantilla/contenido.
+ */
+export function RestaurantLanding({ brand = DEFAULT_BRAND }: RestaurantLandingProps) {
   return (
-    <div style={restaurantTheme} className="font-['Nunito_Sans'] bg-background text-foreground overflow-x-hidden">
-      <Navbar />
-      <Hero />
-      <DigitalMenu />
-      <Destacados />
-      <Promociones />
-      <Ordenar />
-      <Reservaciones />
-      <Nosotros />
-      <Galeria />
-      <Opiniones />
-      <Ubicacion />
-      <Contacto />
-      <FAQ />
-      <ExtrasSection />
-      <Footer />
-    </div>
+    <BrandContext.Provider value={brand}>
+      <div style={restaurantTheme} className="font-['Nunito_Sans'] bg-background text-foreground overflow-x-hidden">
+        <Navbar />
+        <Hero />
+        <DigitalMenu />
+        <Destacados />
+        <Promociones />
+        <Ordenar />
+        <Reservaciones />
+        <Nosotros />
+        <Galeria />
+        <Opiniones />
+        <Ubicacion />
+        <Contacto />
+        <FAQ />
+        <ExtrasSection />
+        <Footer />
+      </div>
+    </BrandContext.Provider>
   );
 }

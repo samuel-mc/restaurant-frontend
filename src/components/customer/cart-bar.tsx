@@ -28,11 +28,6 @@ export function CartBar() {
 
   const orderedLines = useMemo(() => Object.values(lines), [lines]);
 
-  // Cierra la hoja automáticamente si el carrito queda vacío.
-  useEffect(() => {
-    if (count === 0) setIsOpen(false);
-  }, [count]);
-
   // Evita el scroll del fondo mientras la hoja está abierta.
   useEffect(() => {
     if (!isOpen) return;
@@ -84,7 +79,10 @@ export function CartBar() {
               <h2 className="text-lg font-bold">Tu pedido</h2>
               <button
                 type="button"
-                onClick={clear}
+              onClick={() => {
+                setIsOpen(false);
+                clear();
+              }}
                 className="text-sm font-medium text-red-500 transition-transform active:scale-95"
               >
                 Vaciar
@@ -107,7 +105,10 @@ export function CartBar() {
                     quantity={quantity}
                     label={product.name}
                     onIncrement={() => addItem(product)}
-                    onDecrement={() => decrementItem(product.uuid)}
+                    onDecrement={() => {
+                      if (count === 1) setIsOpen(false);
+                      decrementItem(product.uuid);
+                    }}
                   />
                 </li>
               ))}

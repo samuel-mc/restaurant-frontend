@@ -10,18 +10,28 @@ SaaS multi-tenant para restaurantes. Stack: Next.js 16 (App Router), React 19, T
 ## Next.js 16
 Esta versión tiene breaking changes respecto a versiones previas. Antes de escribir código de Next.js, consulta la guía correspondiente en `node_modules/next/dist/docs/` y respeta los avisos de deprecación.
 
-## Multi-tenant (subdominios dinámicos)
-- El tenant se resuelve por URL en `src/middleware.ts`, leyendo el host desde `x-forwarded-host` o `host`.
-- Subdominios válidos (distintos de `www`, `app` o el dominio principal) hacen `NextResponse.rewrite` interno hacia `/_tenants/[tenant]/...`, manteniendo la URL limpia en el navegador.
-- `/admin/*` → `/_tenants/[tenant]/admin/*`; el resto → `/_tenants/[tenant]/customer/*`.
+## Multi-tenant (subdominios dinámicos) — ARQUITECTURA OFICIAL
+- El tenant se resuelve por URL en `src/proxy.ts` (el interceptor de Next.js 16, sucesor de `middleware.ts`), leyendo el host desde `x-forwarded-host` (producción en Render/Vercel) con `host` como fallback.
+- Subdominios válidos (distintos de `www`, `app` o el dominio principal) se dirigen a los Route Groups `(public)` y `(admin)`. Descartado el patrón `_tenants`.
+- El proxy inyecta el slug del tenant en la cabecera interna `x-tenant-slug`, leíble con `headers()` desde los Server Components (imprescindible para la zona `(admin)`, cuyas rutas no llevan `[tenant]`).
+- **Zona pública:** `/`, `/menu`, `/orders/[uuid]` hacen `NextResponse.rewrite` interno e invisible hacia `(public)/[tenant]/...` (ej. `/menu` → `/mario/menu`).
+- **Zona admin:** `/admin/*` NO se reescribe (ya existe en el route group `(admin)`); solo se le inyecta el contexto del tenant vía `x-tenant-slug` con `NextResponse.next`.
+- Dominio principal sin subdominio: pasa directo a la landing global `(marketing)`.
 
 ## Estructura de directorios (bajo `src/`)
-- `app/(marketing)/` — dominio principal (landing/registro).
-- `app/_tenants/[tenant]/` — rutas reescritas por el middleware.
-  - `customer/` — menú digital del comensal (QR, carrito).
-  - `admin/` — panel privado (login, dashboard, kitchen, menu-management).
-- `components/` — `ui/` genéricos, `customer/`, `admin/`.
-- `hooks/`, `context/`, `store/` (Zustand opcional), `lib/` (API clients), `types/` (tipos del backend).
+- `proxy.ts` — interceptor de subdominios (rewrites de la zona pública + inyección de `x-tenant-slug`).
+- `app/(marketing)/` — dominio principal, landing del SaaS (`localhost:3000`).
+- `app/(public)/[tenant]/` — zona del comensal, reescrita por el proxy.
+  - `page.tsx` — sitio institucional del restaurante.
+  - `menu/page.tsx` — menú digital interactivo + carrito.
+  - `orders/[uuid]/page.tsx` — tracking del pedido en tiempo real (WebSockets).
+- `app/(admin)/admin/` — panel privado (contexto de tenant vía `x-tenant-slug`).
+  - `login/page.tsx` — acceso aislado por tenant.
+  - `dashboard/page.tsx` — panel de cocina/caja (comandas en tiempo real).
+  - `dashboard/menu/page.tsx` — gestor de categorías, precios y stock.
+  - `dashboard/settings/page.tsx` — identidad de marca, horarios y módulos.
+- `components/` — `marketing/`, `customer/`, `admin/` y `ui/` genéricos.
+- `services/` (cliente HTTP + servicios de dominio), `store/` (Zustand), `lib/` (utilidades), `types/` (tipos del backend). `hooks/`, `context/` opcionales.
 
 ## Precios y moneda
 - En cliente los precios se operan como `number`; para cálculos críticos o envío al backend se conserva precisión decimal.

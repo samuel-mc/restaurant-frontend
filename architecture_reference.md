@@ -6,58 +6,73 @@ Este documento sirve como la especificación de referencia y guía de diseño t�
 
 ## 🎯 1. Estrategia Multi-Tenant (Subdominios Dinámicos)
 
-La aplicación resolverá dinámicamente el tenant (restaurante) a partir de la URL utilizando un **Next.js Middleware**.
+La aplicación resuelve dinámicamente el tenant (restaurante) a partir de la URL
+utilizando el **proxy de Next.js 16** (`src/proxy.ts`, sucesor de `middleware.ts`).
+Esta es la arquitectura oficial y definitiva; se descarta por completo el patrón
+`_tenants`.
 
 ### Flujo de Resolución de URL
 ```mermaid
 graph TD
-    A[Petición del Cliente] --> B[Middleware de Next.js]
-    B --> C{¿Es subdominio de host principal?}
-    C -->|No: localhost o tusass.com| D[Cargar Landing Page/Registro]
-    C -->|Sí: tenant.localhost o tenant.tusass.com| E{¿Es ruta de administración?}
-    E -->|Sí: /admin/*| F[Rewrite a /_tenants/tenant/admin/*]
-    E -->|No: / o /menu| G[Rewrite a /_tenants/tenant/customer/*]
+    A[Petición del Cliente] --> B[proxy.ts de Next.js 16]
+    B --> C{¿Es subdominio del host principal?}
+    C -->|No: localhost o tusass.com| D[Landing global · Route Group (marketing)]
+    C -->|Sí: tenant.localhost o tenant.tusass.com| E{¿Es ruta /admin/*?}
+    E -->|Sí: /admin/*| F[next() + inyecta cabecera x-tenant-slug → (admin)]
+    E -->|No: / o /menu o /orders| G[rewrite invisible → (public)/[tenant]/*]
 ```
 
-### Configuración del Middleware
-- El middleware extraerá el host del header `x-forwarded-host` o `host`.
-- Identificará si es un subdominio válido (distinto de `www`, `app`, o del dominio principal).
-- Realizará un `NextResponse.rewrite` interno hacia la ruta del Route Group dinámico `/_tenants/[tenant]`, manteniendo limpia la URL en el navegador del usuario.
+### Configuración del proxy
+- Extrae el host de `x-forwarded-host` (producción en Render/Vercel) con `host`
+  como fallback (desarrollo).
+- Identifica si es un subdominio válido (distinto de `www`, `app` o del dominio
+  principal). Si no lo es, deja pasar el tráfico a la landing `(marketing)`.
+- **Zona pública** (`/`, `/menu`, `/orders/[uuid]`): `NextResponse.rewrite`
+  interno e invisible hacia el Route Group `(public)/[tenant]/...`, manteniendo
+  limpia la URL en el navegador.
+- **Zona admin** (`/admin/*`): NO se reescribe (ya existe en el Route Group
+  `(admin)`); se usa `NextResponse.next` inyectando la cabecera interna
+  `x-tenant-slug` para propagar el contexto del tenant a los Server Components
+  (leíble con `headers()`).
 
 ---
 
 ## 📁 2. Estructura de Directorios Propuesta (App Router)
 
-Implementaremos una estructura que separe claramente las responsabilidades del Comensal y del Administrador utilizando carpetas internas bajo Route Groups dinámicos.
+Separamos las responsabilidades del Comensal y del Administrador mediante los
+Route Groups `(public)` y `(admin)`, que no aparecen en la URL. El tenant llega
+por subdominio: como parámetro `[tenant]` en la zona pública y como cabecera
+`x-tenant-slug` en la zona admin.
 
 ```text
 src/
-├── middleware.ts                 # Interceptor de subdominios y redirección/rewrites
+├── proxy.ts                          # Interceptor de subdominios (rewrites + x-tenant-slug)
 ├── app/
-│   ├── (marketing)/              # Dominio principal (tusass.com)
-│   │   ├── page.tsx              # Landing page comercial
-│   │   └── layout.tsx
-│   └── _tenants/[tenant]/        # Rutas dinámicas reescritas por el middleware
-│       ├── layout.tsx            # Contexto común del tenant (config, info básica)
-│       ├── customer/             # 1. El Comensal (Menú Digital)
-│       │   ├── page.tsx          # Menú interactivo (QR)
-│       │   ├── cart/             # Carrito de compras
-│       │   └── layout.tsx
-│       └── admin/                # 2. El Administrador (Panel Dashboard)
-│           ├── login/            # Autenticación administrativa
-│           ├── dashboard/        # Métricas rápidas
-│           ├── kitchen/          # Monitor de Cocina en Tiempo Real (WebSockets)
-│           ├── menu-management/  # Gestión de platillos y categorías
-│           └── layout.tsx        # Layout privado con Sidebar e inyección de token JWT
-├── components/                   # Componentes compartidos y atómicos
-│   ├── ui/                       # Componentes visuales genéricos
-│   ├── customer/                 # Componentes específicos del menú del comensal
-│   └── admin/                    # Componentes específicos del dashboard
-├── hooks/                        # Custom hooks (useCart, useWebSocket, etc.)
-├── context/                      # React Context API para estado global ligero
-├── store/                        # Zustand stores (opcional si requerimos modularidad)
-├── lib/                          # Utilidades, configuración de Axios/Fetch y API clients
-└── types/                        # Tipado estricto de TypeScript
+│   ├── layout.tsx                    # Root layout
+│   ├── globals.css
+│   ├── (marketing)/                  # Dominio principal (localhost:3000 / tusass.com)
+│   │   └── page.tsx                  # Landing page del SaaS
+│   ├── (public)/[tenant]/            # Zona del Comensal (reescrita por el proxy)
+│   │   ├── page.tsx                  # Sitio institucional del restaurante
+│   │   ├── menu/page.tsx             # Menú digital interactivo + carrito
+│   │   └── orders/[uuid]/page.tsx    # Tracking del pedido en tiempo real (WebSockets)
+│   └── (admin)/admin/                # Zona del Administrador (contexto vía x-tenant-slug)
+│       ├── login/page.tsx            # Autenticación administrativa (JWT)
+│       └── dashboard/
+│           ├── page.tsx              # Panel de cocina/caja (comandas en tiempo real)
+│           ├── menu/page.tsx         # Gestión de platillos, precios y stock
+│           └── settings/page.tsx     # Identidad de marca, horarios y módulos
+├── components/                       # Componentes compartidos y atómicos
+│   ├── ui/                           # Componentes visuales genéricos
+│   ├── marketing/                    # Landing del SaaS
+│   ├── customer/                     # Componentes del menú del comensal
+│   └── admin/                        # Componentes del dashboard
+├── services/                         # Cliente HTTP (apiClient) + servicios de dominio
+├── store/                            # Zustand stores (carrito, etc.)
+├── lib/                              # Utilidades (formato de moneda, helpers)
+├── hooks/                            # Custom hooks (useWebSocket, etc.)
+├── context/                          # React Context para estado global ligero (opcional)
+└── types/                            # Tipado estricto del backend
 ```
 
 ---

@@ -1,6 +1,6 @@
 ---
 description: Consumo stateless de API, seguridad JWT y WebSockets en tiempo real
-globs: src/lib/**/*.ts,src/hooks/**/*.ts,src/app/_tenants/**/admin/**/*.tsx
+globs: src/lib/**/*.ts,src/services/**/*.ts,src/hooks/**/*.ts,src/app/(admin)/**/*.tsx
 alwaysApply: false
 ---
 

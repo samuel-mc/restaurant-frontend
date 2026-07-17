@@ -22,6 +22,21 @@ export type OrderStatus =
 export type OrderType = "IN_TABLE" | "PICKUP" | "DELIVERY";
 
 /* -------------------------------------------------------------------------- */
+/* Autenticación admin (wire)                                                 */
+/* -------------------------------------------------------------------------- */
+
+/** Credenciales de login (`LoginRequest.java`). */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/** Respuesta de login (`LoginResponse.java`). */
+export interface LoginResponse {
+  token: string;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Capa "wire": payloads crudos del backend (BigDecimal → number, fechas ISO)  */
 /* -------------------------------------------------------------------------- */
 

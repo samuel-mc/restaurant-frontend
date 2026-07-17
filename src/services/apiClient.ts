@@ -119,21 +119,6 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const url = buildUrl(path);
 
   const finalHeaders = new Headers({ Accept: "application/json", ...headers });
-
-  // Adjunta Bearer desde la cookie HttpOnly cuando corre en el servidor
-  // y el caller no envió Authorization explícita.
-  if (!finalHeaders.has("Authorization") && typeof window === "undefined") {
-    try {
-      const { getAdminAccessToken } = await import("@/lib/auth-server");
-      const token = await getAdminAccessToken();
-      if (token) {
-        finalHeaders.set("Authorization", `Bearer ${token}`);
-      }
-    } catch {
-      // Entorno sin `cookies()` (p. ej. tests): continuar sin auth.
-    }
-  }
-
   let serializedBody: BodyInit | undefined;
   if (body !== undefined && body !== null) {
     serializedBody = JSON.stringify(body);

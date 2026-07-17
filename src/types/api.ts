@@ -49,6 +49,12 @@ export interface CategoryResponse {
   createdAt: string;
 }
 
+/** Alta/edición de categoría (`CategoryRequest.java`). */
+export interface CategoryRequest {
+  name: string;
+  displayOrder: number;
+}
+
 /** Respuesta cruda de un producto (`ProductResponse.java`). */
 export interface ProductResponse {
   uuid: string;
@@ -62,6 +68,16 @@ export interface ProductResponse {
   categoryName: string;
   /** ISO-8601 (`OffsetDateTime`). */
   createdAt: string;
+}
+
+/** Alta/edición de producto (`ProductRequest.java`). */
+export interface ProductRequest {
+  name: string;
+  description?: string | null;
+  /** Precio numérico (BigDecimal en backend). */
+  price: number;
+  imageUrl?: string | null;
+  categoryId: number;
 }
 
 /** Línea de creación de pedido hacia el backend (`OrderDetailRequest.java`). */

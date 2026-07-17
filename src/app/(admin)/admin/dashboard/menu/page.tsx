@@ -1,39 +1,82 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { MenuManager } from "@/components/admin/menu-manager";
+import { getAdminAccessToken } from "@/lib/auth-server";
+import { getAdminCatalog } from "@/services/adminCatalogQueries";
+import { ApiError } from "@/services/apiClient";
+import type { Category, Product } from "@/types/api";
 
 export const metadata: Metadata = {
   title: "Gestor de menú · Panel",
   description: "Administra categorías, platillos, precios y stock.",
 };
 
+function prettifyTenant(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 /**
- * Gestor de categorías, precios y stock rápido (Módulo Admin).
+ * Gestor de categorías, precios y stock rápido.
  *
- * Server Component que resuelve el tenant desde `x-tenant-slug` y cargará el
- * catálogo administrable del backend. Las mutaciones (ABM de platillos,
- * activar/agotar, precios) vivirán en componentes cliente con actualización
- * optimista.
- *
- * TODO: listar categorías y platillos del tenant y montar los controles de ABM.
+ * Server: snapshot autenticado (JWT HttpOnly + X-Tenant).
+ * Client: ABM de platillos y toggle de disponibilidad vía BFF.
  */
 export default async function AdminMenuManagementPage() {
-  const tenantSlug = (await headers()).get("x-tenant-slug");
+  const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
+  if (!tenantSlug) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-3 px-6">
+        <h1 className="text-2xl font-bold">Tenant no identificado</h1>
+        <p className="text-sm text-foreground/60">
+          Abre el panel desde el subdominio de tu restaurante.
+        </p>
+      </main>
+    );
+  }
+
+  const token = await getAdminAccessToken();
+  if (!token) {
+    redirect("/admin/login");
+  }
+
+  let categories: Category[] = [];
+  let products: Product[] = [];
+  let loadError: string | null = null;
+
+  try {
+    const catalog = await getAdminCatalog(tenantSlug);
+    categories = catalog.categories;
+    products = catalog.products;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      redirect("/admin/login");
+    }
+    loadError =
+      error instanceof ApiError
+        ? error.message
+        : "No pudimos cargar el catálogo.";
+  }
+
+  if (loadError) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-3 px-6">
+        <h1 className="text-2xl font-bold">Catálogo no disponible</h1>
+        <p className="text-sm text-foreground/60">{loadError}</p>
+      </main>
+    );
+  }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-8 px-6 py-10">
-      <header className="flex flex-col gap-1">
-        <p className="text-sm uppercase tracking-wide text-foreground/50">
-          {tenantSlug ? `Restaurante · ${tenantSlug}` : "Panel de administración"}
-        </p>
-        <h1 className="text-3xl font-bold">Gestor de menú</h1>
-      </header>
-
-      <section className="rounded-xl border border-black/10 p-6 dark:border-white/15">
-        <p className="text-sm text-foreground/60">
-          Aquí se administrarán categorías, platillos, precios y disponibilidad
-          (stock rápido).
-        </p>
-      </section>
-    </main>
+    <MenuManager
+      tenantSlug={tenantSlug}
+      restaurantName={prettifyTenant(tenantSlug)}
+      initialCategories={categories}
+      initialProducts={products}
+    />
   );
 }

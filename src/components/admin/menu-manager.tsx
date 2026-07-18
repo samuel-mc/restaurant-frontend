@@ -6,14 +6,16 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition, type FormEvent } from "react";
-import type { Category, Product, ProductRequest } from "@/types/api";
+import type { Category, Product } from "@/types/api";
 import { AvailabilityToggle } from "@/components/admin/availability-toggle";
 import { ProductFormModal } from "@/components/admin/product-form-modal";
 import {
   createCategory,
-  createProduct,
+  createProductWithForm,
   toggleProductAvailability,
-  updateProduct,
+  updateCategory,
+  updateProductWithForm,
+  type ProductFormSubmitPayload,
 } from "@/services/adminCatalogService";
 import { ApiError } from "@/services/apiClient";
 
@@ -27,6 +29,10 @@ interface MenuManagerProps {
 type ModalState =
   | { open: false }
   | { open: true; mode: "create" | "edit"; product: Product | null };
+
+type CategoryDialogState =
+  | { open: false }
+  | { open: true; mode: "create" | "edit"; category: Category | null };
 
 export function MenuManager({
   tenantSlug,
@@ -46,8 +52,10 @@ export function MenuManager({
   const [togglingUuid, setTogglingUuid] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [categoryBusy, setCategoryBusy] = useState(false);
-  const [categoryPromptOpen, setCategoryPromptOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryDialog, setCategoryDialog] = useState<CategoryDialogState>({
+    open: false,
+  });
+  const [categoryNameDraft, setCategoryNameDraft] = useState("");
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -84,14 +92,32 @@ export function MenuManager({
     setFormError(null);
   }
 
-  async function handleProductSubmit(payload: ProductRequest) {
+  function openCreateCategory() {
+    setCategoryError(null);
+    setCategoryNameDraft("");
+    setCategoryDialog({ open: true, mode: "create", category: null });
+  }
+
+  function openEditCategory(category: Category) {
+    setCategoryError(null);
+    setCategoryNameDraft(category.name);
+    setCategoryDialog({ open: true, mode: "edit", category });
+  }
+
+  function closeCategoryDialog() {
+    if (categoryBusy) return;
+    setCategoryDialog({ open: false });
+    setCategoryError(null);
+  }
+
+  async function handleProductSubmit(payload: ProductFormSubmitPayload) {
     if (!modal.open) return;
     setFormSubmitting(true);
     setFormError(null);
 
     try {
       if (modal.mode === "create") {
-        const created = await createProduct(payload, tenantSlug);
+        const created = await createProductWithForm(payload, tenantSlug);
         startTransition(() => {
           setProducts((prev) =>
             [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
@@ -100,7 +126,7 @@ export function MenuManager({
         });
         showBanner(`Platillo «${created.name}» creado`);
       } else if (modal.product) {
-        const updated = await updateProduct(
+        const updated = await updateProductWithForm(
           modal.product.uuid,
           payload,
           tenantSlug,
@@ -116,6 +142,7 @@ export function MenuManager({
         showBanner(`Platillo «${updated.name}» actualizado`);
       }
       setModal({ open: false });
+      setFormError(null);
     } catch (error) {
       setFormError(
         error instanceof ApiError
@@ -170,9 +197,11 @@ export function MenuManager({
     }
   }
 
-  async function handleCreateCategory(event: FormEvent) {
+  async function handleCategorySubmit(event: FormEvent) {
     event.preventDefault();
-    const name = newCategoryName.trim();
+    if (!categoryDialog.open) return;
+
+    const name = categoryNameDraft.trim();
     if (!name) {
       setCategoryError("El nombre es obligatorio.");
       return;
@@ -186,30 +215,60 @@ export function MenuManager({
     setCategoryError(null);
 
     try {
-      const displayOrder =
-        categories.reduce((max, c) => Math.max(max, c.displayOrder), -1) + 1;
-      const created = await createCategory(
-        { name, displayOrder },
-        tenantSlug,
-      );
-      startTransition(() => {
-        setCategories((prev) =>
-          [...prev, created].sort(
-            (a, b) =>
-              a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
-          ),
+      if (categoryDialog.mode === "create") {
+        const displayOrder =
+          categories.reduce((max, c) => Math.max(max, c.displayOrder), -1) + 1;
+        const created = await createCategory(
+          { name, displayOrder },
+          tenantSlug,
         );
-        setSelectedCategoryId(created.id);
-      });
-      setNewCategoryName("");
-      setCategoryPromptOpen(false);
+        startTransition(() => {
+          setCategories((prev) =>
+            [...prev, created].sort(
+              (a, b) =>
+                a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
+            ),
+          );
+          setSelectedCategoryId(created.id);
+        });
+        showBanner(`Categoría «${created.name}» creada`);
+      } else if (categoryDialog.category) {
+        const updated = await updateCategory(
+          categoryDialog.category.id,
+          {
+            name,
+            displayOrder: categoryDialog.category.displayOrder,
+          },
+          tenantSlug,
+        );
+        startTransition(() => {
+          setCategories((prev) =>
+            prev
+              .map((c) => (c.id === updated.id ? updated : c))
+              .sort(
+                (a, b) =>
+                  a.displayOrder - b.displayOrder ||
+                  a.name.localeCompare(b.name),
+              ),
+          );
+          setProducts((prev) =>
+            prev.map((p) =>
+              p.categoryId === updated.id
+                ? { ...p, categoryName: updated.name }
+                : p,
+            ),
+          );
+        });
+        showBanner(`Categoría «${updated.name}» actualizada`);
+      }
+      setCategoryDialog({ open: false });
+      setCategoryNameDraft("");
       setMobileCatsOpen(false);
-      showBanner(`Categoría «${created.name}» creada`);
     } catch (error) {
       setCategoryError(
         error instanceof ApiError
           ? error.message
-          : "No se pudo crear la categoría.",
+          : "No se pudo guardar la categoría.",
       );
     } finally {
       setCategoryBusy(false);
@@ -261,7 +320,6 @@ export function MenuManager({
       </header>
 
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 p-4 md:flex-row md:gap-6 md:p-6">
-        {/* Mobile category trigger */}
         <div className="md:hidden">
           <button
             type="button"
@@ -286,30 +344,24 @@ export function MenuManager({
               products={products}
               selectedCategoryId={selectedCategoryId}
               onSelect={selectCategory}
-              onNewCategory={() => {
-                setCategoryError(null);
-                setCategoryPromptOpen(true);
-              }}
+              onNewCategory={openCreateCategory}
+              onEditCategory={openEditCategory}
               className="mt-2"
             />
           ) : null}
         </div>
 
-        {/* Desktop sidebar */}
         <aside className="hidden w-64 shrink-0 md:block lg:w-72">
           <CategoryList
             categories={categories}
             products={products}
             selectedCategoryId={selectedCategoryId}
             onSelect={selectCategory}
-            onNewCategory={() => {
-              setCategoryError(null);
-              setCategoryPromptOpen(true);
-            }}
+            onNewCategory={openCreateCategory}
+            onEditCategory={openEditCategory}
           />
         </aside>
 
-        {/* Products */}
         <section className="min-w-0 flex-1">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
@@ -329,10 +381,7 @@ export function MenuManager({
               title="Sin categorías"
               description="Agrega la primera categoría del menú para organizar tus platillos."
               actionLabel="+ Nueva categoría"
-              onAction={() => {
-                setCategoryError(null);
-                setCategoryPromptOpen(true);
-              }}
+              onAction={openCreateCategory}
             />
           ) : filteredProducts.length === 0 ? (
             <EmptyState
@@ -370,29 +419,31 @@ export function MenuManager({
         onSubmit={handleProductSubmit}
       />
 
-      {categoryPromptOpen ? (
+      {categoryDialog.open ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
           role="presentation"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !categoryBusy) {
-              setCategoryPromptOpen(false);
-            }
+            if (e.target === e.currentTarget) closeCategoryDialog();
           }}
         >
           <form
-            onSubmit={handleCreateCategory}
+            onSubmit={handleCategorySubmit}
             className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl dark:bg-neutral-900"
           >
-            <h2 className="text-lg font-extrabold">Nueva categoría</h2>
+            <h2 className="text-lg font-extrabold">
+              {categoryDialog.mode === "create"
+                ? "Nueva categoría"
+                : "Editar categoría"}
+            </h2>
             <p className="mt-1 text-sm text-black/50 dark:text-white/50">
               Aparecerá en el menú digital y en este panel.
             </p>
             <input
               autoFocus
-              value={newCategoryName}
+              value={categoryNameDraft}
               onChange={(e) => {
-                setNewCategoryName(e.target.value);
+                setCategoryNameDraft(e.target.value);
                 setCategoryError(null);
               }}
               maxLength={50}
@@ -408,7 +459,7 @@ export function MenuManager({
               <button
                 type="button"
                 disabled={categoryBusy}
-                onClick={() => setCategoryPromptOpen(false)}
+                onClick={closeCategoryDialog}
                 className="rounded-2xl px-4 py-2.5 text-sm font-bold text-black/60 hover:bg-black/5 dark:text-white/60 dark:hover:bg-white/10"
               >
                 Cancelar
@@ -418,7 +469,11 @@ export function MenuManager({
                 disabled={categoryBusy}
                 className="rounded-2xl bg-foreground px-4 py-2.5 text-sm font-bold text-background disabled:opacity-50"
               >
-                {categoryBusy ? "Creando…" : "Crear"}
+                {categoryBusy
+                  ? "Guardando…"
+                  : categoryDialog.mode === "create"
+                    ? "Crear"
+                    : "Guardar"}
               </button>
             </div>
           </form>
@@ -434,6 +489,7 @@ function CategoryList({
   selectedCategoryId,
   onSelect,
   onNewCategory,
+  onEditCategory,
   className = "",
 }: {
   categories: Category[];
@@ -441,6 +497,7 @@ function CategoryList({
   selectedCategoryId: number | null;
   onSelect: (id: number) => void;
   onNewCategory: () => void;
+  onEditCategory: (category: Category) => void;
   className?: string;
 }) {
   const counts = useMemo(() => {
@@ -472,11 +529,11 @@ function CategoryList({
             const active = category.id === selectedCategoryId;
             const count = counts.get(category.id) ?? 0;
             return (
-              <li key={category.id}>
+              <li key={category.id} className="group flex items-stretch gap-1">
                 <button
                   type="button"
                   onClick={() => onSelect(category.id)}
-                  className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm transition ${
+                  className={`flex min-w-0 flex-1 items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm transition ${
                     active
                       ? "bg-foreground font-bold text-background"
                       : "font-semibold text-foreground hover:bg-black/[0.04] dark:hover:bg-white/5"
@@ -490,6 +547,14 @@ function CategoryList({
                   >
                     {count}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Editar ${category.name}`}
+                  onClick={() => onEditCategory(category)}
+                  className="shrink-0 rounded-2xl px-2.5 text-xs font-bold text-black/45 hover:bg-black/[0.04] hover:text-foreground dark:text-white/45 dark:hover:bg-white/5"
+                >
+                  Editar
                 </button>
               </li>
             );

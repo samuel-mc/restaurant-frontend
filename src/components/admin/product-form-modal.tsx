@@ -1,11 +1,12 @@
 "use client";
 
 /**
- * Modal de alta/edición de platillo con validación de formulario.
+ * Modal de alta/edición de platillo con carga de imagen (FormData / R2-ready).
  */
 
 import { useId, useState, type FormEvent, type ReactNode } from "react";
-import type { Category, Product, ProductRequest } from "@/types/api";
+import type { Category, Product } from "@/types/api";
+import type { ProductFormSubmitPayload } from "@/services/adminCatalogService";
 
 export interface ProductFormValues {
   name: string;
@@ -13,7 +14,6 @@ export interface ProductFormValues {
   /** Precisión decimal como string (evita drift de float en el input). */
   price: string;
   categoryId: number;
-  imageUrl: string;
 }
 
 interface ProductFormModalProps {
@@ -25,8 +25,16 @@ interface ProductFormModalProps {
   submitting: boolean;
   error: string | null;
   onClose: () => void;
-  onSubmit: (payload: ProductRequest) => Promise<void>;
+  onSubmit: (payload: ProductFormSubmitPayload) => Promise<void>;
 }
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
 
 function productToValues(
   product: Product | null | undefined,
@@ -41,7 +49,6 @@ function productToValues(
       description: "",
       price: "",
       categoryId: fallbackCategory,
-      imageUrl: "",
     };
   }
 
@@ -50,7 +57,6 @@ function productToValues(
     description: product.description ?? "",
     price: Number.isFinite(product.price) ? product.price.toFixed(2) : "",
     categoryId: product.categoryId,
-    imageUrl: product.imageUrl ?? "",
   };
 }
 
@@ -60,6 +66,12 @@ function parsePriceInput(raw: string): number | null {
   const value = Number(normalized);
   if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value * 100) / 100;
+}
+
+function revokeIfBlob(url: string | null) {
+  if (url?.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
 }
 
 export function ProductFormModal({
@@ -103,11 +115,16 @@ function ProductFormDialog({
   onSubmit,
 }: Omit<ProductFormModalProps, "open">) {
   const titleId = useId();
+  const fileInputId = useId();
   const [values, setValues] = useState<ProductFormValues>(() =>
     productToValues(initial, defaultCategoryId, categories),
   );
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    () => initial?.imageUrl ?? null,
+  );
   const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<keyof ProductFormValues, string>>
+    Partial<Record<keyof ProductFormValues | "image", string>>
   >({});
 
   function updateField<K extends keyof ProductFormValues>(
@@ -122,8 +139,50 @@ function ProductFormDialog({
     });
   }
 
-  function validate(): ProductRequest | null {
-    const errors: Partial<Record<keyof ProductFormValues, string>> = {};
+  function handleFileChange(fileList: FileList | null) {
+    const file = fileList?.[0] ?? null;
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.image;
+      return next;
+    });
+
+    if (!file) {
+      setImageFile(null);
+      setPreviewUrl((prev) => {
+        revokeIfBlob(prev);
+        return initial?.imageUrl ?? null;
+      });
+      return;
+    }
+
+    if (!ACCEPTED_TYPES.has(file.type)) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        image: "Usa JPG, PNG, WEBP o GIF.",
+      }));
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        image: "La imagen no puede superar 5 MB.",
+      }));
+      return;
+    }
+
+    const nextUrl = URL.createObjectURL(file);
+    setImageFile(file);
+    setPreviewUrl((prev) => {
+      revokeIfBlob(prev);
+      return nextUrl;
+    });
+  }
+
+  function validate(): ProductFormSubmitPayload | null {
+    const errors: Partial<Record<keyof ProductFormValues | "image", string>> =
+      {};
     const name = values.name.trim();
     if (!name) errors.name = "El nombre es obligatorio.";
     else if (name.length > 100) errors.name = "Máximo 100 caracteres.";
@@ -144,15 +203,6 @@ function ProductFormDialog({
       errors.categoryId = "Selecciona una categoría.";
     }
 
-    const imageUrl = values.imageUrl.trim();
-    if (imageUrl) {
-      try {
-        void new URL(imageUrl);
-      } catch {
-        errors.imageUrl = "URL de imagen inválida.";
-      }
-    }
-
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0 || price === null) return null;
 
@@ -160,8 +210,9 @@ function ProductFormDialog({
       name,
       description: values.description.trim() || null,
       price,
-      imageUrl: imageUrl || null,
       categoryId: values.categoryId,
+      imageFile,
+      existingImageUrl: initial?.imageUrl ?? null,
     };
   }
 
@@ -171,6 +222,14 @@ function ProductFormDialog({
     if (!payload) return;
     await onSubmit(payload);
   }
+
+  const submitLabel = submitting
+    ? imageFile
+      ? "Subiendo imagen y guardando platillo…"
+      : "Guardando platillo…"
+    : mode === "create"
+      ? "Crear platillo"
+      : "Guardar cambios";
 
   return (
     <div
@@ -209,6 +268,7 @@ function ProductFormDialog({
           onSubmit={handleSubmit}
           className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-5"
           noValidate
+          encType="multipart/form-data"
         >
           <Field
             label="Nombre"
@@ -227,7 +287,7 @@ function ProductFormDialog({
           </Field>
 
           <Field
-            label="Descripción corta"
+            label="Descripción"
             error={fieldErrors.description}
             htmlFor="product-description"
           >
@@ -284,20 +344,55 @@ function ProductFormDialog({
             </Field>
           </div>
 
-          <Field
-            label="URL de imagen"
-            error={fieldErrors.imageUrl}
-            htmlFor="product-image"
-            hint="Opcional. Usa una URL pública (https://…)."
-          >
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-black/50 dark:text-white/50">
+              Imagen del platillo
+            </span>
+            <div className="overflow-hidden rounded-2xl border border-dashed border-black/15 bg-neutral-50 dark:border-white/15 dark:bg-neutral-800/60">
+              {previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewUrl}
+                  alt="Vista previa del platillo"
+                  className="aspect-[16/10] w-full object-cover"
+                />
+              ) : (
+                <div className="flex aspect-[16/10] items-center justify-center px-4 text-center text-sm text-black/40 dark:text-white/40">
+                  Vista previa de la imagen
+                </div>
+              )}
+            </div>
+            <label
+              htmlFor={fileInputId}
+              className={`inline-flex cursor-pointer items-center justify-center rounded-2xl border border-black/10 bg-white px-4 py-2.5 text-sm font-bold hover:bg-black/[0.03] dark:border-white/15 dark:bg-neutral-900 dark:hover:bg-white/5 ${
+                submitting ? "pointer-events-none opacity-50" : ""
+              }`}
+            >
+              {imageFile ? "Cambiar imagen" : "Seleccionar imagen"}
+            </label>
             <input
-              id="product-image"
-              value={values.imageUrl}
-              onChange={(e) => updateField("imageUrl", e.target.value)}
-              className={inputClass(Boolean(fieldErrors.imageUrl))}
-              placeholder="https://…"
+              id={fileInputId}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              disabled={submitting}
+              onChange={(e) => handleFileChange(e.target.files)}
             />
-          </Field>
+            {imageFile ? (
+              <p className="text-xs text-black/45 dark:text-white/45">
+                {imageFile.name} · {(imageFile.size / 1024).toFixed(0)} KB
+              </p>
+            ) : (
+              <p className="text-xs text-black/40 dark:text-white/40">
+                Opcional. JPG, PNG, WEBP o GIF · máx. 5 MB
+              </p>
+            )}
+            {fieldErrors.image ? (
+              <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                {fieldErrors.image}
+              </span>
+            ) : null}
+          </div>
 
           {error ? (
             <p
@@ -322,11 +417,7 @@ function ProductFormDialog({
               disabled={submitting || categories.length === 0}
               className="inline-flex items-center justify-center rounded-2xl bg-foreground px-5 py-2.5 text-sm font-bold text-background disabled:opacity-50"
             >
-              {submitting
-                ? "Guardando…"
-                : mode === "create"
-                  ? "Crear platillo"
-                  : "Guardar cambios"}
+              {submitLabel}
             </button>
           </div>
         </form>

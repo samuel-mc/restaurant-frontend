@@ -14,6 +14,18 @@ import { toProduct } from "@/lib/product-mapper";
 import { resolveTenantSlug } from "@/lib/tenant";
 import { ApiError } from "@/services/apiClient";
 
+/** Payload de alta/edición con archivo opcional (R2-ready / multipart). */
+export interface ProductFormSubmitPayload {
+  name: string;
+  description: string | null;
+  price: number;
+  categoryId: number;
+  /** Archivo binario; si existe se envía como FormData. */
+  imageFile: File | null;
+  /** URL previa al editar sin cambiar imagen. */
+  existingImageUrl?: string | null;
+}
+
 function toCategory(dto: CategoryResponse): Category {
   return {
     id: dto.id,
@@ -23,6 +35,20 @@ function toCategory(dto: CategoryResponse): Category {
   };
 }
 
+function buildProductFormData(payload: ProductFormSubmitPayload): FormData {
+  const formData = new FormData();
+  formData.append("name", payload.name);
+  if (payload.description) {
+    formData.append("description", payload.description);
+  }
+  formData.append("price", String(payload.price));
+  formData.append("categoryId", String(payload.categoryId));
+  if (payload.imageFile) {
+    formData.append("image", payload.imageFile);
+  }
+  return formData;
+}
+
 async function bffJson<T>(
   path: string,
   tenantSlug: string,
@@ -30,11 +56,15 @@ async function bffJson<T>(
 ): Promise<T> {
   const slug = resolveTenantSlug(tenantSlug);
   const hasBody = init.body !== undefined && init.body !== null;
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+
   const response = await fetch(path, {
     ...init,
     headers: {
       Accept: "application/json",
-      ...(hasBody ? { "Content-Type": "application/json" } : {}),
+      // FormData: no fijar Content-Type (boundary automático).
+      ...(hasBody && !isFormData ? { "Content-Type": "application/json" } : {}),
       "x-tenant-slug": slug,
       ...(init.headers ?? {}),
     },
@@ -75,27 +105,61 @@ export async function createCategory(
   return toCategory(dto);
 }
 
-export async function createProduct(
-  data: ProductRequest,
+export async function updateCategory(
+  id: number,
+  data: CategoryRequest,
+  tenantSlug: string,
+): Promise<Category> {
+  const dto = await bffJson<CategoryResponse>(
+    `/api/admin/categories/${id}`,
+    tenantSlug,
+    { method: "PUT", body: JSON.stringify(data) },
+  );
+  return toCategory(dto);
+}
+
+/** Alta con FormData (multipart) cuando hay imagen o siempre en create. */
+export async function createProductWithForm(
+  payload: ProductFormSubmitPayload,
   tenantSlug: string,
 ): Promise<Product> {
+  const formData = buildProductFormData(payload);
   const dto = await bffJson<ProductResponse>(
     "/api/admin/products",
     tenantSlug,
-    { method: "POST", body: JSON.stringify(data) },
+    { method: "POST", body: formData },
   );
   return toProduct(dto);
 }
 
-export async function updateProduct(
+/** Edición: multipart si hay archivo nuevo; JSON si solo cambian campos. */
+export async function updateProductWithForm(
   uuid: string,
-  data: ProductRequest,
+  payload: ProductFormSubmitPayload,
   tenantSlug: string,
 ): Promise<Product> {
+  if (payload.imageFile) {
+    const formData = buildProductFormData(payload);
+    const dto = await bffJson<ProductResponse>(
+      `/api/admin/products/${uuid}`,
+      tenantSlug,
+      { method: "PUT", body: formData },
+    );
+    return toProduct(dto);
+  }
+
+  const json: ProductRequest = {
+    name: payload.name,
+    description: payload.description,
+    price: payload.price,
+    categoryId: payload.categoryId,
+    imageUrl: payload.existingImageUrl ?? null,
+  };
+
   const dto = await bffJson<ProductResponse>(
     `/api/admin/products/${uuid}`,
     tenantSlug,
-    { method: "PUT", body: JSON.stringify(data) },
+    { method: "PUT", body: JSON.stringify(json) },
   );
   return toProduct(dto);
 }

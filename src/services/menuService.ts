@@ -8,7 +8,7 @@
  */
 
 import type { Product, ProductResponse } from "@/types/api";
-import { formatCurrency } from "@/lib/format";
+import { toProduct } from "@/lib/product-mapper";
 import { apiClient, ApiError } from "@/services/apiClient";
 
 /** Cabecera que el backend (`TenantFilter`) usa para identificar al restaurante. */
@@ -16,22 +16,6 @@ const TENANT_HEADER = "X-Tenant";
 
 /** Endpoint público del catálogo de menú. */
 const MENU_CATALOG_PATH = "/api/v1/menu/catalog";
-
-/** Normaliza un `ProductResponse` crudo al modelo de dominio `Product`. */
-function toProduct(dto: ProductResponse): Product {
-  return {
-    uuid: dto.uuid,
-    name: dto.name,
-    description: dto.description ?? null,
-    price: dto.price,
-    formattedPrice: formatCurrency(dto.price),
-    imageUrl: dto.imageUrl ?? null,
-    isAvailable: dto.isAvailable,
-    categoryId: dto.categoryId,
-    categoryName: dto.categoryName,
-    createdAt: dto.createdAt,
-  };
-}
 
 /**
  * Obtiene el menú público de un restaurante por su identificador de tenant.

@@ -10,7 +10,7 @@ import type {
   Product,
   ProductResponse,
 } from "@/types/api";
-import { formatCurrency } from "@/lib/format";
+import { toProduct } from "@/lib/product-mapper";
 import { resolveTenantSlug } from "@/lib/tenant";
 import { getAdminAuthHeaders } from "@/lib/auth-server";
 import { apiClient, ApiError } from "@/services/apiClient";
@@ -24,21 +24,6 @@ function toCategory(dto: CategoryResponse): Category {
     id: dto.id,
     name: dto.name,
     displayOrder: dto.displayOrder,
-    createdAt: dto.createdAt,
-  };
-}
-
-function toProduct(dto: ProductResponse): Product {
-  return {
-    uuid: dto.uuid,
-    name: dto.name,
-    description: dto.description ?? null,
-    price: dto.price,
-    formattedPrice: formatCurrency(dto.price),
-    imageUrl: dto.imageUrl ?? null,
-    isAvailable: dto.isAvailable,
-    categoryId: dto.categoryId,
-    categoryName: dto.categoryName,
     createdAt: dto.createdAt,
   };
 }

@@ -63,7 +63,11 @@ export interface ProductResponse {
   /** Serializado como número JSON desde un `BigDecimal`. */
   price: number;
   imageUrl: string | null;
-  isAvailable: boolean;
+  /**
+   * Jackson serializa el campo Java `boolean isAvailable` como `available`
+   * (no `isAvailable`). Ver ProductIntegrationTest `$.available`.
+   */
+  available: boolean;
   categoryId: number;
   categoryName: string;
   /** ISO-8601 (`OffsetDateTime`). */

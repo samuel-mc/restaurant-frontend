@@ -10,7 +10,7 @@ import type {
   ProductRequest,
   ProductResponse,
 } from "@/types/api";
-import { formatCurrency } from "@/lib/format";
+import { toProduct } from "@/lib/product-mapper";
 import { resolveTenantSlug } from "@/lib/tenant";
 import { ApiError } from "@/services/apiClient";
 
@@ -23,32 +23,18 @@ function toCategory(dto: CategoryResponse): Category {
   };
 }
 
-function toProduct(dto: ProductResponse): Product {
-  return {
-    uuid: dto.uuid,
-    name: dto.name,
-    description: dto.description ?? null,
-    price: dto.price,
-    formattedPrice: formatCurrency(dto.price),
-    imageUrl: dto.imageUrl ?? null,
-    isAvailable: dto.isAvailable,
-    categoryId: dto.categoryId,
-    categoryName: dto.categoryName,
-    createdAt: dto.createdAt,
-  };
-}
-
 async function bffJson<T>(
   path: string,
   tenantSlug: string,
   init: RequestInit,
 ): Promise<T> {
   const slug = resolveTenantSlug(tenantSlug);
+  const hasBody = init.body !== undefined && init.body !== null;
   const response = await fetch(path, {
     ...init,
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json",
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
       "x-tenant-slug": slug,
       ...(init.headers ?? {}),
     },

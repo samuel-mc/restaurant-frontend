@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Toggle de disponibilidad (stock rápido) con estado de carga.
+ * Control segmentado de disponibilidad (stock rápido).
+ * Una sola superficie: el estado y la acción viven juntos.
  */
 
 interface AvailabilityToggleProps {
@@ -9,7 +10,8 @@ interface AvailabilityToggleProps {
   disabled?: boolean;
   busy?: boolean;
   onChange: () => void;
-  label: string;
+  /** Nombre del platillo, para aria-label. */
+  productName: string;
 }
 
 export function AvailabilityToggle({
@@ -17,28 +19,52 @@ export function AvailabilityToggle({
   disabled = false,
   busy = false,
   onChange,
-  label,
+  productName,
 }: AvailabilityToggleProps) {
+  const isAvailable = checked;
+
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled || busy}
-      onClick={onChange}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-not-allowed ${
-        checked
-          ? "bg-emerald-500"
-          : "bg-neutral-300 dark:bg-neutral-600"
-      } ${busy ? "opacity-70" : ""}`}
+    <div
+      role="group"
+      aria-label={`Disponibilidad de ${productName}`}
+      className={`inline-flex rounded-full p-0.5 ${
+        isAvailable
+          ? "bg-emerald-500/15 dark:bg-emerald-400/15"
+          : "bg-neutral-200/90 dark:bg-neutral-700/80"
+      }`}
     >
-      <span
-        aria-hidden
-        className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-6" : "translate-x-1"
-        } ${busy ? "animate-pulse" : ""}`}
-      />
-    </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={isAvailable}
+        disabled={disabled || busy || isAvailable}
+        onClick={() => {
+          if (!isAvailable) onChange();
+        }}
+        className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide transition disabled:cursor-default ${
+          isAvailable
+            ? "bg-emerald-600 text-white shadow-sm dark:bg-emerald-500"
+            : "text-black/40 hover:text-black/70 disabled:opacity-100 dark:text-white/35 dark:hover:text-white/70"
+        } ${busy && !isAvailable ? "animate-pulse" : ""}`}
+      >
+        En menú
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!isAvailable}
+        disabled={disabled || busy || !isAvailable}
+        onClick={() => {
+          if (isAvailable) onChange();
+        }}
+        className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide transition disabled:cursor-default ${
+          !isAvailable
+            ? "bg-neutral-800 text-white shadow-sm dark:bg-neutral-200 dark:text-neutral-900"
+            : "text-black/40 hover:text-black/70 disabled:opacity-100 dark:text-white/35 dark:hover:text-white/70"
+        } ${busy && isAvailable ? "animate-pulse" : ""}`}
+      >
+        {busy ? "…" : "Agotado"}
+      </button>
+    </div>
   );
 }

@@ -511,40 +511,48 @@ function ProductAdminCard({
   onToggle: () => void;
   onEdit: () => void;
 }) {
+  const available = product.isAvailable;
+
   return (
-    <article
-      className={`flex h-full flex-col overflow-hidden rounded-3xl border bg-white shadow-sm dark:bg-neutral-900 ${
-        product.isAvailable
-          ? "border-black/5 dark:border-white/10"
-          : "border-amber-300/60 opacity-90 dark:border-amber-500/30"
-      }`}
-    >
-      <div className="relative aspect-[16/10] bg-neutral-100 dark:bg-neutral-800">
+    <article className="flex h-full flex-col overflow-hidden rounded-3xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-neutral-900">
+      <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100 dark:bg-neutral-800">
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.imageUrl}
             alt=""
-            className="size-full object-cover"
+            className={`size-full object-cover transition-[filter,opacity] duration-300 ${
+              available ? "" : "opacity-55 grayscale"
+            }`}
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
           />
         ) : (
-          <div className="flex size-full items-center justify-center text-xs font-semibold uppercase tracking-wide text-black/30 dark:text-white/30">
+          <div
+            className={`flex size-full items-center justify-center text-xs font-semibold uppercase tracking-wide text-black/30 dark:text-white/30 ${
+              available ? "" : "opacity-60"
+            }`}
+          >
             Sin imagen
           </div>
         )}
-        {!product.isAvailable ? (
-          <span className="absolute left-3 top-3 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-bold text-amber-950">
-            Agotado
-          </span>
+        {!available ? (
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2.5 pt-8">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white/95">
+              Fuera del menú
+            </span>
+          </div>
         ) : null}
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-extrabold tracking-tight">
+          <h3
+            className={`truncate font-extrabold tracking-tight ${
+              available ? "" : "text-black/55 dark:text-white/55"
+            }`}
+          >
             {product.name}
           </h3>
           {product.description ? (
@@ -558,25 +566,12 @@ function ProductAdminCard({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-black/5 pt-3 dark:border-white/10">
-          <div className="flex items-center gap-2">
-            <AvailabilityToggle
-              checked={product.isAvailable}
-              busy={toggling}
-              onChange={onToggle}
-              label={
-                product.isAvailable
-                  ? `Marcar ${product.name} como agotado`
-                  : `Marcar ${product.name} como disponible`
-              }
-            />
-            <span className="text-xs font-semibold text-black/45 dark:text-white/45">
-              {toggling
-                ? "Guardando…"
-                : product.isAvailable
-                  ? "Disponible"
-                  : "Agotado"}
-            </span>
-          </div>
+          <AvailabilityToggle
+            checked={available}
+            busy={toggling}
+            onChange={onToggle}
+            productName={product.name}
+          />
           <button
             type="button"
             onClick={onEdit}

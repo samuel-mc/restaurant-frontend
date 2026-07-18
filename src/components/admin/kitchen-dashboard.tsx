@@ -4,6 +4,7 @@
  * Monitor en vivo de cocina/caja (Kanban de comandas).
  */
 
+import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Order, OrderStatus } from "@/types/api";
 import { OrderTicket } from "@/components/admin/order-ticket";
@@ -11,6 +12,7 @@ import {
   useKitchenOrdersSubscription,
   type KitchenConnectionState,
 } from "@/hooks/useKitchenOrdersSubscription";
+import { useKitchenAlertSound } from "@/hooks/useKitchenAlertSound";
 import { updateOrderStatus } from "@/services/adminOrderService";
 import { ApiError } from "@/services/apiClient";
 
@@ -47,6 +49,7 @@ interface KitchenDashboardProps {
 function nextStatusFor(status: OrderStatus): OrderStatus | null {
   if (status === "PENDING") return "ACCEPTED";
   if (status === "ACCEPTED") return "IN_KITCHEN";
+  // Backend no tiene READY: "Listo" → DELIVERED (sale del tablero activo).
   if (status === "IN_KITCHEN") return "DELIVERED";
   return null;
 }
@@ -73,11 +76,7 @@ export function KitchenDashboard({
   const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
   const [ticketErrors, setTicketErrors] = useState<Record<string, string>>({});
   const knownUuidsRef = useRef(new Set(initialOrders.map((o) => o.uuid)));
-
-  const playNewOrderCue = useCallback(() => {
-    // Placeholder: aquí se puede reproducir un beep corto de cocina.
-    // Ejemplo futuro: new Audio("/sounds/new-order.mp3").play().catch(() => {});
-  }, []);
+  const playNewOrderCue = useKitchenAlertSound();
 
   const handleOrderEvent = useCallback(
     (incoming: Order) => {
@@ -87,25 +86,26 @@ export function KitchenDashboard({
       setOrders((prev) => {
         const without = prev.filter((o) => o.uuid !== incoming.uuid);
         if (!isActive) return without;
-        const next = isNew
+        return isNew
           ? [incoming, ...without]
           : sortByCreatedAt([...without, incoming]);
-        return next;
       });
 
       if (isNew && isActive) {
         knownUuidsRef.current.add(incoming.uuid);
         setFlashUuid(incoming.uuid);
-        setBanner(`Nueva comanda · #${incoming.uuid.slice(0, 8)}`);
+        setBanner(`Nueva comanda · #${incoming.uuid.slice(0, 8).toUpperCase()}`);
         playNewOrderCue();
         window.setTimeout(() => {
           setFlashUuid((current) =>
             current === incoming.uuid ? null : current,
           );
           setBanner((current) =>
-            current?.includes(incoming.uuid.slice(0, 8)) ? null : current,
+            current?.includes(incoming.uuid.slice(0, 8).toUpperCase())
+              ? null
+              : current,
           );
-        }, 4000);
+        }, 4_000);
       } else if (isActive) {
         knownUuidsRef.current.add(incoming.uuid);
       } else {
@@ -132,10 +132,15 @@ export function KitchenDashboard({
       return copy;
     });
 
+    // Mutación optimista: la cocina ve el cambio al instante.
+    const optimistic: Order = { ...order, status: next };
+    handleOrderEvent(optimistic);
+
     try {
       const updated = await updateOrderStatus(order.uuid, next, tenantSlug);
       handleOrderEvent(updated);
     } catch (error) {
+      handleOrderEvent(order);
       const message =
         error instanceof ApiError
           ? error.message
@@ -165,24 +170,30 @@ export function KitchenDashboard({
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/95 px-4 py-4 backdrop-blur md:px-6 dark:border-white/10 dark:bg-neutral-900/95">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-black/45 dark:text-white/45">
+            <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
               Cocina · Caja
             </p>
-            <h1 className="text-2xl font-extrabold tracking-tight md:text-3xl">
+            <h1 className="text-3xl font-black tracking-tight md:text-4xl">
               {restaurantName}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <ConnectionBadge state={connection} />
-            <span className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-bold tabular-nums dark:bg-white/10">
+            <span className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-black tabular-nums dark:bg-white/10">
               {orders.length} activas
             </span>
+            <Link
+              href="/admin/dashboard/menu"
+              className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-bold hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
+            >
+              Menú
+            </Link>
           </div>
         </div>
         {banner ? (
           <p
             role="status"
-            className="mx-auto mt-3 max-w-7xl rounded-xl bg-amber-400 px-4 py-2 text-center text-sm font-bold text-amber-950 animate-pulse"
+            className="mx-auto mt-3 max-w-7xl rounded-2xl bg-amber-400 px-4 py-3 text-center text-base font-black text-amber-950 animate-pulse"
           >
             {banner}
           </p>
@@ -196,20 +207,20 @@ export function KitchenDashboard({
             <section
               key={column.status}
               aria-label={column.title}
-              className={`flex min-h-64 flex-col rounded-3xl border-2 border-dashed p-3 md:p-4 ${column.accent}`}
+              className={`flex min-h-72 flex-col rounded-3xl border-2 border-dashed p-3 md:p-4 ${column.accent}`}
             >
               <header className="mb-3 flex items-center justify-between px-1">
-                <h2 className="text-sm font-extrabold uppercase tracking-wide">
+                <h2 className="text-base font-black uppercase tracking-wide">
                   {column.title}
                 </h2>
-                <span className="rounded-full bg-white/80 px-2.5 py-0.5 text-sm font-black tabular-nums dark:bg-black/30">
+                <span className="rounded-full bg-white/90 px-3 py-1 text-base font-black tabular-nums dark:bg-black/30">
                   {columnOrders.length}
                 </span>
               </header>
 
-              <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
+              <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
                 {columnOrders.length === 0 ? (
-                  <p className="rounded-2xl bg-white/50 px-3 py-8 text-center text-sm text-black/40 dark:bg-black/20 dark:text-white/40">
+                  <p className="rounded-2xl bg-white/60 px-3 py-10 text-center text-base font-semibold text-black/40 dark:bg-black/20 dark:text-white/40">
                     Sin comandas
                   </p>
                 ) : (
@@ -243,7 +254,7 @@ function ConnectionBadge({ state }: { state: KitchenConnectionState }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${
+      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black ${
         state === "connected"
           ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
           : "bg-amber-500/15 text-amber-800 dark:text-amber-200"
@@ -251,7 +262,7 @@ function ConnectionBadge({ state }: { state: KitchenConnectionState }) {
     >
       <span
         aria-hidden
-        className={`size-2 rounded-full ${
+        className={`size-2.5 rounded-full ${
           state === "connected"
             ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
             : "animate-pulse bg-amber-500"

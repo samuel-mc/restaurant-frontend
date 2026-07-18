@@ -3,6 +3,8 @@
 /**
  * Suscripción STOMP al canal de cocina/caja del tenant.
  * Topic: `/topic/admin/{tenantSlug}/orders`
+ *
+ * Reconexión con backoff exponencial para redes de restaurante inestables.
  */
 
 import { useEffect, useRef } from "react";
@@ -24,6 +26,9 @@ interface UseKitchenOrdersSubscriptionOptions {
   onConnectionChange?: (state: KitchenConnectionState) => void;
 }
 
+const RECONNECT_BASE_MS = 1_000;
+const RECONNECT_MAX_MS = 30_000;
+
 function parseOrderMessage(message: IMessage): Order | null {
   try {
     const raw = JSON.parse(message.body) as OrderResponse;
@@ -34,6 +39,16 @@ function parseOrderMessage(message: IMessage): Order | null {
   }
 }
 
+function nextReconnectDelay(attempt: number): number {
+  const exp = Math.min(
+    RECONNECT_MAX_MS,
+    RECONNECT_BASE_MS * 2 ** Math.max(0, attempt),
+  );
+  // Jitter ±20% para evitar thundering herd si varias tablets reconectan.
+  const jitter = exp * (0.8 + Math.random() * 0.4);
+  return Math.round(Math.min(RECONNECT_MAX_MS, jitter));
+}
+
 export function useKitchenOrdersSubscription({
   tenantSlug,
   enabled = true,
@@ -42,8 +57,11 @@ export function useKitchenOrdersSubscription({
 }: UseKitchenOrdersSubscriptionOptions): void {
   const onOrderEventRef = useRef(onOrderEvent);
   const onConnectionChangeRef = useRef(onConnectionChange);
-  onOrderEventRef.current = onOrderEvent;
-  onConnectionChangeRef.current = onConnectionChange;
+
+  useEffect(() => {
+    onOrderEventRef.current = onOrderEvent;
+    onConnectionChangeRef.current = onConnectionChange;
+  }, [onOrderEvent, onConnectionChange]);
 
   useEffect(() => {
     if (!enabled || !tenantSlug) return;
@@ -53,16 +71,25 @@ export function useKitchenOrdersSubscription({
         globalThis;
     }
 
+    let attempt = 0;
     let client: Client;
+
     try {
       const sockJsUrl = resolveOrdersWsUrl();
       client = new Client({
         webSocketFactory: () => new SockJS(sockJsUrl) as unknown as IStompSocket,
-        reconnectDelay: 3000,
-        heartbeatIncoming: 10000,
-        heartbeatOutgoing: 10000,
-        connectionTimeout: 8000,
+        // stompjs llama esta función en cada intento de reconexión.
+        reconnectDelay: RECONNECT_BASE_MS,
+        heartbeatIncoming: 10_000,
+        heartbeatOutgoing: 10_000,
+        connectionTimeout: 8_000,
+        beforeConnect: async () => {
+          // Ajusta el delay del próximo ciclo con backoff exponencial.
+          client.reconnectDelay = nextReconnectDelay(attempt);
+        },
         onConnect: () => {
+          attempt = 0;
+          client.reconnectDelay = RECONNECT_BASE_MS;
           onConnectionChangeRef.current?.("connected");
           client.subscribe(adminKitchenTopic(tenantSlug), (message) => {
             const order = parseOrderMessage(message);
@@ -73,12 +100,15 @@ export function useKitchenOrdersSubscription({
           onConnectionChangeRef.current?.("disconnected");
         },
         onStompError: () => {
+          attempt += 1;
           onConnectionChangeRef.current?.("disconnected");
         },
         onWebSocketClose: () => {
+          attempt += 1;
           onConnectionChangeRef.current?.("disconnected");
         },
         onWebSocketError: () => {
+          attempt += 1;
           onConnectionChangeRef.current?.("disconnected");
         },
       });

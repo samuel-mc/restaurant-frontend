@@ -14,7 +14,7 @@ export type SitePublishStatus = "published" | "draft" | "not_created";
 
 /** Configuración del website de un tenant. */
 export interface TenantSiteConfig {
-  /** Slug del subdominio (ej. "la-trattoria"). */
+  /** Subdominio del restaurante (ej. "latrattoria"). */
   slug: string;
   /** Nombre comercial. */
   name: string;

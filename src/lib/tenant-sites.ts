@@ -3,7 +3,7 @@
  *
  * Fuente de verdad temporal (hasta que el backend/settings exponga el sitio).
  * - Solo los tenants con entrada aquí tienen website propio.
- * - "La Trattoria" es exclusiva del slug `la-trattoria`.
+ * - La clave del mapa DEBE coincidir con el subdominio (ej. `latrattoria`).
  * - Un restaurante nuevo no hereda ese contenido: su sitio se crea bajo demanda.
  */
 
@@ -14,8 +14,8 @@ import type { TenantSiteConfig } from "@/types/tenant-site";
  * Agregar aquí (o vía API más adelante) cuando se cree un website bajo demanda.
  */
 const TENANT_SITES: Readonly<Record<string, TenantSiteConfig>> = {
-  "la-trattoria": {
-    slug: "la-trattoria",
+  latrattoria: {
+    slug: "latrattoria",
     name: "La Trattoria",
     tagline: "Ristorante Italiano",
     templateId: "la-trattoria",

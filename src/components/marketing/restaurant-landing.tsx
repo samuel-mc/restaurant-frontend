@@ -25,7 +25,7 @@ export type RestaurantBrand = {
 const DEFAULT_BRAND: RestaurantBrand = {
   name: "La Trattoria",
   tagline: "Ristorante Italiano",
-  slug: "la-trattoria",
+  slug: "latrattoria",
 };
 
 const BrandContext = createContext<RestaurantBrand>(DEFAULT_BRAND);

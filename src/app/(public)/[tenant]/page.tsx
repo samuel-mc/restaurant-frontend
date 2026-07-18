@@ -30,7 +30,7 @@ export async function generateMetadata({
 /**
  * Website institucional del restaurante (uno exclusivo por tenant).
  *
- * - `la-trattoria` → sitio exclusivo La Trattoria (plantilla demo completa).
+ * - `latrattoria` → sitio exclusivo La Trattoria (plantilla demo completa).
  * - Otros tenants → solo si tienen sitio registrado; si no, estado "bajo demanda".
  * Nunca se reutiliza el contenido de La Trattoria para otro restaurante.
  */

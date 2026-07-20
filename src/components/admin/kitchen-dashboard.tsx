@@ -7,6 +7,8 @@
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Order, OrderStatus } from "@/types/api";
+import type { AnalyticsSummary } from "@/types/analytics";
+import { AnalyticsOverview } from "@/components/admin/analytics-overview";
 import { OrderTicket } from "@/components/admin/order-ticket";
 import {
   useKitchenOrdersSubscription,
@@ -44,6 +46,7 @@ interface KitchenDashboardProps {
   tenantSlug: string;
   restaurantName: string;
   initialOrders: Order[];
+  analytics: AnalyticsSummary;
 }
 
 function nextStatusFor(status: OrderStatus): OrderStatus | null {
@@ -65,6 +68,7 @@ export function KitchenDashboard({
   tenantSlug,
   restaurantName,
   initialOrders,
+  analytics,
 }: KitchenDashboardProps) {
   const [orders, setOrders] = useState<Order[]>(() =>
     sortByCreatedAt(initialOrders),
@@ -171,7 +175,7 @@ export function KitchenDashboard({
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Cocina · Caja
+              Analíticas · Cocina
             </p>
             <h1 className="text-3xl font-black tracking-tight md:text-4xl">
               {restaurantName}
@@ -199,6 +203,21 @@ export function KitchenDashboard({
           </p>
         ) : null}
       </header>
+
+      <AnalyticsOverview summary={analytics} />
+
+      <div className="mx-auto mt-2 w-full max-w-7xl px-4 md:px-6">
+        <div className="flex items-end justify-between gap-3 border-t border-black/5 pt-5 dark:border-white/10">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
+              Operación
+            </p>
+            <h2 className="text-xl font-black tracking-tight md:text-2xl">
+              Monitor de cocina
+            </h2>
+          </div>
+        </div>
+      </div>
 
       <div className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-3 md:gap-5 md:p-6">
         {COLUMNS.map((column) => {

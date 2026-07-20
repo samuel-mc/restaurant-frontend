@@ -84,6 +84,45 @@ export interface ProductRequest {
   categoryId: number;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Perfil / settings del restaurante (wire)                                   */
+/* -------------------------------------------------------------------------- */
+
+/** Perfil de marca del tenant (`RestaurantProfileResponse.java`). */
+export interface RestaurantProfileResponse {
+  id: number;
+  name: string;
+  subdomain: string;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  description: string | null;
+  address: string | null;
+  googleMapsUrl: string | null;
+  whatsapp: string | null;
+  businessHours: string | null;
+  hasDelivery: boolean;
+  hasPickup: boolean;
+  hasReservations: boolean;
+  updatedAt: string;
+}
+
+/** Payload de actualización de perfil (`RestaurantProfileRequest.java`). */
+export interface RestaurantProfileRequest {
+  name?: string | null;
+  description?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  address?: string | null;
+  googleMapsUrl?: string | null;
+  whatsapp?: string | null;
+  businessHours?: string | null;
+  hasDelivery?: boolean;
+  hasPickup?: boolean;
+  hasReservations?: boolean;
+}
+
 /** Línea de creación de pedido hacia el backend (`OrderDetailRequest.java`). */
 export interface OrderDetailRequest {
   productUuid: string;
@@ -208,4 +247,24 @@ export interface Order {
   formattedTotal: string;
   createdAt: string;
   items: OrderItem[];
+}
+
+/** Perfil de dominio del restaurante (settings / identidad). */
+export interface RestaurantProfile {
+  id: number;
+  name: string;
+  subdomain: string;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  description: string | null;
+  address: string | null;
+  googleMapsUrl: string | null;
+  whatsapp: string | null;
+  businessHours: string | null;
+  hasDelivery: boolean;
+  hasPickup: boolean;
+  hasReservations: boolean;
+  updatedAt: string;
 }

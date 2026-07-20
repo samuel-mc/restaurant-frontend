@@ -6,7 +6,9 @@ import {
   getTenantSite,
   prettifyTenantSlug,
 } from "@/lib/tenant-sites";
+import { getMenuByTenant } from "@/services/menuService";
 import { getPublicRestaurantProfileOrNull } from "@/services/publicRestaurantQueries";
+import type { Product } from "@/types/api";
 
 type TenantWebsitePageProps = {
   params: Promise<{ tenant: string }>;
@@ -31,16 +33,27 @@ export async function generateMetadata({
   };
 }
 
+async function loadCatalog(tenant: string): Promise<Product[]> {
+  try {
+    return await getMenuByTenant(tenant);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Website institucional del restaurante (uno exclusivo por tenant).
- * Identidad y módulos vienen del perfil público del backend.
+ * Identidad, módulos y carta vienen del backend.
  */
 export default async function TenantWebsitePage({
   params,
 }: TenantWebsitePageProps) {
   const { tenant } = await params;
   const site = getTenantSite(tenant);
-  const profile = await getPublicRestaurantProfileOrNull(tenant);
+  const [profile, products] = await Promise.all([
+    getPublicRestaurantProfileOrNull(tenant),
+    loadCatalog(tenant),
+  ]);
 
   if (!site) {
     return (
@@ -55,7 +68,7 @@ export default async function TenantWebsitePage({
 
   switch (site.templateId) {
     case "la-trattoria":
-      return <RestaurantLanding brand={brand} />;
+      return <RestaurantLanding brand={brand} products={products} />;
     default: {
       const _exhaustive: never = site.templateId;
       return _exhaustive;

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent, ReactNode } from "react";
 import {
   Search, ChevronDown, ChevronUp, Star, MapPin, Phone, Mail,
-  Clock, Flame, Leaf, Wheat, Heart, Menu, X, ArrowRight,
+  Clock, Leaf, Heart, Menu, X, ArrowRight,
   MessageCircle, Camera, Share2, Radio, Video,
   ShoppingBag, Calendar, Users, ChefHat, Award, Gift,
   Music, Coffee, Cake, BookOpen, Send, CheckCircle, ExternalLink, Play
@@ -18,6 +18,7 @@ import {
   DEFAULT_RESTAURANT_BRAND,
   type RestaurantBrand,
 } from "@/types/restaurant-brand";
+import type { Product } from "@/types/api";
 
 export type { RestaurantBrand };
 
@@ -29,131 +30,16 @@ function useBrand(): RestaurantBrand {
   return useContext(BrandContext);
 }
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+const CatalogContext = createContext<Product[]>([]);
 
-type MenuCategory = "Todos" | "Entradas" | "Pizzas" | "Pastas" | "Bebidas" | "Postres";
-type Tag = "picante" | "vegetariano" | "sin-gluten" | "favorito";
-
-interface MenuItem {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-  category: Exclude<MenuCategory, "Todos">;
-  tags: Tag[];
-  ingredients: string[];
+function useCatalog(): Product[] {
+  return useContext(CatalogContext);
 }
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+const MENU_PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=280&fit=crop&auto=format";
 
-const MENU_ITEMS: MenuItem[] = [
-  {
-    id: 1, name: "Bruschetta al Pomodoro", price: 129,
-    description: "Pan tostado artesanal con tomate fresco, albahaca y aceite de oliva extra virgen.",
-    image: "https://images.unsplash.com/photo-1572441710-7f920786a90c?w=400&h=280&fit=crop&auto=format",
-    category: "Entradas", tags: ["vegetariano", "favorito"],
-    ingredients: ["Pan de masa madre", "Tomate Roma", "Albahaca fresca", "Aceite de oliva EV", "Ajo"]
-  },
-  {
-    id: 2, name: "Carpaccio di Manzo", price: 189,
-    description: "Finas láminas de res madurada con rúcula, parmesano y alcaparras.",
-    image: "https://images.unsplash.com/photo-1553621042-f6e147245754?w=400&h=280&fit=crop&auto=format",
-    category: "Entradas", tags: ["sin-gluten", "favorito"],
-    ingredients: ["Solomillo de res", "Rúcula", "Parmesano Reggiano", "Alcaparras", "Limón"]
-  },
-  {
-    id: 3, name: "Arancini di Riso", price: 149,
-    description: "Bolitas de risotto rellenas de mozzarella y carne, rebozadas y fritas.",
-    image: "https://images.unsplash.com/photo-1536964430406-8b10f7731d0b?w=400&h=280&fit=crop&auto=format",
-    category: "Entradas", tags: ["favorito"],
-    ingredients: ["Arroz Arborio", "Mozzarella", "Carne molida", "Azafrán", "Pan molido"]
-  },
-  {
-    id: 4, name: "Pizza Margherita", price: 189,
-    description: "La clásica napolitana con salsa de tomate San Marzano, mozzarella di bufala y albahaca.",
-    image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=280&fit=crop&auto=format",
-    category: "Pizzas", tags: ["vegetariano", "favorito"],
-    ingredients: ["Masa madre 48h", "Tomate San Marzano", "Mozzarella di Bufala", "Albahaca", "AOVE"]
-  },
-  {
-    id: 5, name: "Pizza Diavola", price: 219,
-    description: "Salami picante, jalapeños, mozzarella y chile de árbol sobre base de tomate.",
-    image: "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400&h=280&fit=crop&auto=format",
-    category: "Pizzas", tags: ["picante"],
-    ingredients: ["Masa madre 48h", "Salami napolitano", "Jalapeños", "Mozzarella", "Chile de árbol"]
-  },
-  {
-    id: 6, name: "Pizza Tartufo", price: 269,
-    description: "Crema de trufa negra, funghi porcini, mozzarella y parmesano. Sin salsa de tomate.",
-    image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&h=280&fit=crop&auto=format",
-    category: "Pizzas", tags: ["vegetariano", "favorito"],
-    ingredients: ["Masa madre 48h", "Crema de trufa negra", "Funghi porcini", "Mozzarella", "Parmesano"]
-  },
-  {
-    id: 7, name: "Spaghetti Carbonara", price: 199,
-    description: "La receta original romana: guanciale, huevo, pecorino y pimienta negra. Sin crema.",
-    image: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=280&fit=crop&auto=format",
-    category: "Pastas", tags: ["favorito"],
-    ingredients: ["Spaghetti artesanal", "Guanciale", "Huevo entero", "Yema", "Pecorino Romano", "Pimienta"]
-  },
-  {
-    id: 8, name: "Tagliatelle al Ragù", price: 229,
-    description: "Pasta fresca con ragù bolognese cocido 6 horas, parmesano y basilico.",
-    image: "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=280&fit=crop&auto=format",
-    category: "Pastas", tags: ["favorito"],
-    ingredients: ["Tagliatelle fresca", "Res y cerdo", "Vino tinto", "Sofrito", "Parmesano"]
-  },
-  {
-    id: 9, name: "Penne all\'Arrabbiata", price: 179,
-    description: "Salsa de tomate con ajo y chile rojo, aceite de oliva y perejil fresco.",
-    image: "https://images.unsplash.com/photo-1608897013039-887f21d8c804?w=400&h=280&fit=crop&auto=format",
-    category: "Pastas", tags: ["picante", "vegetariano", "sin-gluten"],
-    ingredients: ["Penne di Gragnano", "Tomate San Marzano", "Ajo", "Chile rojo", "Perejil"]
-  },
-  {
-    id: 10, name: "Acqua Frizzante", price: 59,
-    description: "Agua mineral italiana con gas, importada directamente de los Alpes.",
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=280&fit=crop&auto=format",
-    category: "Bebidas", tags: ["vegetariano", "sin-gluten"],
-    ingredients: ["Agua mineral con gas"]
-  },
-  {
-    id: 11, name: "Spritz Aperol", price: 129,
-    description: "Aperol, Prosecco DOC, agua con gas y rodaja de naranja. El aperitivo italiano por excelencia.",
-    image: "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=400&h=280&fit=crop&auto=format",
-    category: "Bebidas", tags: ["favorito"],
-    ingredients: ["Aperol", "Prosecco DOC", "Agua con gas", "Naranja"]
-  },
-  {
-    id: 12, name: "Espresso Doppio", price: 79,
-    description: "Doble extracción de nuestros granos de Sicilia, tostado artesanal en casa.",
-    image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=280&fit=crop&auto=format",
-    category: "Bebidas", tags: ["vegetariano", "sin-gluten"],
-    ingredients: ["Café Sicilia", "Tostado medio-oscuro"]
-  },
-  {
-    id: 13, name: "Tiramisù Classico", price: 149,
-    description: "La receta original de la nonna: savoiardi, mascarpone, espresso y cacao.",
-    image: "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=400&h=280&fit=crop&auto=format",
-    category: "Postres", tags: ["favorito"],
-    ingredients: ["Savoiardi", "Mascarpone", "Espresso", "Marsala", "Cacao en polvo"]
-  },
-  {
-    id: 14, name: "Panna Cotta al Frutto", price: 129,
-    description: "Crema cocida con vainilla de Madagascar, coulis de frutos rojos y menta fresca.",
-    image: "https://images.unsplash.com/photo-1488477181117-7e4856b0ace1?w=400&h=280&fit=crop&auto=format",
-    category: "Postres", tags: ["vegetariano", "sin-gluten"],
-    ingredients: ["Nata", "Vainilla Madagascar", "Gelatina", "Frutos rojos", "Menta"]
-  },
-  {
-    id: 15, name: "Gelato Artigianale", price: 99,
-    description: "Tres bolas de helado artesanal: pistacho de Bronte, stracciatella y limón de Amalfi.",
-    image: "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&h=280&fit=crop&auto=format",
-    category: "Postres", tags: ["vegetariano", "sin-gluten"],
-    ingredients: ["Leche entera", "Pistacho de Bronte", "Chocolate", "Limón de Amalfi"]
-  },
-];
+// ─── Data ────────────────────────────────────────────────────────────────────
 
 const GALLERY_IMAGES = [
   { src: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&h=450&fit=crop&auto=format", alt: "Interior del restaurante" },
@@ -212,21 +98,6 @@ function useCountdown(target: Date) {
 }
 
 // ─── Small components ────────────────────────────────────────────────────────
-
-function TagBadge({ tag }: { tag: Tag }) {
-  const map: Record<Tag, { label: string; icon: ReactNode; cls: string }> = {
-    picante: { label: "Picante", icon: <Flame size={11} />, cls: "bg-red-100 text-red-700 border-red-200" },
-    vegetariano: { label: "Vegetariano", icon: <Leaf size={11} />, cls: "bg-green-100 text-green-700 border-green-200" },
-    "sin-gluten": { label: "Sin Gluten", icon: <Wheat size={11} />, cls: "bg-amber-100 text-amber-700 border-amber-200" },
-    favorito: { label: "Favorito", icon: <Heart size={11} />, cls: "bg-rose-100 text-rose-700 border-rose-200" },
-  };
-  const { label, icon, cls } = map[tag];
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold tracking-wide ${cls}`}>
-      {icon}{label}
-    </span>
-  );
-}
 
 function SectionHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
   return (
@@ -406,108 +277,131 @@ function Hero() {
 // ─── Menu ────────────────────────────────────────────────────────────────────
 
 function DigitalMenu() {
-  const [category, setCategory] = useState<MenuCategory>("Todos");
+  const products = useCatalog();
+  const [categoryId, setCategoryId] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<Tag[]>([]);
-  const [expanded, setExpanded] = useState<number | null>(null);
 
-  const categories: MenuCategory[] = ["Todos", "Entradas", "Pizzas", "Pastas", "Bebidas", "Postres"];
-  const tagFilters: { tag: Tag; label: string; icon: ReactNode }[] = [
-    { tag: "vegetariano", label: "Vegetariano", icon: <Leaf size={13} /> },
-    { tag: "picante", label: "Picante", icon: <Flame size={13} /> },
-    { tag: "sin-gluten", label: "Sin Gluten", icon: <Wheat size={13} /> },
-    { tag: "favorito", label: "Favorito", icon: <Heart size={13} /> },
-  ];
+  const categories = useMemo(() => {
+    const seen = new Map<number, string>();
+    for (const product of products) {
+      if (!seen.has(product.categoryId)) {
+        seen.set(product.categoryId, product.categoryName);
+      }
+    }
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [products]);
 
-  const toggleFilter = (tag: Tag) => setFilters(f => f.includes(tag) ? f.filter(t => t !== tag) : [...f, tag]);
-
-  const filtered = MENU_ITEMS.filter(item => {
-    const catOk = category === "Todos" || item.category === category;
-    const searchOk = !search || item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
-    const tagOk = filters.length === 0 || filters.every(f => item.tags.includes(f));
-    return catOk && searchOk && tagOk;
-  });
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return products.filter((product) => {
+      const catOk =
+        categoryId === "all" || product.categoryId === categoryId;
+      const searchOk =
+        !query ||
+        product.name.toLowerCase().includes(query) ||
+        (product.description ?? "").toLowerCase().includes(query);
+      return catOk && searchOk;
+    });
+  }, [products, categoryId, search]);
 
   return (
     <section id="menu" className="py-24 bg-background">
       <div className="max-w-7xl mx-auto px-6">
-        <SectionHeader eyebrow="Menú Digital" title="Nuestra Carta" subtitle="Ingredientes importados directamente de Italia, elaborados con técnicas tradicionales de cada región." />
+        <SectionHeader
+          eyebrow="Menú Digital"
+          title="Nuestra Carta"
+          subtitle="Platillos publicados desde el panel del restaurante. Explora por categoría o busca por nombre."
+        />
 
-        {/* Search */}
         <div className="relative max-w-md mx-auto mb-8">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            size={16}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <input
-            value={search} onChange={e => setSearch(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar platillo..."
             className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-sm font-nunito-sans text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
           />
         </div>
 
-        {/* Category tabs */}
-        <div className="flex flex-wrap justify-center gap-2 mb-6">
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setCategory(cat)}
+        {categories.length > 0 ? (
+          <div className="flex flex-wrap justify-center gap-2 mb-10">
+            <button
+              type="button"
+              onClick={() => setCategoryId("all")}
               className={`font-nunito-sans text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm border transition-all ${
-                category === cat
+                categoryId === "all"
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
-              }`}>
-              {cat}
+              }`}
+            >
+              Todos
             </button>
-          ))}
-        </div>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setCategoryId(cat.id)}
+                className={`font-nunito-sans text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm border transition-all ${
+                  categoryId === cat.id
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-        {/* Tag filters */}
-        <div className="flex flex-wrap justify-center gap-2 mb-10">
-          {tagFilters.map(({ tag, label, icon }) => (
-            <button key={tag} onClick={() => toggleFilter(tag)}
-              className={`inline-flex items-center gap-1.5 font-nunito-sans text-xs px-4 py-1.5 rounded-full border transition-all ${
-                filters.includes(tag)
-                  ? "bg-accent text-white border-accent"
-                  : "bg-card text-muted-foreground border-border hover:border-accent/40"
-              }`}>
-              {icon}{label}
-            </button>
-          ))}
-          {filters.length > 0 && (
-            <button onClick={() => setFilters([])}
-              className="font-nunito-sans text-xs text-accent underline px-2">Limpiar filtros</button>
-          )}
-        </div>
-
-        {/* Grid */}
-        {filtered.length === 0 ? (
-          <p className="text-center text-muted-foreground font-nunito-sans py-16">No se encontraron platillos con esos filtros.</p>
+        {products.length === 0 ? (
+          <p className="text-center text-muted-foreground font-nunito-sans py-16">
+            Aún no hay platillos publicados. Agrégalos desde el panel de Menú.
+          </p>
+        ) : filtered.length === 0 ? (
+          <p className="text-center text-muted-foreground font-nunito-sans py-16">
+            No se encontraron platillos con esos filtros.
+          </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map(item => (
-              <div key={item.id} className="bg-card border border-border rounded-sm overflow-hidden hover:shadow-lg transition-shadow group">
+            {filtered.map((item) => (
+              <div
+                key={item.uuid}
+                className="bg-card border border-border rounded-sm overflow-hidden hover:shadow-lg transition-shadow group"
+              >
                 <div className="relative h-48 bg-muted overflow-hidden">
-                  <img src={item.image} alt={item.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <div className="absolute top-3 left-3 flex flex-wrap gap-1">
-                    {item.tags.map(t => <TagBadge key={t} tag={t} />)}
-                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.imageUrl || MENU_PLACEHOLDER_IMAGE}
+                    alt={item.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <span className="absolute top-3 left-3 font-nunito-sans text-[10px] tracking-widest uppercase bg-black/55 text-white px-2.5 py-1 rounded-sm">
+                    {item.categoryName}
+                  </span>
                 </div>
                 <div className="p-5">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-playfair-display text-lg font-bold leading-tight">{item.name}</h3>
-                    <span className="font-playfair-display text-xl font-bold text-accent ml-3 shrink-0">${item.price}</span>
+                  <div className="flex items-start justify-between mb-2 gap-3">
+                    <h3 className="font-playfair-display text-lg font-bold leading-tight">
+                      {item.name}
+                    </h3>
+                    <span className="font-playfair-display text-xl font-bold text-accent shrink-0 tabular-nums">
+                      {item.formattedPrice}
+                    </span>
                   </div>
-                  <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed mb-3">{item.description}</p>
-                  <button onClick={() => setExpanded(expanded === item.id ? null : item.id)}
-                    className="flex items-center gap-1 font-nunito-sans text-xs text-accent hover:underline">
-                    {expanded === item.id ? <><ChevronUp size={13} /> Ocultar ingredientes</> : <><ChevronDown size={13} /> Ver ingredientes</>}
-                  </button>
-                  {expanded === item.id && (
-                    <div className="mt-3 pt-3 border-t border-border">
-                      <div className="flex flex-wrap gap-1.5">
-                        {item.ingredients.map(ing => (
-                          <span key={ing} className="font-nunito-sans text-[10px] bg-secondary text-secondary-foreground px-2 py-0.5 rounded-sm">{ing}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {item.description ? (
+                    <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed">
+                      {item.description}
+                    </p>
+                  ) : null}
+                  <a
+                    href="/menu"
+                    className="mt-4 inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
+                  >
+                    <ShoppingBag size={13} /> Pedir en menú digital
+                  </a>
                 </div>
               </div>
             ))}
@@ -521,36 +415,68 @@ function DigitalMenu() {
 // ─── Destacados ──────────────────────────────────────────────────────────────
 
 function Destacados() {
-  const featured = [
-    { ...MENU_ITEMS[6], badge: "Más Vendido", badgeCls: "bg-accent text-white" },
-    { ...MENU_ITEMS[5], badge: "Recomendación del Chef", badgeCls: "bg-[#1a3d2b] text-[#d4a853]" },
-    { ...MENU_ITEMS[12], badge: "Favorito de la Casa", badgeCls: "bg-[#8b5e3c] text-white" },
-  ];
+  const products = useCatalog();
+  const badges = [
+    { badge: "Más Vendido", badgeCls: "bg-accent text-white" },
+    { badge: "Recomendación del Chef", badgeCls: "bg-[#1a3d2b] text-[#d4a853]" },
+    { badge: "Favorito de la Casa", badgeCls: "bg-[#8b5e3c] text-white" },
+  ] as const;
+
+  const featured = products.slice(0, 3).map((product, index) => ({
+    product,
+    ...badges[index]!,
+  }));
+
+  if (featured.length === 0) return null;
 
   return (
     <section id="destacados" className="py-24 bg-secondary">
       <div className="max-w-7xl mx-auto px-6">
-        <SectionHeader eyebrow="Lo Mejor de la Casa" title="Platillos Destacados" subtitle="Nuestra selección de lo más vendido, las recomendaciones del Chef Marco y las promociones de temporada." />
+        <SectionHeader
+          eyebrow="Lo Mejor de la Casa"
+          title="Platillos Destacados"
+          subtitle="Una selección de nuestra carta actual para que pruebes lo esencial."
+        />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {featured.map((item, i) => (
-            <div key={item.id} className={`bg-card rounded-sm overflow-hidden border border-border shadow-sm hover:shadow-xl transition-all duration-300 ${i === 1 ? "md:-translate-y-4" : ""}`}>
+          {featured.map(({ product, badge, badgeCls }, i) => (
+            <div
+              key={product.uuid}
+              className={`bg-card rounded-sm overflow-hidden border border-border shadow-sm hover:shadow-xl transition-all duration-300 ${
+                i === 1 ? "md:-translate-y-4" : ""
+              }`}
+            >
               <div className="relative h-56 bg-muted">
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={product.imageUrl || MENU_PLACEHOLDER_IMAGE}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                <span className={`absolute top-4 left-4 font-nunito-sans text-[10px] tracking-[0.2em] uppercase px-3 py-1.5 rounded-sm font-bold ${item.badgeCls}`}>
-                  {item.badge}
+                <span
+                  className={`absolute top-4 left-4 font-nunito-sans text-[10px] tracking-[0.2em] uppercase px-3 py-1.5 rounded-sm font-bold ${badgeCls}`}
+                >
+                  {badge}
                 </span>
                 <div className="absolute bottom-4 left-4 right-4">
-                  <h3 className="font-playfair-display text-xl font-bold text-white">{item.name}</h3>
-                  <p className="font-playfair-display text-2xl font-black text-[#d4a853] mt-0.5">${item.price}</p>
+                  <h3 className="font-playfair-display text-xl font-bold text-white">
+                    {product.name}
+                  </h3>
+                  <p className="font-playfair-display text-2xl font-black text-[#d4a853] mt-0.5 tabular-nums">
+                    {product.formattedPrice}
+                  </p>
                 </div>
               </div>
               <div className="p-5">
-                <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed">{item.description}</p>
-                <button onClick={() => document.getElementById("ordenar")?.scrollIntoView({ behavior: "smooth" })}
-                  className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-nunito-sans text-xs tracking-widest uppercase py-3 rounded-sm hover:bg-[#2d5c40] transition-colors">
+                <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed">
+                  {product.description?.trim() || product.categoryName}
+                </p>
+                <a
+                  href="/menu"
+                  className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-nunito-sans text-xs tracking-widest uppercase py-3 rounded-sm hover:bg-[#2d5c40] transition-colors"
+                >
                   <ShoppingBag size={14} /> Ordenar
-                </button>
+                </a>
               </div>
             </div>
           ))}
@@ -1311,38 +1237,43 @@ function buildRestaurantTheme(brand: RestaurantBrand): CSSProperties {
 type RestaurantLandingProps = {
   /** Identidad del restaurante. Si no se pasa, usa la demo "La Trattoria". */
   brand?: RestaurantBrand;
+  /** Catálogo público del tenant (productos disponibles). */
+  products?: Product[];
 };
 
 /**
- * Sitio institucional (plantilla La Trattoria) alimentado por perfil público.
+ * Sitio institucional (plantilla La Trattoria) alimentado por perfil + menú.
  */
 export function RestaurantLanding({
   brand = DEFAULT_RESTAURANT_BRAND,
+  products = [],
 }: RestaurantLandingProps) {
   const theme = useMemo(() => buildRestaurantTheme(brand), [brand]);
 
   return (
     <BrandContext.Provider value={brand}>
-      <div
-        style={theme}
-        className="font-nunito-sans bg-background text-foreground overflow-x-hidden"
-      >
-        <Navbar />
-        <Hero />
-        <DigitalMenu />
-        <Destacados />
-        <Promociones />
-        <Ordenar />
-        {brand.hasReservations ? <Reservaciones /> : null}
-        <Nosotros />
-        <Galeria />
-        <Opiniones />
-        <Ubicacion />
-        <Contacto />
-        <FAQ />
-        <ExtrasSection />
-        <Footer />
-      </div>
+      <CatalogContext.Provider value={products}>
+        <div
+          style={theme}
+          className="font-nunito-sans bg-background text-foreground overflow-x-hidden"
+        >
+          <Navbar />
+          <Hero />
+          <DigitalMenu />
+          <Destacados />
+          <Promociones />
+          <Ordenar />
+          {brand.hasReservations ? <Reservaciones /> : null}
+          <Nosotros />
+          <Galeria />
+          <Opiniones />
+          <Ubicacion />
+          <Contacto />
+          <FAQ />
+          <ExtrasSection />
+          <Footer />
+        </div>
+      </CatalogContext.Provider>
     </BrandContext.Provider>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { landingFontVariables } from "@/lib/fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
+    <html lang="es" className={landingFontVariables}>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

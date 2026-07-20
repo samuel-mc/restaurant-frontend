@@ -1,22 +1,22 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { SettingsForm } from "@/components/admin/settings-form";
+import { KitchenDashboard } from "@/components/admin/kitchen-dashboard";
 import { prettifyTenantSlug } from "@/lib/admin-nav";
 import { getAdminAccessToken } from "@/lib/auth-server";
-import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
+import { getActiveOrders } from "@/services/adminOrderQueries";
 import { ApiError } from "@/services/apiClient";
-import type { RestaurantProfile } from "@/types/api";
+import type { Order } from "@/types/api";
 
 export const metadata: Metadata = {
-  title: "Ajustes · Panel",
-  description: "Configura la identidad de marca, horarios y módulos activos.",
+  title: "Operación · Cocina",
+  description: "Monitor en tiempo real de comandas activas.",
 };
 
 /**
- * Ajustes de identidad de marca, horarios y módulos.
+ * Módulo Operación — monitor de cocina/caja.
  */
-export default async function AdminSettingsPage() {
+export default async function AdminKitchenPage() {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
   if (!tenantSlug) {
     return (
@@ -34,11 +34,11 @@ export default async function AdminSettingsPage() {
     redirect("/admin/login");
   }
 
-  let profile: RestaurantProfile | null = null;
+  let initialOrders: Order[] = [];
   let loadError: string | null = null;
 
   try {
-    profile = await getRestaurantProfile(tenantSlug);
+    initialOrders = await getActiveOrders(tenantSlug);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       redirect("/admin/login");
@@ -46,25 +46,23 @@ export default async function AdminSettingsPage() {
     loadError =
       error instanceof ApiError
         ? error.message
-        : "No pudimos cargar la configuración.";
+        : "No pudimos cargar las comandas activas.";
   }
 
-  if (loadError || !profile) {
+  if (loadError) {
     return (
       <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
-        <h1 className="text-2xl font-bold">Configuración no disponible</h1>
-        <p className="text-sm text-foreground/60">
-          {loadError ?? "Perfil no encontrado."}
-        </p>
+        <h1 className="text-2xl font-bold">Monitor no disponible</h1>
+        <p className="text-sm text-foreground/60">{loadError}</p>
       </div>
     );
   }
 
   return (
-    <SettingsForm
+    <KitchenDashboard
       tenantSlug={tenantSlug}
-      restaurantName={profile.name || prettifyTenantSlug(tenantSlug)}
-      initialProfile={profile}
+      restaurantName={prettifyTenantSlug(tenantSlug)}
+      initialOrders={initialOrders}
     />
   );
 }

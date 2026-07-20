@@ -4,7 +4,6 @@
  * Panel de gestión del catálogo: categorías + productos + stock rápido.
  */
 
-import Link from "next/link";
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import type { Category, Product } from "@/types/api";
 import { AvailabilityToggle } from "@/components/admin/availability-toggle";
@@ -281,45 +280,40 @@ export function MenuManager({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-100 dark:bg-neutral-950">
-      <header className="sticky top-0 z-20 border-b border-black/5 bg-white/95 px-4 py-4 backdrop-blur md:px-6 dark:border-white/10 dark:bg-neutral-900/95">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col pb-6">
+      <header className="border-b border-black/5 px-4 py-5 md:px-6 dark:border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Catálogo · Menú
+              Configuración del menú
             </p>
             <h1 className="text-2xl font-extrabold tracking-tight md:text-3xl">
-              {restaurantName}
+              Categorías y platillos
             </h1>
+            <p className="mt-1 text-sm font-medium text-black/50 dark:text-white/50">
+              {restaurantName}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/admin/dashboard"
-              className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-bold hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
-            >
-              Cocina
-            </Link>
-            <button
-              type="button"
-              onClick={openCreateProduct}
-              disabled={categories.length === 0}
-              className="rounded-full bg-foreground px-4 py-1.5 text-sm font-bold text-background disabled:opacity-40"
-            >
-              Agregar platillo
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={openCreateProduct}
+            disabled={categories.length === 0}
+            className="rounded-full bg-foreground px-4 py-1.5 text-sm font-bold text-background disabled:opacity-40"
+          >
+            Agregar platillo
+          </button>
         </div>
         {banner ? (
           <p
             role="status"
-            className="mx-auto mt-3 max-w-7xl rounded-xl bg-emerald-500/15 px-4 py-2 text-center text-sm font-bold text-emerald-800 dark:text-emerald-200"
+            className="mt-3 rounded-xl bg-emerald-500/15 px-4 py-2 text-center text-sm font-bold text-emerald-800 dark:text-emerald-200"
           >
             {banner}
           </p>
         ) : null}
       </header>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 p-4 md:flex-row md:gap-6 md:p-6">
+      <div className="flex flex-1 flex-col gap-4 p-4 md:flex-row md:gap-6 md:p-6">
         <div className="md:hidden">
           <button
             type="button"

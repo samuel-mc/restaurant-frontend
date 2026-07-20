@@ -162,6 +162,8 @@ export interface CreateOrderDTO {
   customerName?: string | null;
   /** Número de mesa (pedidos en salón). */
   tableNumber?: string | null;
+  /** Dirección (solo DELIVERY). */
+  deliveryAddress?: string | null;
   /** Modalidad; por defecto `IN_TABLE` en el menú digital. */
   orderType?: OrderType;
   customerPhone?: string | null;

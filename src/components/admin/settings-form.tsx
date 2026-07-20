@@ -4,7 +4,6 @@
  * Formulario de configuración de identidad, info comercial y módulos SaaS.
  */
 
-import Link from "next/link";
 import {
   useId,
   useState,
@@ -233,30 +232,19 @@ export function SettingsForm({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-100 dark:bg-neutral-950">
-      <header className="sticky top-0 z-20 border-b border-black/5 bg-white/95 px-4 py-4 backdrop-blur md:px-6 dark:border-white/10 dark:bg-neutral-900/95">
+    <div className="flex flex-col pb-6">
+      <header className="border-b border-black/5 px-4 py-5 md:px-6 dark:border-white/10">
         <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Configuración · Identidad
+              Ajustes
             </p>
             <h1 className="text-2xl font-extrabold tracking-tight md:text-3xl">
-              {restaurantName}
+              Identidad y módulos
             </h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/admin/dashboard"
-              className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-bold hover:bg-black/10 dark:bg-white/10"
-            >
-              Cocina
-            </Link>
-            <Link
-              href="/admin/dashboard/menu"
-              className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-bold hover:bg-black/10 dark:bg-white/10"
-            >
-              Menú
-            </Link>
+            <p className="mt-1 text-sm font-medium text-black/50 dark:text-white/50">
+              {restaurantName}
+            </p>
           </div>
         </div>
         {savedBanner ? (

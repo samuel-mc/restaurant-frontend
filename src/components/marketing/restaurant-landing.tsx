@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent, ReactNode } from "react";
 import {
   Search, ChevronDown, ChevronUp, Star, MapPin, Phone, Mail,
@@ -9,26 +9,21 @@ import {
   ShoppingBag, Calendar, Users, ChefHat, Award, Gift,
   Music, Coffee, Cake, BookOpen, Send, CheckCircle, ExternalLink, Play
 } from "lucide-react";
+import {
+  mapsEmbedSrc,
+  telHref,
+  whatsappChatUrl,
+} from "@/lib/contact-links";
+import {
+  DEFAULT_RESTAURANT_BRAND,
+  type RestaurantBrand,
+} from "@/types/restaurant-brand";
+
+export type { RestaurantBrand };
 
 // ─── Brand (multi-tenant) ────────────────────────────────────────────────────
 
-/** Identidad mínima del restaurante para la plantilla institucional. */
-export type RestaurantBrand = {
-  /** Nombre comercial visible (ej. "La Trattoria"). */
-  name: string;
-  /** Subtítulo / categoría (ej. "Ristorante Italiano"). */
-  tagline?: string;
-  /** Slug del subdominio (ej. "mario"). */
-  slug?: string;
-};
-
-const DEFAULT_BRAND: RestaurantBrand = {
-  name: "La Trattoria",
-  tagline: "Ristorante Italiano",
-  slug: "latrattoria",
-};
-
-const BrandContext = createContext<RestaurantBrand>(DEFAULT_BRAND);
+const BrandContext = createContext<RestaurantBrand>(DEFAULT_RESTAURANT_BRAND);
 
 function useBrand(): RestaurantBrand {
   return useContext(BrandContext);
@@ -236,9 +231,9 @@ function TagBadge({ tag }: { tag: Tag }) {
 function SectionHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
   return (
     <div className="text-center mb-14">
-      <p className="font-['Nunito_Sans'] text-xs tracking-[0.25em] uppercase text-accent mb-3">{eyebrow}</p>
-      <h2 className="font-['Playfair_Display'] text-4xl md:text-5xl font-bold text-foreground leading-tight">{title}</h2>
-      {subtitle && <p className="mt-4 text-muted-foreground font-['Nunito_Sans'] max-w-xl mx-auto leading-relaxed">{subtitle}</p>}
+      <p className="font-nunito-sans text-xs tracking-[0.25em] uppercase text-accent mb-3">{eyebrow}</p>
+      <h2 className="font-playfair-display text-4xl md:text-5xl font-bold text-foreground leading-tight">{title}</h2>
+      {subtitle && <p className="mt-4 text-muted-foreground font-nunito-sans max-w-xl mx-auto leading-relaxed">{subtitle}</p>}
     </div>
   );
 }
@@ -265,7 +260,16 @@ function Navbar() {
     return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  const links = ["Menú", "Destacados", "Promociones", "Reservar", "Nosotros", "Galería", "Opiniones", "Contacto"];
+  const links = [
+    "Menú",
+    "Destacados",
+    "Promociones",
+    ...(brand.hasReservations ? (["Reservar"] as const) : []),
+    "Nosotros",
+    "Galería",
+    "Opiniones",
+    "Contacto",
+  ];
 
   const scrollTo = (id: string) => {
     document.getElementById(id.toLowerCase())?.scrollIntoView({ behavior: "smooth" });
@@ -275,24 +279,43 @@ function Navbar() {
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#1a3d2b] shadow-lg" : "bg-transparent"}`}>
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-16">
-        <button onClick={() => scrollTo("inicio")} className="flex flex-col leading-none">
-          <span className="font-['Pinyon_Script'] text-2xl text-[#d4a853]">{brand.name}</span>
-          <span className="font-['Nunito_Sans'] text-[9px] tracking-[0.3em] uppercase text-[#f7f3eb] opacity-70">
-            {brand.tagline ?? "Restaurante"}
+        <button onClick={() => scrollTo("inicio")} className="flex items-center gap-3 leading-none">
+          {brand.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={brand.logoUrl}
+              alt=""
+              className="size-9 rounded-sm object-cover ring-1 ring-white/20"
+            />
+          ) : null}
+          <span className="flex flex-col items-start">
+            <span className="font-pinyon-script text-2xl text-[#d4a853]">{brand.name}</span>
+            <span className="font-nunito-sans text-[9px] tracking-[0.3em] uppercase text-[#f7f3eb] opacity-70">
+              {brand.tagline ?? "Restaurante"}
+            </span>
           </span>
         </button>
         <nav className="hidden lg:flex items-center gap-7">
           {links.map(l => (
             <button key={l} onClick={() => scrollTo(l === "Menú" ? "menu" : l === "Reservar" ? "reservaciones" : l.toLowerCase())}
-              className="font-['Nunito_Sans'] text-xs tracking-widest uppercase text-[#f7f3eb] opacity-80 hover:opacity-100 hover:text-[#d4a853] transition-colors">
+              className="font-nunito-sans text-xs tracking-widest uppercase text-[#f7f3eb] opacity-80 hover:opacity-100 hover:text-[#d4a853] transition-colors">
               {l}
             </button>
           ))}
         </nav>
-        <button onClick={() => scrollTo("reservaciones")}
-          className="hidden lg:inline-flex items-center gap-2 bg-accent text-white font-['Nunito_Sans'] text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm hover:bg-[#a84e22] transition-colors">
-          Reservar Mesa
-        </button>
+        {brand.hasReservations ? (
+          <button onClick={() => scrollTo("reservaciones")}
+            className="hidden lg:inline-flex items-center gap-2 bg-accent text-white font-nunito-sans text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm hover:bg-[#a84e22] transition-colors">
+            Reservar Mesa
+          </button>
+        ) : (
+          <a
+            href="/menu"
+            className="hidden lg:inline-flex items-center gap-2 bg-accent text-white font-nunito-sans text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm hover:bg-[#a84e22] transition-colors"
+          >
+            Ordenar
+          </a>
+        )}
         <button className="lg:hidden text-[#f7f3eb]" onClick={() => setOpen(!open)}>
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
@@ -301,7 +324,7 @@ function Navbar() {
         <div className="lg:hidden bg-[#1a3d2b] border-t border-white/10 px-6 py-6 space-y-4">
           {links.map(l => (
             <button key={l} onClick={() => scrollTo(l === "Menú" ? "menu" : l === "Reservar" ? "reservaciones" : l.toLowerCase())}
-              className="block w-full text-left font-['Nunito_Sans'] text-sm tracking-widest uppercase text-[#f7f3eb] py-2 border-b border-white/10">
+              className="block w-full text-left font-nunito-sans text-sm tracking-widest uppercase text-[#f7f3eb] py-2 border-b border-white/10">
               {l}
             </button>
           ))}
@@ -315,54 +338,65 @@ function Navbar() {
 
 function Hero() {
   const brand = useBrand();
+  const heroImage =
+    brand.bannerUrl ||
+    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1600&h=900&fit=crop&auto=format";
+  const subtitle =
+    brand.description?.trim() ||
+    "Ingredientes frescos, recetas de la casa y un servicio que te hará sentir como en casa.";
+
+  const ctas = [
+    { label: "Ver Menú", id: "menu", primary: true },
+    { label: "Ordenar Ahora", id: "ordenar", primary: false },
+    ...(brand.hasReservations
+      ? [{ label: "Reservar Mesa", id: "reservaciones", primary: false }]
+      : []),
+    { label: "Cómo Llegar", id: "ubicacion", primary: false },
+  ];
+
   return (
     <section id="inicio" className="relative min-h-screen flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-[#0e1f16]">
-        <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1600&h=900&fit=crop&auto=format"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={heroImage}
           alt={`Interior de ${brand.name}`}
-          className="w-full h-full object-cover opacity-45" />
+          className="w-full h-full object-cover opacity-45"
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0e1f16]/60 via-[#0e1f16]/30 to-[#0e1f16]/80" />
       </div>
       <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
-        <p className="font-['Nunito_Sans'] text-[11px] tracking-[0.4em] uppercase text-[#d4a853] mb-6">
-          ✦ Desde 1987 · Auténtica Cocina Italiana ✦
+        <p className="font-nunito-sans text-[11px] tracking-[0.4em] uppercase text-[#d4a853] mb-6">
+          ✦ {brand.tagline ?? "Restaurante"} ✦
         </p>
-        <h1 className="font-['Playfair_Display'] text-5xl md:text-7xl lg:text-8xl font-black text-white leading-[1.05] mb-6">
-          La mejor comida<br />
-          <span className="italic text-[#d4a853]">italiana</span> de la ciudad
+        <h1 className="font-playfair-display text-5xl md:text-7xl lg:text-8xl font-black text-white leading-[1.05] mb-6">
+          {brand.name}
         </h1>
-        <p className="font-['Nunito_Sans'] text-base md:text-lg text-white/75 max-w-xl mx-auto leading-relaxed mb-10">
-          Ingredientes frescos importados, recetas de la nonna y un servicio que te hará sentir en Roma. Servicio a domicilio disponible.
+        <p className="font-nunito-sans text-base md:text-lg text-white/75 max-w-xl mx-auto leading-relaxed mb-10">
+          {subtitle}
         </p>
         <div className="flex flex-wrap gap-3 justify-center">
-          {[
-            { label: "Ver Menú", id: "menu", primary: true },
-            { label: "Ordenar Ahora", id: "ordenar", primary: false },
-            { label: "Reservar Mesa", id: "reservaciones", primary: false },
-            { label: "Cómo Llegar", id: "ubicacion", primary: false },
-          ].map(btn => (
-            <button key={btn.label}
-              onClick={() => document.getElementById(btn.id)?.scrollIntoView({ behavior: "smooth" })}
-              className={`font-['Nunito_Sans'] text-xs tracking-widest uppercase px-7 py-3.5 rounded-sm transition-all duration-200 ${
+          {ctas.map((btn) => (
+            <button
+              key={btn.label}
+              onClick={() =>
+                document.getElementById(btn.id)?.scrollIntoView({ behavior: "smooth" })
+              }
+              className={`font-nunito-sans text-xs tracking-widest uppercase px-7 py-3.5 rounded-sm transition-all duration-200 ${
                 btn.primary
                   ? "bg-accent text-white hover:bg-[#a84e22]"
                   : "border border-white/40 text-white hover:bg-white/10 hover:border-white/70"
-              }`}>
+              }`}
+            >
               {btn.label}
             </button>
           ))}
         </div>
-        <div className="mt-16 flex justify-center gap-8 text-white/60 text-center">
-          {[["4.9★", "Google Reviews"], ["12", "Años de sabor"], ["200+", "Platillos únicos"]].map(([v, l]) => (
-            <div key={l}>
-              <div className="font-['Playfair_Display'] text-2xl font-bold text-[#d4a853]">{v}</div>
-              <div className="font-['Nunito_Sans'] text-[10px] tracking-widest uppercase mt-0.5">{l}</div>
-            </div>
-          ))}
-        </div>
       </div>
-      <button onClick={() => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" })}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/40 hover:text-white/70 transition-colors animate-bounce">
+      <button
+        onClick={() => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" })}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/40 hover:text-white/70 transition-colors animate-bounce"
+      >
         <ChevronDown size={28} />
       </button>
     </section>
@@ -405,7 +439,7 @@ function DigitalMenu() {
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar platillo..."
-            className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-sm font-['Nunito_Sans'] text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+            className="w-full pl-11 pr-4 py-3 bg-card border border-border rounded-sm font-nunito-sans text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
           />
         </div>
 
@@ -413,7 +447,7 @@ function DigitalMenu() {
         <div className="flex flex-wrap justify-center gap-2 mb-6">
           {categories.map(cat => (
             <button key={cat} onClick={() => setCategory(cat)}
-              className={`font-['Nunito_Sans'] text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm border transition-all ${
+              className={`font-nunito-sans text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm border transition-all ${
                 category === cat
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
@@ -427,7 +461,7 @@ function DigitalMenu() {
         <div className="flex flex-wrap justify-center gap-2 mb-10">
           {tagFilters.map(({ tag, label, icon }) => (
             <button key={tag} onClick={() => toggleFilter(tag)}
-              className={`inline-flex items-center gap-1.5 font-['Nunito_Sans'] text-xs px-4 py-1.5 rounded-full border transition-all ${
+              className={`inline-flex items-center gap-1.5 font-nunito-sans text-xs px-4 py-1.5 rounded-full border transition-all ${
                 filters.includes(tag)
                   ? "bg-accent text-white border-accent"
                   : "bg-card text-muted-foreground border-border hover:border-accent/40"
@@ -437,13 +471,13 @@ function DigitalMenu() {
           ))}
           {filters.length > 0 && (
             <button onClick={() => setFilters([])}
-              className="font-['Nunito_Sans'] text-xs text-accent underline px-2">Limpiar filtros</button>
+              className="font-nunito-sans text-xs text-accent underline px-2">Limpiar filtros</button>
           )}
         </div>
 
         {/* Grid */}
         {filtered.length === 0 ? (
-          <p className="text-center text-muted-foreground font-['Nunito_Sans'] py-16">No se encontraron platillos con esos filtros.</p>
+          <p className="text-center text-muted-foreground font-nunito-sans py-16">No se encontraron platillos con esos filtros.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map(item => (
@@ -457,19 +491,19 @@ function DigitalMenu() {
                 </div>
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-['Playfair_Display'] text-lg font-bold leading-tight">{item.name}</h3>
-                    <span className="font-['Playfair_Display'] text-xl font-bold text-accent ml-3 shrink-0">${item.price}</span>
+                    <h3 className="font-playfair-display text-lg font-bold leading-tight">{item.name}</h3>
+                    <span className="font-playfair-display text-xl font-bold text-accent ml-3 shrink-0">${item.price}</span>
                   </div>
-                  <p className="font-['Nunito_Sans'] text-sm text-muted-foreground leading-relaxed mb-3">{item.description}</p>
+                  <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed mb-3">{item.description}</p>
                   <button onClick={() => setExpanded(expanded === item.id ? null : item.id)}
-                    className="flex items-center gap-1 font-['Nunito_Sans'] text-xs text-accent hover:underline">
+                    className="flex items-center gap-1 font-nunito-sans text-xs text-accent hover:underline">
                     {expanded === item.id ? <><ChevronUp size={13} /> Ocultar ingredientes</> : <><ChevronDown size={13} /> Ver ingredientes</>}
                   </button>
                   {expanded === item.id && (
                     <div className="mt-3 pt-3 border-t border-border">
                       <div className="flex flex-wrap gap-1.5">
                         {item.ingredients.map(ing => (
-                          <span key={ing} className="font-['Nunito_Sans'] text-[10px] bg-secondary text-secondary-foreground px-2 py-0.5 rounded-sm">{ing}</span>
+                          <span key={ing} className="font-nunito-sans text-[10px] bg-secondary text-secondary-foreground px-2 py-0.5 rounded-sm">{ing}</span>
                         ))}
                       </div>
                     </div>
@@ -503,18 +537,18 @@ function Destacados() {
               <div className="relative h-56 bg-muted">
                 <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                <span className={`absolute top-4 left-4 font-['Nunito_Sans'] text-[10px] tracking-[0.2em] uppercase px-3 py-1.5 rounded-sm font-bold ${item.badgeCls}`}>
+                <span className={`absolute top-4 left-4 font-nunito-sans text-[10px] tracking-[0.2em] uppercase px-3 py-1.5 rounded-sm font-bold ${item.badgeCls}`}>
                   {item.badge}
                 </span>
                 <div className="absolute bottom-4 left-4 right-4">
-                  <h3 className="font-['Playfair_Display'] text-xl font-bold text-white">{item.name}</h3>
-                  <p className="font-['Playfair_Display'] text-2xl font-black text-[#d4a853] mt-0.5">${item.price}</p>
+                  <h3 className="font-playfair-display text-xl font-bold text-white">{item.name}</h3>
+                  <p className="font-playfair-display text-2xl font-black text-[#d4a853] mt-0.5">${item.price}</p>
                 </div>
               </div>
               <div className="p-5">
-                <p className="font-['Nunito_Sans'] text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed">{item.description}</p>
                 <button onClick={() => document.getElementById("ordenar")?.scrollIntoView({ behavior: "smooth" })}
-                  className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-['Nunito_Sans'] text-xs tracking-widest uppercase py-3 rounded-sm hover:bg-[#2d5c40] transition-colors">
+                  className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-nunito-sans text-xs tracking-widest uppercase py-3 rounded-sm hover:bg-[#2d5c40] transition-colors">
                   <ShoppingBag size={14} /> Ordenar
                 </button>
               </div>
@@ -536,16 +570,16 @@ function PromoCard({ promo }: { promo: typeof PROMOS[0] }) {
         <div className="w-48 h-48 rounded-full border-[40px] border-white -translate-y-16 translate-x-16" />
       </div>
       <div>
-        <span className={`font-['Nunito_Sans'] text-[9px] tracking-[0.3em] uppercase ${promo.accent} font-bold`}>{promo.badge}</span>
-        <h3 className={`font-['Playfair_Display'] text-2xl font-bold ${promo.textColor} mt-2 leading-tight`}>{promo.title}</h3>
-        <p className={`font-['Nunito_Sans'] text-xs tracking-widest uppercase ${promo.accent} mt-1`}>{promo.subtitle}</p>
-        <p className={`font-['Nunito_Sans'] text-sm ${promo.textColor} opacity-80 mt-3 leading-relaxed`}>{promo.desc}</p>
+        <span className={`font-nunito-sans text-[9px] tracking-[0.3em] uppercase ${promo.accent} font-bold`}>{promo.badge}</span>
+        <h3 className={`font-playfair-display text-2xl font-bold ${promo.textColor} mt-2 leading-tight`}>{promo.title}</h3>
+        <p className={`font-nunito-sans text-xs tracking-widest uppercase ${promo.accent} mt-1`}>{promo.subtitle}</p>
+        <p className={`font-nunito-sans text-sm ${promo.textColor} opacity-80 mt-3 leading-relaxed`}>{promo.desc}</p>
       </div>
       <div className={`flex gap-3 mt-4 ${promo.textColor}`}>
         {[["Horas", time.h], ["Min", time.m], ["Seg", time.s]].map(([label, val]) => (
           <div key={label as string} className="text-center">
-            <div className="font-['Playfair_Display'] text-3xl font-black">{String(val).padStart(2, "0")}</div>
-            <div className="font-['Nunito_Sans'] text-[9px] tracking-widest uppercase opacity-60">{label}</div>
+            <div className="font-playfair-display text-3xl font-black">{String(val).padStart(2, "0")}</div>
+            <div className="font-nunito-sans text-[9px] tracking-widest uppercase opacity-60">{label}</div>
           </div>
         ))}
       </div>
@@ -569,31 +603,80 @@ function Promociones() {
 // ─── Ordena ──────────────────────────────────────────────────────────────────
 
 function Ordenar() {
+  const brand = useBrand();
+  const wa = whatsappChatUrl(brand.whatsapp);
+
+  const modalityBits: string[] = [];
+  if (brand.hasDelivery) modalityBits.push("Delivery");
+  if (brand.hasPickup) modalityBits.push("Pickup");
+  const eyebrow =
+    modalityBits.length > 0 ? modalityBits.join(" & ") : "Pedidos";
+
   const platforms = [
-    { name: "WhatsApp", desc: "Atención inmediata", color: "bg-green-600", hov: "hover:bg-green-700", icon: <MessageCircle size={28} />, link: "https://wa.me/5219876543210" },
-    { name: "Rappi", desc: "Entrega en 30 min", color: "bg-orange-500", hov: "hover:bg-orange-600", icon: <ShoppingBag size={28} />, link: "#" },
-    { name: "Uber Eats", desc: "Disponible 24/7", color: "bg-[#142328]", hov: "hover:bg-[#0a1419]", icon: <ShoppingBag size={28} />, link: "#" },
-    { name: "Didi Food", desc: "Rastreo en tiempo real", color: "bg-[#ff6b00]", hov: "hover:bg-[#e05e00]", icon: <ShoppingBag size={28} />, link: "#" },
-    { name: "Pedido Propio", desc: "Sin comisiones extra", color: "bg-primary", hov: "hover:bg-[#2d5c40]", icon: <Award size={28} />, link: "#" },
+    ...(wa
+      ? [
+          {
+            name: "WhatsApp",
+            desc: "Atención inmediata",
+            color: "bg-green-600",
+            hov: "hover:bg-green-700",
+            icon: <MessageCircle size={28} />,
+            link: wa,
+            external: true,
+          },
+        ]
+      : []),
+    {
+      name: "Pedido en menú",
+      desc: brand.hasPickup
+        ? "Recoge o pide en mesa"
+        : brand.hasDelivery
+          ? "Pide a domicilio"
+          : "Ordena desde la mesa",
+      color: "bg-primary",
+      hov: "hover:opacity-90",
+      icon: <Award size={28} />,
+      link: "/menu",
+      external: false,
+    },
   ];
+
   return (
     <section id="ordenar" className="py-24 bg-[#1a3d2b]">
       <div className="max-w-5xl mx-auto px-6">
         <div className="text-center mb-14">
-          <p className="font-['Nunito_Sans'] text-xs tracking-[0.25em] uppercase text-[#d4a853] mb-3">Delivery & Pickup</p>
-          <h2 className="font-['Playfair_Display'] text-4xl md:text-5xl font-bold text-white leading-tight">Ordena en Línea</h2>
-          <p className="mt-4 text-white/60 font-['Nunito_Sans'] max-w-md mx-auto">Recibe tus platillos favoritos donde estés, o pídelos para recoger.</p>
+          <p className="font-nunito-sans text-xs tracking-[0.25em] uppercase text-[#d4a853] mb-3">
+            {eyebrow}
+          </p>
+          <h2 className="font-playfair-display text-4xl md:text-5xl font-bold text-white leading-tight">
+            Ordena en Línea
+          </h2>
+          <p className="mt-4 text-white/60 font-nunito-sans max-w-md mx-auto">
+            {brand.hasDelivery || brand.hasPickup
+              ? "Recibe tus platillos favoritos donde estés, o pídelos para recoger."
+              : "Arma tu pedido desde la mesa con nuestro menú digital."}
+          </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {platforms.map(p => (
-            <a key={p.name} href={p.link} target="_blank" rel="noopener noreferrer"
-              className={`${p.color} ${p.hov} text-white p-6 rounded-sm flex items-center gap-5 transition-all duration-200 group`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto">
+          {platforms.map((p) => (
+            <a
+              key={p.name}
+              href={p.link}
+              {...(p.external
+                ? { target: "_blank", rel: "noopener noreferrer" }
+                : {})}
+              className={`${p.color} ${p.hov} text-white p-6 rounded-sm flex items-center gap-5 transition-all duration-200 group`}
+            >
               <div className="shrink-0 w-14 h-14 bg-white/10 rounded-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
                 {p.icon}
               </div>
               <div>
-                <div className="font-['Playfair_Display'] text-xl font-bold">{p.name}</div>
-                <div className="font-['Nunito_Sans'] text-xs opacity-70 mt-0.5">{p.desc}</div>
+                <div className="font-playfair-display text-xl font-bold">
+                  {p.name}
+                </div>
+                <div className="font-nunito-sans text-xs opacity-70 mt-0.5">
+                  {p.desc}
+                </div>
               </div>
               <ExternalLink size={16} className="ml-auto opacity-40 group-hover:opacity-80" />
             </a>
@@ -614,29 +697,41 @@ function Reservaciones() {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
   const handleSubmit = (e: FormEvent) => { e.preventDefault(); setSent(true); };
 
-  const labelCls = "block font-['Nunito_Sans'] text-xs tracking-widest uppercase text-muted-foreground mb-2";
-  const inputCls = "w-full bg-secondary border border-border rounded-sm px-4 py-3 font-['Nunito_Sans'] text-sm focus:outline-none focus:ring-2 focus:ring-accent/30";
+  const labelCls = "block font-nunito-sans text-xs tracking-widest uppercase text-muted-foreground mb-2";
+  const inputCls = "w-full bg-secondary border border-border rounded-sm px-4 py-3 font-nunito-sans text-sm focus:outline-none focus:ring-2 focus:ring-accent/30";
 
   return (
     <section id="reservaciones" className="py-24 bg-secondary">
       <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
         <div>
-          <p className="font-['Nunito_Sans'] text-xs tracking-[0.25em] uppercase text-accent mb-3">Reservaciones</p>
-          <h2 className="font-['Playfair_Display'] text-4xl md:text-5xl font-bold text-foreground leading-tight">Reserva tu Mesa</h2>
-          <p className="mt-5 text-muted-foreground font-['Nunito_Sans'] leading-relaxed">
+          <p className="font-nunito-sans text-xs tracking-[0.25em] uppercase text-accent mb-3">Reservaciones</p>
+          <h2 className="font-playfair-display text-4xl md:text-5xl font-bold text-foreground leading-tight">Reserva tu Mesa</h2>
+          <p className="mt-5 text-muted-foreground font-nunito-sans leading-relaxed">
             Asegura tu lugar en {brand.name}. Para grupos de 8+ personas contáctanos directamente por WhatsApp para atención especial.
           </p>
           <div className="mt-8 space-y-4">
             {[
-              [<Clock key="clock" size={18} />, "Horario", "Lun–Vie 13:00–23:00 · Sáb–Dom 12:00–00:00"],
-              [<Phone key="phone" size={18} />, "Teléfono", "+52 (55) 1234-5678"],
-              [<MapPin key="map-pin" size={18} />, "Dirección", "Calle Florencia 88, Colonia Juárez, CDMX"],
+              [
+                <Clock key="clock" size={18} />,
+                "Horario",
+                brand.businessHours?.trim() || "Consulta horarios en contacto",
+              ],
+              [
+                <Phone key="phone" size={18} />,
+                "WhatsApp",
+                brand.whatsapp?.trim() || "Próximamente",
+              ],
+              [
+                <MapPin key="map-pin" size={18} />,
+                "Dirección",
+                brand.address?.trim() || "Dirección por confirmar",
+              ],
             ].map(([icon, label, value]) => (
               <div key={label as string} className="flex items-start gap-4">
                 <div className="w-10 h-10 bg-primary rounded-sm flex items-center justify-center text-primary-foreground shrink-0 mt-0.5">{icon}</div>
                 <div>
-                  <div className="font-['Nunito_Sans'] text-[10px] tracking-widest uppercase text-muted-foreground">{label}</div>
-                  <div className="font-['Nunito_Sans'] text-sm font-semibold mt-0.5">{value}</div>
+                  <div className="font-nunito-sans text-[10px] tracking-widest uppercase text-muted-foreground">{label}</div>
+                  <div className="font-nunito-sans text-sm font-semibold mt-0.5">{value}</div>
                 </div>
               </div>
             ))}
@@ -646,9 +741,9 @@ function Reservaciones() {
           {sent ? (
             <div className="text-center py-10">
               <CheckCircle size={52} className="text-green-600 mx-auto mb-4" />
-              <h3 className="font-['Playfair_Display'] text-2xl font-bold mb-2">¡Reservación Confirmada!</h3>
-              <p className="font-['Nunito_Sans'] text-sm text-muted-foreground">Te contactaremos en breve al número proporcionado para confirmar los detalles.</p>
-              <button onClick={() => setSent(false)} className="mt-6 font-['Nunito_Sans'] text-xs text-accent underline">Hacer otra reservación</button>
+              <h3 className="font-playfair-display text-2xl font-bold mb-2">¡Reservación Confirmada!</h3>
+              <p className="font-nunito-sans text-sm text-muted-foreground">Te contactaremos en breve al número proporcionado para confirmar los detalles.</p>
+              <button onClick={() => setSent(false)} className="mt-6 font-nunito-sans text-xs text-accent underline">Hacer otra reservación</button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -683,7 +778,7 @@ function Reservaciones() {
                 <textarea name="notas" value={form.notas} onChange={handleChange} placeholder="Alergias, ocasión especial, silla para bebé..." rows={3} className={`${inputCls} resize-none`} />
               </div>
               <button type="submit"
-                className="w-full bg-accent text-white font-['Nunito_Sans'] text-xs tracking-widest uppercase py-4 rounded-sm hover:bg-[#a84e22] transition-colors">
+                className="w-full bg-accent text-white font-nunito-sans text-xs tracking-widest uppercase py-4 rounded-sm hover:bg-[#a84e22] transition-colors">
                 Confirmar Reservación
               </button>
             </form>
@@ -709,11 +804,11 @@ function Nosotros() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-20">
           <div>
-            <p className="font-['Nunito_Sans'] text-xs tracking-[0.25em] uppercase text-accent mb-3">Nuestra Historia</p>
-            <h2 className="font-['Playfair_Display'] text-4xl md:text-5xl font-bold text-foreground leading-tight mb-6">
+            <p className="font-nunito-sans text-xs tracking-[0.25em] uppercase text-accent mb-3">Nuestra Historia</p>
+            <h2 className="font-playfair-display text-4xl md:text-5xl font-bold text-foreground leading-tight mb-6">
               Una familia italiana<br /><span className="italic">en el corazón de CDMX</span>
             </h2>
-            <div className="space-y-4 text-muted-foreground font-['Nunito_Sans'] leading-relaxed text-sm">
+            <div className="space-y-4 text-muted-foreground font-nunito-sans leading-relaxed text-sm">
               <p>En 1987, la familia Conti llegó de Nápoles con una maleta llena de recetas y el sueño de compartir la auténtica cocina italiana con México. Lo que comenzó como un pequeño trattoria de 12 mesas hoy es el restaurante italiano más querido de la Ciudad.</p>
               <p>El Chef Marco Conti, segunda generación, estudió en la Academia Culinaria de Bolonia y volvió con técnicas modernas sin abandonar la filosofía familiar: <em>&ldquo;La comida buena no necesita trucos, necesita tiempo y amor.&rdquo;</em></p>
               <p>Importamos nuestra mozzarella di bufala directamente de Campania, nuestro aceite de oliva de los olivares centenarios de la familia en Apulia, y nuestro café de los cafetales de Sicilia.</p>
@@ -723,8 +818,8 @@ function Nosotros() {
             <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=640&h=480&fit=crop&auto=format"
               alt="Chef Marco Conti" className="w-full h-96 object-cover rounded-sm" />
             <div className="absolute -bottom-6 -left-6 bg-primary text-primary-foreground p-5 rounded-sm">
-              <div className="font-['Playfair_Display'] text-3xl font-black text-[#d4a853]">37</div>
-              <div className="font-['Nunito_Sans'] text-[10px] tracking-widest uppercase opacity-80 mt-1">Años de Tradición</div>
+              <div className="font-playfair-display text-3xl font-black text-[#d4a853]">37</div>
+              <div className="font-nunito-sans text-[10px] tracking-widest uppercase opacity-80 mt-1">Años de Tradición</div>
             </div>
           </div>
         </div>
@@ -734,8 +829,8 @@ function Nosotros() {
               <div className="w-12 h-12 bg-secondary rounded-sm flex items-center justify-center mx-auto mb-4 text-accent group-hover:bg-accent group-hover:text-white transition-colors">
                 {v.icon}
               </div>
-              <h4 className="font-['Playfair_Display'] text-lg font-bold mb-2">{v.title}</h4>
-              <p className="font-['Nunito_Sans'] text-xs text-muted-foreground leading-relaxed">{v.desc}</p>
+              <h4 className="font-playfair-display text-lg font-bold mb-2">{v.title}</h4>
+              <p className="font-nunito-sans text-xs text-muted-foreground leading-relaxed">{v.desc}</p>
             </div>
           ))}
         </div>
@@ -786,29 +881,29 @@ function Opiniones() {
       <div className="max-w-7xl mx-auto px-6">
         <SectionHeader eyebrow="Google Reviews" title="Lo que Dicen de Nosotros" />
         <div className="flex flex-col items-center mb-12">
-          <div className="font-['Playfair_Display'] text-7xl font-black text-accent">{avg}</div>
+          <div className="font-playfair-display text-7xl font-black text-accent">{avg}</div>
           <div className="flex gap-1 my-2">
             {[1,2,3,4,5].map(i => <Star key={i} size={20} className="fill-[#d4a853] text-[#d4a853]" />)}
           </div>
-          <p className="font-['Nunito_Sans'] text-xs tracking-widest uppercase text-muted-foreground">{REVIEWS.length * 47}+ Reseñas en Google</p>
+          <p className="font-nunito-sans text-xs tracking-widest uppercase text-muted-foreground">{REVIEWS.length * 47}+ Reseñas en Google</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {REVIEWS.map((r, i) => (
             <div key={i} className="bg-card border border-border rounded-sm p-6 hover:border-accent/30 transition-colors">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-['Playfair_Display'] font-bold text-sm text-[#d4a853]">{r.avatar}</div>
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-playfair-display font-bold text-sm text-[#d4a853]">{r.avatar}</div>
                 <div>
-                  <div className="font-['Nunito_Sans'] text-sm font-semibold">{r.name}</div>
-                  <div className="font-['Nunito_Sans'] text-[10px] text-muted-foreground">{r.date}</div>
+                  <div className="font-nunito-sans text-sm font-semibold">{r.name}</div>
+                  <div className="font-nunito-sans text-[10px] text-muted-foreground">{r.date}</div>
                 </div>
               </div>
               <StarRow rating={r.rating} />
-              <p className="font-['Nunito_Sans'] text-sm text-muted-foreground leading-relaxed mt-3 italic">&ldquo;{r.text}&rdquo;</p>
+              <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed mt-3 italic">&ldquo;{r.text}&rdquo;</p>
             </div>
           ))}
         </div>
         <div className="text-center mt-10">
-          <a href="#" className="inline-flex items-center gap-2 font-['Nunito_Sans'] text-xs tracking-widest uppercase text-accent border border-accent px-6 py-3 rounded-sm hover:bg-accent hover:text-white transition-colors">
+          <a href="#" className="inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent border border-accent px-6 py-3 rounded-sm hover:bg-accent hover:text-white transition-colors">
             Ver todas en Google <ExternalLink size={13} />
           </a>
         </div>
@@ -821,12 +916,10 @@ function Opiniones() {
 
 function Ubicacion() {
   const brand = useBrand();
-  const horarios = [
-    ["Lunes – Viernes", "13:00 – 23:00"],
-    ["Sábado", "12:00 – 00:00"],
-    ["Domingo", "12:00 – 22:00"],
-    ["Días festivos", "Horario especial"],
-  ];
+  const embed = mapsEmbedSrc(brand.googleMapsUrl);
+  const address = brand.address?.trim() || "Dirección por confirmar";
+  const hours = brand.businessHours?.trim() || "Horario por confirmar";
+
   return (
     <section id="ubicacion" className="py-24 bg-secondary">
       <div className="max-w-7xl mx-auto px-6">
@@ -834,37 +927,52 @@ function Ubicacion() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-7">
             <div>
-              <p className="font-['Nunito_Sans'] text-[10px] tracking-[0.25em] uppercase text-accent mb-3 font-semibold">Dirección</p>
+              <p className="font-nunito-sans text-[10px] tracking-[0.25em] uppercase text-accent mb-3 font-semibold">Dirección</p>
               <div className="flex items-start gap-3">
                 <MapPin size={16} className="text-accent mt-0.5 shrink-0" />
-                <p className="font-['Nunito_Sans'] text-sm leading-relaxed">Calle Florencia 88, Col. Juárez<br />Cuauhtémoc, CDMX, 06600</p>
+                <p className="font-nunito-sans text-sm leading-relaxed whitespace-pre-line">{address}</p>
               </div>
             </div>
             <div>
-              <p className="font-['Nunito_Sans'] text-[10px] tracking-[0.25em] uppercase text-accent mb-3 font-semibold">Horarios</p>
-              <div className="space-y-2">
-                {horarios.map(([day, hrs]) => (
-                  <div key={day} className="flex justify-between font-['Nunito_Sans'] text-sm">
-                    <span className="text-muted-foreground">{day}</span>
-                    <span className="font-semibold">{hrs}</span>
-                  </div>
-                ))}
+              <p className="font-nunito-sans text-[10px] tracking-[0.25em] uppercase text-accent mb-3 font-semibold">Horarios</p>
+              <div className="flex items-start gap-3">
+                <Clock size={16} className="text-accent mt-0.5 shrink-0" />
+                <p className="font-nunito-sans text-sm font-semibold leading-relaxed whitespace-pre-line">{hours}</p>
               </div>
             </div>
-            <div>
-              <p className="font-['Nunito_Sans'] text-[10px] tracking-[0.25em] uppercase text-accent mb-3 font-semibold">Extras</p>
-              {["Valet Parking cortesía +$500", "Estacionamiento público a 50m", "Metro Insurgentes (5 min)", "Pet friendly en terraza"].map(item => (
-                <div key={item} className="flex items-center gap-2 font-['Nunito_Sans'] text-sm text-muted-foreground py-1">
-                  <CheckCircle size={13} className="text-accent shrink-0" /> {item}
-                </div>
-              ))}
-            </div>
+            {brand.googleMapsUrl ? (
+              <a
+                href={brand.googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent border border-accent px-5 py-3 rounded-sm hover:bg-accent hover:text-white transition-colors"
+              >
+                Abrir en Google Maps <ExternalLink size={13} />
+              </a>
+            ) : null}
           </div>
           <div className="lg:col-span-2 bg-muted rounded-sm overflow-hidden h-80 lg:h-auto min-h-[320px] relative">
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3762.1234!2d-99.1532!3d19.4326!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTnCsDI1JzU3LjQiTiA5OcKwMDknMTEuNSJX!5e0!3m2!1ses!2smx!4v1234567890"
-              width="100%" height="100%" style={{ border: 0, minHeight: "320px" }} allowFullScreen loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade" title={`Mapa ${brand.name}`} className="w-full h-full" />
+            {embed ? (
+              <iframe
+                src={embed}
+                width="100%"
+                height="100%"
+                style={{ border: 0, minHeight: "320px" }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title={`Mapa ${brand.name}`}
+                className="w-full h-full"
+              />
+            ) : (
+              <div className="flex h-full min-h-[320px] items-center justify-center px-6 text-center">
+                <p className="font-nunito-sans text-sm text-muted-foreground max-w-sm">
+                  {brand.googleMapsUrl
+                    ? "Usa el enlace de Google Maps para ver la ubicación."
+                    : "Configura la URL de Google Maps en Ajustes del panel admin."}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -876,41 +984,99 @@ function Ubicacion() {
 
 function Contacto() {
   const brand = useBrand();
+  const wa = whatsappChatUrl(brand.whatsapp);
+  const phone = telHref(brand.whatsapp);
   const socials = [
     { icon: <Camera size={20} />, label: `@${brand.slug ?? "restaurante"}`, href: "#" },
     { icon: <Share2 size={20} />, label: `${brand.name}`, href: "#" },
     { icon: <Radio size={20} />, label: `@${brand.slug ?? "restaurante"}`, href: "#" },
     { icon: <Video size={20} />, label: `${brand.name} Cocina`, href: "#" },
   ];
+
+  const cards = [
+    ...(wa
+      ? [
+          {
+            icon: <MessageCircle size={24} />,
+            title: "WhatsApp",
+            sub: brand.whatsapp ?? "",
+            cta: "Escribir ahora",
+            href: wa,
+            cls: "bg-green-700 hover:bg-green-800",
+          },
+        ]
+      : []),
+    ...(phone
+      ? [
+          {
+            icon: <Phone size={24} />,
+            title: "Teléfono",
+            sub: brand.whatsapp ?? "",
+            cta: "Llamar",
+            href: phone,
+            cls: "bg-[#2d5c40] hover:bg-[#3a7253]",
+          },
+        ]
+      : []),
+    ...(brand.address
+      ? [
+          {
+            icon: <MapPin size={24} />,
+            title: "Visítanos",
+            sub: brand.address,
+            cta: brand.googleMapsUrl ? "Ver mapa" : "Ubicación",
+            href: brand.googleMapsUrl || "#ubicacion",
+            cls: "bg-[#8b5e3c] hover:bg-[#9e6a44]",
+          },
+        ]
+      : []),
+  ];
+
   return (
     <section id="contacto" className="py-24 bg-[#1a3d2b]">
       <div className="max-w-5xl mx-auto px-6">
         <div className="text-center mb-14">
-          <p className="font-['Nunito_Sans'] text-xs tracking-[0.25em] uppercase text-[#d4a853] mb-3">Estamos para ti</p>
-          <h2 className="font-['Playfair_Display'] text-4xl md:text-5xl font-bold text-white">Contáctanos</h2>
+          <p className="font-nunito-sans text-xs tracking-[0.25em] uppercase text-[#d4a853] mb-3">Estamos para ti</p>
+          <h2 className="font-playfair-display text-4xl md:text-5xl font-bold text-white">Contáctanos</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-12">
-          {[
-            { icon: <MessageCircle size={24} />, title: "WhatsApp", sub: "+52 (55) 1234-5678", cta: "Escribir ahora", href: "https://wa.me/5215512345678", cls: "bg-green-700 hover:bg-green-800" },
-            { icon: <Phone size={24} />, title: "Teléfono", sub: "+52 (55) 1234-5678", cta: "Llamar", href: "tel:+5215512345678", cls: "bg-[#2d5c40] hover:bg-[#3a7253]" },
-            { icon: <Mail size={24} />, title: "Email", sub: "hola@latrattoria.mx", cta: "Enviar email", href: "mailto:hola@latrattoria.mx", cls: "bg-[#8b5e3c] hover:bg-[#9e6a44]" },
-          ].map(c => (
-            <a key={c.title} href={c.href} className={`${c.cls} text-white rounded-sm p-6 flex flex-col items-center text-center gap-3 transition-colors group`}>
-              <div className="w-14 h-14 bg-white/10 rounded-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">{c.icon}</div>
-              <div>
-                <div className="font-['Playfair_Display'] text-lg font-bold">{c.title}</div>
-                <div className="font-['Nunito_Sans'] text-xs opacity-70 mt-0.5">{c.sub}</div>
-              </div>
-              <span className="font-['Nunito_Sans'] text-xs tracking-widest uppercase border border-white/30 px-4 py-1.5 rounded-sm group-hover:bg-white/10 transition-colors">{c.cta}</span>
-            </a>
-          ))}
-        </div>
+        {cards.length > 0 ? (
+          <div className={`grid grid-cols-1 gap-5 mb-12 ${cards.length >= 3 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+            {cards.map((c) => (
+              <a
+                key={c.title}
+                href={c.href}
+                {...(c.href.startsWith("http")
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
+                className={`${c.cls} text-white rounded-sm p-6 flex flex-col items-center text-center gap-3 transition-colors group`}
+              >
+                <div className="w-14 h-14 bg-white/10 rounded-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                  {c.icon}
+                </div>
+                <div>
+                  <div className="font-playfair-display text-lg font-bold">{c.title}</div>
+                  <div className="font-nunito-sans text-xs opacity-70 mt-0.5 line-clamp-2">{c.sub}</div>
+                </div>
+                <span className="font-nunito-sans text-xs tracking-widest uppercase border border-white/30 px-4 py-1.5 rounded-sm group-hover:bg-white/10 transition-colors">
+                  {c.cta}
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="mb-12 text-center font-nunito-sans text-sm text-white/60">
+            Completa WhatsApp y dirección en Ajustes del panel para mostrar contacto.
+          </p>
+        )}
         <div className="border-t border-white/10 pt-10">
-          <p className="font-['Nunito_Sans'] text-xs tracking-[0.25em] uppercase text-[#d4a853] text-center mb-6">Síguenos</p>
+          <p className="font-nunito-sans text-xs tracking-[0.25em] uppercase text-[#d4a853] text-center mb-6">Síguenos</p>
           <div className="flex flex-wrap justify-center gap-4">
-            {socials.map(s => (
-              <a key={s.label} href={s.href}
-                className="flex items-center gap-2 text-white/60 hover:text-white font-['Nunito_Sans'] text-sm border border-white/10 hover:border-white/30 px-5 py-2.5 rounded-sm transition-all">
+            {socials.map((s) => (
+              <a
+                key={s.label}
+                href={s.href}
+                className="flex items-center gap-2 text-white/60 hover:text-white font-nunito-sans text-sm border border-white/10 hover:border-white/30 px-5 py-2.5 rounded-sm transition-all"
+              >
                 {s.icon} {s.label}
               </a>
             ))}
@@ -934,12 +1100,12 @@ function FAQ() {
             <div key={i} className="border border-border rounded-sm overflow-hidden">
               <button onClick={() => setOpen(open === i ? null : i)}
                 className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-secondary transition-colors">
-                <span className="font-['Nunito_Sans'] text-sm font-semibold pr-4">{faq.q}</span>
+                <span className="font-nunito-sans text-sm font-semibold pr-4">{faq.q}</span>
                 {open === i ? <ChevronUp size={16} className="text-accent shrink-0" /> : <ChevronDown size={16} className="text-muted-foreground shrink-0" />}
               </button>
               {open === i && (
                 <div className="px-6 pb-5 bg-card">
-                  <p className="font-['Nunito_Sans'] text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
+                  <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
                 </div>
               )}
             </div>
@@ -975,9 +1141,9 @@ function ExtrasSection() {
       {/* Lealtad */}
       <section className="py-20 bg-secondary">
         <div className="max-w-5xl mx-auto px-6 text-center">
-          <p className="font-['Nunito_Sans'] text-xs tracking-[0.25em] uppercase text-accent mb-3">Programa Exclusivo</p>
-          <h2 className="font-['Playfair_Display'] text-4xl font-bold mb-4">Programa de Lealtad</h2>
-          <p className="font-['Nunito_Sans'] text-sm text-muted-foreground max-w-lg mx-auto mb-10">Acumula puntos con cada visita y canjéalos por descuentos, platillos gratis y experiencias exclusivas.</p>
+          <p className="font-nunito-sans text-xs tracking-[0.25em] uppercase text-accent mb-3">Programa Exclusivo</p>
+          <h2 className="font-playfair-display text-4xl font-bold mb-4">Programa de Lealtad</h2>
+          <p className="font-nunito-sans text-sm text-muted-foreground max-w-lg mx-auto mb-10">Acumula puntos con cada visita y canjéalos por descuentos, platillos gratis y experiencias exclusivas.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             {[
               { icon: <Gift size={28} />, title: "Acumula Puntos", desc: "1 punto por cada $10 de consumo. Doble en cumpleaños." },
@@ -986,12 +1152,12 @@ function ExtrasSection() {
             ].map(item => (
               <div key={item.title} className="bg-card border border-border rounded-sm p-7">
                 <div className="w-14 h-14 bg-primary rounded-sm flex items-center justify-center text-[#d4a853] mx-auto mb-4">{item.icon}</div>
-                <h4 className="font-['Playfair_Display'] text-lg font-bold mb-2">{item.title}</h4>
-                <p className="font-['Nunito_Sans'] text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                <h4 className="font-playfair-display text-lg font-bold mb-2">{item.title}</h4>
+                <p className="font-nunito-sans text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
-          <button className="mt-10 inline-flex items-center gap-2 bg-accent text-white font-['Nunito_Sans'] text-xs tracking-widest uppercase px-8 py-3.5 rounded-sm hover:bg-[#a84e22] transition-colors">
+          <button className="mt-10 inline-flex items-center gap-2 bg-accent text-white font-nunito-sans text-xs tracking-widest uppercase px-8 py-3.5 rounded-sm hover:bg-[#a84e22] transition-colors">
             <Gift size={15} /> Únete Gratis
           </button>
         </div>
@@ -1005,9 +1171,9 @@ function ExtrasSection() {
             {events.map(ev => (
               <div key={ev.title} className="bg-card border border-border rounded-sm p-5 text-center hover:border-accent/40 hover:shadow-sm transition-all group">
                 <div className="w-12 h-12 bg-secondary rounded-sm flex items-center justify-center mx-auto mb-4 text-accent group-hover:bg-accent group-hover:text-white transition-colors">{ev.icon}</div>
-                <h4 className="font-['Playfair_Display'] font-bold text-base mb-1">{ev.title}</h4>
-                <p className="font-['Nunito_Sans'] text-[10px] tracking-widest uppercase text-accent mb-2">{ev.desc}</p>
-                <p className="font-['Nunito_Sans'] text-xs text-muted-foreground leading-relaxed">{ev.sub}</p>
+                <h4 className="font-playfair-display font-bold text-base mb-1">{ev.title}</h4>
+                <p className="font-nunito-sans text-[10px] tracking-widest uppercase text-accent mb-2">{ev.desc}</p>
+                <p className="font-nunito-sans text-xs text-muted-foreground leading-relaxed">{ev.sub}</p>
               </div>
             ))}
           </div>
@@ -1025,9 +1191,9 @@ function ExtrasSection() {
                   <img src={post.img} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
                 <div className="p-5">
-                  <span className="font-['Nunito_Sans'] text-[9px] tracking-[0.3em] uppercase text-accent font-semibold">{post.cat}</span>
-                  <h4 className="font-['Playfair_Display'] text-base font-bold mt-2 leading-snug group-hover:text-accent transition-colors">{post.title}</h4>
-                  <div className="flex items-center gap-1 mt-4 font-['Nunito_Sans'] text-xs text-accent">
+                  <span className="font-nunito-sans text-[9px] tracking-[0.3em] uppercase text-accent font-semibold">{post.cat}</span>
+                  <h4 className="font-playfair-display text-base font-bold mt-2 leading-snug group-hover:text-accent transition-colors">{post.title}</h4>
+                  <div className="flex items-center gap-1 mt-4 font-nunito-sans text-xs text-accent">
                     Leer más <ArrowRight size={12} />
                   </div>
                 </div>
@@ -1041,17 +1207,17 @@ function ExtrasSection() {
       <section className="py-20 bg-accent">
         <div className="max-w-xl mx-auto px-6 text-center">
           <BookOpen size={36} className="text-white/80 mx-auto mb-4" />
-          <h2 className="font-['Playfair_Display'] text-3xl md:text-4xl font-bold text-white mb-3">Únete a Nuestra Comunidad</h2>
-          <p className="font-['Nunito_Sans'] text-sm text-white/80 mb-6">Recibe recetas exclusivas, invitaciones a eventos y un <strong className="text-white">10% de descuento</strong> en tu próxima visita.</p>
+          <h2 className="font-playfair-display text-3xl md:text-4xl font-bold text-white mb-3">Únete a Nuestra Comunidad</h2>
+          <p className="font-nunito-sans text-sm text-white/80 mb-6">Recibe recetas exclusivas, invitaciones a eventos y un <strong className="text-white">10% de descuento</strong> en tu próxima visita.</p>
           {subbed ? (
-            <div className="flex items-center justify-center gap-2 text-white font-['Nunito_Sans']">
+            <div className="flex items-center justify-center gap-2 text-white font-nunito-sans">
               <CheckCircle size={20} /> <span>¡Gracias! Revisa tu bandeja de entrada.</span>
             </div>
           ) : (
             <form onSubmit={e => { e.preventDefault(); setSubbed(true); }} className="flex gap-2">
               <input value={email} onChange={e => setEmail(e.target.value)} required type="email" placeholder="tu@email.com"
-                className="flex-1 bg-white/20 text-white placeholder-white/60 border border-white/30 rounded-sm px-4 py-3 font-['Nunito_Sans'] text-sm focus:outline-none focus:bg-white/30" />
-              <button type="submit" className="bg-white text-accent font-['Nunito_Sans'] text-xs tracking-widest uppercase px-6 py-3 rounded-sm hover:bg-white/90 transition-colors shrink-0">
+                className="flex-1 bg-white/20 text-white placeholder-white/60 border border-white/30 rounded-sm px-4 py-3 font-nunito-sans text-sm focus:outline-none focus:bg-white/30" />
+              <button type="submit" className="bg-white text-accent font-nunito-sans text-xs tracking-widest uppercase px-6 py-3 rounded-sm hover:bg-white/90 transition-colors shrink-0">
                 <Send size={14} />
               </button>
             </form>
@@ -1070,28 +1236,33 @@ function Footer() {
     <footer className="bg-[#0e1f16] text-white/60 py-14">
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
         <div className="md:col-span-2">
-          <div className="font-['Pinyon_Script'] text-3xl text-[#d4a853] mb-1">{brand.name}</div>
-          <p className="font-['Nunito_Sans'] text-[9px] tracking-[0.35em] uppercase opacity-50 mb-4">
+          <div className="font-pinyon-script text-3xl text-[#d4a853] mb-1">{brand.name}</div>
+          <p className="font-nunito-sans text-[9px] tracking-[0.35em] uppercase opacity-50 mb-4">
             {brand.tagline ?? "Restaurante"}
           </p>
-          <p className="font-['Nunito_Sans'] text-xs leading-relaxed max-w-xs">
+          <p className="font-nunito-sans text-xs leading-relaxed max-w-xs">
             El sitio oficial de {brand.name}. Menú, reservaciones y experiencia gastronómica.
           </p>
         </div>
         <div>
-          <p className="font-['Nunito_Sans'] text-[9px] tracking-[0.25em] uppercase text-[#d4a853] mb-4 font-semibold">Navegación</p>
+          <p className="font-nunito-sans text-[9px] tracking-[0.25em] uppercase text-[#d4a853] mb-4 font-semibold">Navegación</p>
           {["Menú", "Reservaciones", "Nosotros", "Galería", "Blog", "Eventos", "Contacto"].map(l => (
             <button key={l} onClick={() => document.getElementById(l.toLowerCase())?.scrollIntoView({ behavior: "smooth" })}
-              className="block font-['Nunito_Sans'] text-xs py-1 hover:text-white hover:text-[#d4a853] transition-colors">{l}</button>
+              className="block font-nunito-sans text-xs py-1 hover:text-white hover:text-[#d4a853] transition-colors">{l}</button>
           ))}
         </div>
         <div>
-          <p className="font-['Nunito_Sans'] text-[9px] tracking-[0.25em] uppercase text-[#d4a853] mb-4 font-semibold">Contacto</p>
-          <div className="space-y-2 font-['Nunito_Sans'] text-xs">
-            <p className="flex items-center gap-2"><MapPin size={12} className="shrink-0" /> Florencia 88, Juárez, CDMX</p>
-            <p className="flex items-center gap-2"><Phone size={12} /> +52 (55) 1234-5678</p>
-            <p className="flex items-center gap-2"><Mail size={12} /> hola@latrattoria.mx</p>
-            <p className="flex items-center gap-2"><Clock size={12} /> Lun–Vie 13:00–23:00</p>
+          <p className="font-nunito-sans text-[9px] tracking-[0.25em] uppercase text-[#d4a853] mb-4 font-semibold">Contacto</p>
+          <div className="space-y-2 font-nunito-sans text-xs">
+            {brand.address ? (
+              <p className="flex items-center gap-2"><MapPin size={12} className="shrink-0" /> {brand.address}</p>
+            ) : null}
+            {brand.whatsapp ? (
+              <p className="flex items-center gap-2"><Phone size={12} /> {brand.whatsapp}</p>
+            ) : null}
+            {brand.businessHours ? (
+              <p className="flex items-center gap-2"><Clock size={12} /> {brand.businessHours}</p>
+            ) : null}
           </div>
           <div className="flex gap-3 mt-5">
             {[<Camera key="instagram" size={16} />, <Share2 key="facebook" size={16} />, <Radio key="twitter" size={16} />, <Video key="youtube" size={16} />].map((icon, i) => (
@@ -1101,8 +1272,8 @@ function Footer() {
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-6 pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-3">
-        <p className="font-['Nunito_Sans'] text-[10px]">© {new Date().getFullYear()} {brand.name}. Todos los derechos reservados.</p>
-        <p className="font-['Nunito_Sans'] text-[10px]">Aviso de Privacidad · Términos y Condiciones</p>
+        <p className="font-nunito-sans text-[10px]">© {new Date().getFullYear()} {brand.name}. Todos los derechos reservados.</p>
+        <p className="font-nunito-sans text-[10px]">Aviso de Privacidad · Términos y Condiciones</p>
       </div>
     </footer>
   );
@@ -1110,28 +1281,32 @@ function Footer() {
 
 // ─── App ─────────────────────────────────────────────────────────────────────
 
-const restaurantTheme = {
-  "--background": "#f7f3eb",
-  "--foreground": "#1c1208",
-  "--card": "#fdfaf4",
-  "--card-foreground": "#1c1208",
-  "--popover": "#fdfaf4",
-  "--popover-foreground": "#1c1208",
-  "--primary": "#1a3d2b",
-  "--primary-foreground": "#f7f3eb",
-  "--secondary": "#ede3ce",
-  "--secondary-foreground": "#1a3d2b",
-  "--muted": "#e6ddc8",
-  "--muted-foreground": "#7a6a52",
-  "--accent": "#c9612a",
-  "--accent-foreground": "#fdfaf4",
-  "--destructive": "#c0392b",
-  "--destructive-foreground": "#ffffff",
-  "--border": "rgba(26, 61, 43, 0.18)",
-  "--input": "transparent",
-  "--input-background": "#ede3ce",
-  "--ring": "#c9612a",
-} as CSSProperties;
+function buildRestaurantTheme(brand: RestaurantBrand): CSSProperties {
+  const primary = brand.primaryColor || "#1a3d2b";
+  const accent = brand.secondaryColor || "#c9612a";
+  return {
+    "--background": "#f7f3eb",
+    "--foreground": "#1c1208",
+    "--card": "#fdfaf4",
+    "--card-foreground": "#1c1208",
+    "--popover": "#fdfaf4",
+    "--popover-foreground": "#1c1208",
+    "--primary": primary,
+    "--primary-foreground": "#f7f3eb",
+    "--secondary": "#ede3ce",
+    "--secondary-foreground": primary,
+    "--muted": "#e6ddc8",
+    "--muted-foreground": "#7a6a52",
+    "--accent": accent,
+    "--accent-foreground": "#fdfaf4",
+    "--destructive": "#c0392b",
+    "--destructive-foreground": "#ffffff",
+    "--border": "rgba(26, 61, 43, 0.18)",
+    "--input": "transparent",
+    "--input-background": "#ede3ce",
+    "--ring": accent,
+  } as CSSProperties;
+}
 
 type RestaurantLandingProps = {
   /** Identidad del restaurante. Si no se pasa, usa la demo "La Trattoria". */
@@ -1139,22 +1314,26 @@ type RestaurantLandingProps = {
 };
 
 /**
- * Sitio institucional exclusivo de La Trattoria.
- *
- * No es una plantilla genérica para todos los tenants. Otros restaurantes
- * tendrán su propio website (creado bajo demanda) con otra plantilla/contenido.
+ * Sitio institucional (plantilla La Trattoria) alimentado por perfil público.
  */
-export function RestaurantLanding({ brand = DEFAULT_BRAND }: RestaurantLandingProps) {
+export function RestaurantLanding({
+  brand = DEFAULT_RESTAURANT_BRAND,
+}: RestaurantLandingProps) {
+  const theme = useMemo(() => buildRestaurantTheme(brand), [brand]);
+
   return (
     <BrandContext.Provider value={brand}>
-      <div style={restaurantTheme} className="font-['Nunito_Sans'] bg-background text-foreground overflow-x-hidden">
+      <div
+        style={theme}
+        className="font-nunito-sans bg-background text-foreground overflow-x-hidden"
+      >
         <Navbar />
         <Hero />
         <DigitalMenu />
         <Destacados />
         <Promociones />
         <Ordenar />
-        <Reservaciones />
+        {brand.hasReservations ? <Reservaciones /> : null}
         <Nosotros />
         <Galeria />
         <Opiniones />

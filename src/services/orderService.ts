@@ -71,7 +71,7 @@ function toOrderRequest(orderData: CreateOrderDTO): OrderRequest {
     customerPhone: orderData.customerPhone?.trim() || null,
     orderType: orderData.orderType ?? "IN_TABLE",
     tableNumber,
-    deliveryAddress: null,
+    deliveryAddress: orderData.deliveryAddress?.trim() || null,
     details: orderData.items.map((item) => ({
       productUuid: item.productId,
       quantity: item.quantity,

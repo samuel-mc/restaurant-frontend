@@ -4,11 +4,8 @@
  * Monitor en vivo de cocina/caja (Kanban de comandas).
  */
 
-import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Order, OrderStatus } from "@/types/api";
-import type { AnalyticsSummary } from "@/types/analytics";
-import { AnalyticsOverview } from "@/components/admin/analytics-overview";
 import { OrderTicket } from "@/components/admin/order-ticket";
 import {
   useKitchenOrdersSubscription,
@@ -46,13 +43,11 @@ interface KitchenDashboardProps {
   tenantSlug: string;
   restaurantName: string;
   initialOrders: Order[];
-  analytics: AnalyticsSummary;
 }
 
 function nextStatusFor(status: OrderStatus): OrderStatus | null {
   if (status === "PENDING") return "ACCEPTED";
   if (status === "ACCEPTED") return "IN_KITCHEN";
-  // Backend no tiene READY: "Listo" → DELIVERED (sale del tablero activo).
   if (status === "IN_KITCHEN") return "DELIVERED";
   return null;
 }
@@ -68,7 +63,6 @@ export function KitchenDashboard({
   tenantSlug,
   restaurantName,
   initialOrders,
-  analytics,
 }: KitchenDashboardProps) {
   const [orders, setOrders] = useState<Order[]>(() =>
     sortByCreatedAt(initialOrders),
@@ -136,7 +130,6 @@ export function KitchenDashboard({
       return copy;
     });
 
-    // Mutación optimista: la cocina ve el cambio al instante.
     const optimistic: Order = { ...order, status: next };
     handleOrderEvent(optimistic);
 
@@ -170,56 +163,38 @@ export function KitchenDashboard({
   }, [orders]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-100 dark:bg-neutral-950">
-      <header className="sticky top-0 z-20 border-b border-black/5 bg-white/95 px-4 py-4 backdrop-blur md:px-6 dark:border-white/10 dark:bg-neutral-900/95">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col pb-6">
+      <header className="border-b border-black/5 px-4 py-5 md:px-6 dark:border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Analíticas · Cocina
+              Operación
             </p>
-            <h1 className="text-3xl font-black tracking-tight md:text-4xl">
-              {restaurantName}
+            <h1 className="text-2xl font-black tracking-tight md:text-3xl">
+              Monitor de cocina
             </h1>
+            <p className="mt-1 text-sm font-medium text-black/50 dark:text-white/50">
+              {restaurantName}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <ConnectionBadge state={connection} />
             <span className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-black tabular-nums dark:bg-white/10">
               {orders.length} activas
             </span>
-            <Link
-              href="/admin/dashboard/menu"
-              className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-bold hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
-            >
-              Menú
-            </Link>
           </div>
         </div>
         {banner ? (
           <p
             role="status"
-            className="mx-auto mt-3 max-w-7xl rounded-2xl bg-amber-400 px-4 py-3 text-center text-base font-black text-amber-950 animate-pulse"
+            className="mt-3 rounded-2xl bg-amber-400 px-4 py-3 text-center text-base font-black text-amber-950 animate-pulse"
           >
             {banner}
           </p>
         ) : null}
       </header>
 
-      <AnalyticsOverview summary={analytics} />
-
-      <div className="mx-auto mt-2 w-full max-w-7xl px-4 md:px-6">
-        <div className="flex items-end justify-between gap-3 border-t border-black/5 pt-5 dark:border-white/10">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Operación
-            </p>
-            <h2 className="text-xl font-black tracking-tight md:text-2xl">
-              Monitor de cocina
-            </h2>
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-3 md:gap-5 md:p-6">
+      <div className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-3 md:gap-5 md:p-6">
         {COLUMNS.map((column) => {
           const columnOrders = grouped[column.status] ?? [];
           return (

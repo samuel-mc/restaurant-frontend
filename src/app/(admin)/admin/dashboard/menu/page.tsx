@@ -2,26 +2,19 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { MenuManager } from "@/components/admin/menu-manager";
+import { prettifyTenantSlug } from "@/lib/admin-nav";
 import { getAdminAccessToken } from "@/lib/auth-server";
 import { getAdminCatalog } from "@/services/adminCatalogQueries";
 import { ApiError } from "@/services/apiClient";
 import type { Category, Product } from "@/types/api";
 
 export const metadata: Metadata = {
-  title: "Gestor de menú · Panel",
+  title: "Menú · Panel",
   description: "Administra categorías, platillos, precios y stock.",
 };
 
-function prettifyTenant(slug: string): string {
-  return slug
-    .split("-")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
 /**
- * Gestor de categorías, precios y stock rápido.
+ * Módulo Menú — categorías y platillos.
  *
  * Server: snapshot autenticado (JWT HttpOnly + X-Tenant).
  * Client: ABM de platillos y toggle de disponibilidad vía BFF.
@@ -30,12 +23,12 @@ export default async function AdminMenuManagementPage() {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
   if (!tenantSlug) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-3 px-6">
+      <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
         <h1 className="text-2xl font-bold">Tenant no identificado</h1>
         <p className="text-sm text-foreground/60">
           Abre el panel desde el subdominio de tu restaurante.
         </p>
-      </main>
+      </div>
     );
   }
 
@@ -64,17 +57,17 @@ export default async function AdminMenuManagementPage() {
 
   if (loadError) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-3 px-6">
+      <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
         <h1 className="text-2xl font-bold">Catálogo no disponible</h1>
         <p className="text-sm text-foreground/60">{loadError}</p>
-      </main>
+      </div>
     );
   }
 
   return (
     <MenuManager
       tenantSlug={tenantSlug}
-      restaurantName={prettifyTenant(tenantSlug)}
+      restaurantName={prettifyTenantSlug(tenantSlug)}
       initialCategories={categories}
       initialProducts={products}
     />

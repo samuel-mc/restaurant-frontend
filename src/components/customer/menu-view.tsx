@@ -17,7 +17,7 @@ import {
   type CategoryTab,
 } from "@/components/customer/category-bar";
 import { ProductCard } from "@/components/customer/product-card";
-import { CartBar } from "@/components/customer/cart-bar";
+import { CartBar, type OrderModules } from "@/components/customer/cart-bar";
 
 interface MenuSection {
   id: string;
@@ -29,9 +29,11 @@ interface MenuViewProps {
   products: Product[];
   /** Slug del restaurante para crear el pedido en el tenant correcto. */
   tenantSlug: string;
+  /** Módulos activos (pickup / delivery) desde el perfil público. */
+  modules?: OrderModules;
 }
 
-export function MenuView({ products, tenantSlug }: MenuViewProps) {
+export function MenuView({ products, tenantSlug, modules }: MenuViewProps) {
   const sections = useMemo<MenuSection[]>(() => {
     const byCategory = new Map<string, MenuSection>();
     for (const product of products) {
@@ -148,7 +150,7 @@ export function MenuView({ products, tenantSlug }: MenuViewProps) {
         ))}
       </div>
 
-      <CartBar tenantSlug={tenantSlug} />
+      <CartBar tenantSlug={tenantSlug} modules={modules} />
     </>
   );
 }

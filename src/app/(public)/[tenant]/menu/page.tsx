@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { ClipboardList } from "lucide-react";
 import { getMenuByTenant } from "@/services/menuService";
+import { getPublicRestaurantProfileOrNull } from "@/services/publicRestaurantQueries";
 import { ApiError } from "@/services/apiClient";
-import type { Product } from "@/types/api";
+import type { Product, RestaurantProfile } from "@/types/api";
 import { MenuView } from "@/components/customer/menu-view";
 
 type TenantMenuPageProps = {
   params: Promise<{ tenant: string }>;
 };
 
-/** Convierte el slug del subdominio en un nombre legible ("la-parrilla" → "La Parrilla"). */
 function prettifyTenant(slug: string): string {
   return slug
     .split("-")
@@ -22,10 +23,11 @@ export async function generateMetadata({
   params,
 }: TenantMenuPageProps): Promise<Metadata> {
   const { tenant } = await params;
-  const name = prettifyTenant(tenant);
+  const profile = await getPublicRestaurantProfileOrNull(tenant);
+  const name = profile?.name ?? prettifyTenant(tenant);
   return {
     title: `${name} · Menú digital`,
-    description: `Explora el menú de ${name} y arma tu pedido desde tu mesa.`,
+    description: `Explora el menú de ${name} y arma tu pedido.`,
   };
 }
 
@@ -34,10 +36,6 @@ type MenuLoadResult =
   | { status: "empty" }
   | { status: "unavailable"; message: string };
 
-/**
- * Carga el catálogo del tenant. Se aísla para mantener el Server Component limpio
- * y tipar explícitamente los estados de UI (ok / vacío / no disponible).
- */
 async function loadMenu(tenant: string): Promise<MenuLoadResult> {
   try {
     const products = await getMenuByTenant(tenant);
@@ -60,32 +58,57 @@ async function loadMenu(tenant: string): Promise<MenuLoadResult> {
 }
 
 /**
- * Menú digital interactivo + carrito (Módulo Catálogo/Pedidos).
- *
- * Server Component: resuelve el tenant, carga el catálogo y delega la
- * interactividad (categorías, listado, carrito) a componentes cliente.
+ * Menú digital interactivo + carrito.
+ * Cabecera y modalidades de pedido según perfil público.
  */
 export default async function TenantMenuPage({ params }: TenantMenuPageProps) {
   const { tenant } = await params;
-  const restaurantName = prettifyTenant(tenant);
-  const menu = await loadMenu(tenant);
+  const [menu, profile] = await Promise.all([
+    loadMenu(tenant),
+    getPublicRestaurantProfileOrNull(tenant),
+  ]);
+
+  const restaurantName = profile?.name ?? prettifyTenant(tenant);
+  const headerStyle = headerStyleFromProfile(profile);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-neutral-50 px-4 dark:bg-neutral-950">
-      <header className="-mx-4 mb-1 bg-linear-to-br from-amber-500 to-orange-600 px-6 pb-8 pt-10 text-white shadow-sm">
-        <p className="text-xs font-medium uppercase tracking-widest text-white/80">
-          Menú digital
-        </p>
-        <h1 className="mt-1 text-3xl font-extrabold tracking-tight">
-          {restaurantName}
-        </h1>
+      <header
+        className="-mx-4 mb-1 px-6 pb-8 pt-10 text-white shadow-sm"
+        style={headerStyle}
+      >
+        <div className="flex items-center gap-3">
+          {profile?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profile.logoUrl}
+              alt=""
+              className="size-12 rounded-2xl object-cover ring-2 ring-white/30"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-widest text-white/80">
+              Menú digital
+            </p>
+            <h1 className="mt-1 truncate text-3xl font-extrabold tracking-tight">
+              {restaurantName}
+            </h1>
+          </div>
+        </div>
         <p className="mt-2 text-sm text-white/85">
-          Explora nuestro menú y arma tu pedido desde tu mesa.
+          {menuSubtitle(profile)}
         </p>
       </header>
 
       {menu.status === "ok" ? (
-        <MenuView products={menu.products} tenantSlug={tenant} />
+        <MenuView
+          products={menu.products}
+          tenantSlug={tenant}
+          modules={{
+            hasDelivery: profile?.hasDelivery ?? false,
+            hasPickup: profile?.hasPickup ?? true,
+          }}
+        />
       ) : (
         <MenuUnavailableState
           title="Menú no disponible"
@@ -100,7 +123,24 @@ export default async function TenantMenuPage({ params }: TenantMenuPageProps) {
   );
 }
 
-/** Estado vacío / error elegante, mobile-first. */
+function headerStyleFromProfile(
+  profile: RestaurantProfile | null,
+): CSSProperties {
+  const from = profile?.primaryColor || "#f59e0b";
+  const to = profile?.secondaryColor || "#ea580c";
+  return {
+    backgroundImage: `linear-gradient(135deg, ${from}, ${to})`,
+  };
+}
+
+function menuSubtitle(profile: RestaurantProfile | null): string {
+  const bits: string[] = [];
+  if (profile?.hasPickup) bits.push("para llevar");
+  if (profile?.hasDelivery) bits.push("delivery");
+  if (bits.length === 0) return "Arma tu pedido desde tu mesa.";
+  return `Pide en mesa, ${bits.join(" o ")}.`;
+}
+
 function MenuUnavailableState({
   title,
   description,

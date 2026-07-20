@@ -4,7 +4,7 @@
  * Tracking en vivo del pedido del comensal.
  *
  * Snapshot inicial (SSR/REST) + suscripción STOMP/SockJS a `/topic/order/{uuid}`.
- * Stepper: Recibido → En Cocina → Listo → Entregado.
+ * Stepper: Recibido → En Cocina → En preparación → Entregado.
  */
 
 import { useState } from "react";
@@ -36,9 +36,12 @@ export function OrderTracker({
   const [connection, setConnection] =
     useState<OrderConnectionState>("connecting");
 
+  const isTerminal =
+    order.status === "DELIVERED" || order.status === "CANCELLED";
+
   useOrderStatusSubscription({
     orderUuid: order.uuid,
-    enabled: order.status !== "DELIVERED" && order.status !== "CANCELLED",
+    enabled: !isTerminal,
     onUpdate: setOrder,
     onConnectionChange: setConnection,
   });
@@ -48,8 +51,8 @@ export function OrderTracker({
   const stepKey = toTrackingStepKey(order.status);
   const isCancelled = order.status === "CANCELLED";
   const isDelivered = order.status === "DELIVERED";
-  const isReady = stepKey === "READY";
-  const isPreparing = stepKey === "IN_PREPARATION";
+  const isCooking = stepKey === "READY"; // IN_KITCHEN → "En preparación"
+  const isAccepted = stepKey === "IN_PREPARATION";
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -69,7 +72,10 @@ export function OrderTracker({
         </p>
 
         <div className="mt-8 flex flex-col items-center text-center">
-          <StatusGlyph status={order.status} highlight={isReady || isDelivered} />
+          <StatusGlyph
+            status={order.status}
+            highlight={isDelivered}
+          />
           <p
             key={order.status}
             className="mt-4 animate-[fade-up_0.45s_ease-out] text-2xl font-extrabold tracking-tight"
@@ -80,20 +86,26 @@ export function OrderTracker({
             {getStatusDescription(order.status)}
           </p>
 
-          {isPreparing ? (
-            <span className="mt-4 rounded-full bg-yellow-300/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-yellow-950 animate-pulse">
+          {isAccepted ? (
+            <span className="mt-4 rounded-full bg-yellow-300/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-yellow-950">
+              Pedido aceptado
+            </span>
+          ) : null}
+          {isCooking ? (
+            <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-orange-800 shadow-sm animate-pulse">
+              <ChefHat className="size-3.5 stroke-[2.5]" aria-hidden />
               En preparación
             </span>
           ) : null}
-          {isReady ? (
+          {isDelivered ? (
             <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700 shadow-sm">
               <Check className="size-3.5 stroke-[2.5]" aria-hidden />
-              Listo para entregar
+              Entregado
             </span>
           ) : null}
         </div>
 
-        <ConnectionHint state={connection} terminal={isDelivered || isCancelled} />
+        <ConnectionHint state={connection} terminal={isTerminal} />
       </section>
 
       {/* Stepper */}
@@ -106,7 +118,7 @@ export function OrderTracker({
             const complete = index < currentIndex || isDelivered;
             const active = index === currentIndex && !isDelivered;
             const showCheck =
-              complete || (active && (step.key === "READY" || step.key === "DELIVERED"));
+              complete || (active && step.key === "DELIVERED");
 
             return (
               <li
@@ -130,7 +142,7 @@ export function OrderTracker({
                     index={index}
                     active={active}
                     showCheck={showCheck}
-                    preparing={active && step.key === "IN_PREPARATION"}
+                    preparing={active && step.key === "READY"}
                     ringClass={theme.ring}
                   />
                   {index < TRACKING_STEPS.length - 1 ? (
@@ -266,9 +278,9 @@ function StatusGlyph({
       : key === "DELIVERED"
         ? Check
         : key === "READY"
-          ? Sparkles
+          ? ChefHat
           : key === "IN_PREPARATION"
-            ? ChefHat
+            ? Sparkles
             : Clock;
 
   return (

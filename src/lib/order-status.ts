@@ -1,7 +1,7 @@
 /**
  * Presentación del flujo de tracking del comensal.
  *
- * UI (producto): PENDING → IN_PREPARATION → READY → DELIVERED
+ * UI (producto): Recibido → En Cocina → En preparación → Entregado
  * Backend:       PENDING → ACCEPTED → IN_KITCHEN → DELIVERED
  *
  * El mapeo mantiene el contrato Spring Boot sin romper la UX pedida.
@@ -31,12 +31,12 @@ export const TRACKING_STEPS: TrackingStep[] = [
   {
     key: "IN_PREPARATION",
     label: "En Cocina",
-    description: "Estamos preparando tu orden",
+    description: "El restaurante aceptó tu orden",
   },
   {
     key: "READY",
-    label: "Listo",
-    description: "Listo para entregar",
+    label: "En preparación",
+    description: "La cocina está preparando tu platillo",
   },
   {
     key: "DELIVERED",
@@ -116,10 +116,10 @@ export function getStatusTheme(status: OrderStatus): {
       };
     case "READY":
       return {
-        hero: "from-emerald-500 to-green-600",
-        badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-        ring: "ring-emerald-500",
-        badgePulse: false,
+        hero: "from-orange-500 to-amber-600",
+        badge: "bg-orange-500/15 text-orange-800 dark:text-orange-200",
+        ring: "ring-orange-500",
+        badgePulse: true,
       };
     case "DELIVERED":
       return {

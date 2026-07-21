@@ -49,17 +49,17 @@ function buildProductFormData(payload: ProductFormSubmitPayload): FormData {
   return formData;
 }
 
-async function bffJson<T>(
+async function bffFetch(
   path: string,
   tenantSlug: string,
   init: RequestInit,
-): Promise<T> {
+): Promise<Response> {
   const slug = resolveTenantSlug(tenantSlug);
   const hasBody = init.body !== undefined && init.body !== null;
   const isFormData =
     typeof FormData !== "undefined" && init.body instanceof FormData;
 
-  const response = await fetch(path, {
+  return fetch(path, {
     ...init,
     headers: {
       Accept: "application/json",
@@ -70,6 +70,24 @@ async function bffJson<T>(
     },
     credentials: "same-origin",
   });
+}
+
+function catalogErrorMessage(
+  body: { error?: string } | null,
+  fallback: string,
+): string {
+  if (body && typeof body === "object" && body.error) {
+    return String(body.error);
+  }
+  return fallback;
+}
+
+async function bffJson<T>(
+  path: string,
+  tenantSlug: string,
+  init: RequestInit,
+): Promise<T> {
+  const response = await bffFetch(path, tenantSlug, init);
 
   const body = (await response.json().catch(() => null)) as
     | T
@@ -77,12 +95,13 @@ async function bffJson<T>(
     | null;
 
   if (!response.ok) {
-    const message =
-      body && typeof body === "object" && "error" in body && body.error
-        ? String(body.error)
-        : "No se pudo completar la operación del catálogo.";
     throw new ApiError({
-      message,
+      message: catalogErrorMessage(
+        body && typeof body === "object" && "error" in body
+          ? (body as { error?: string })
+          : null,
+        "No se pudo completar la operación del catálogo.",
+      ),
       status: response.status,
       statusText: response.statusText,
       url: path,
@@ -91,6 +110,36 @@ async function bffJson<T>(
   }
 
   return body as T;
+}
+
+/** DELETE / mutaciones sin cuerpo (p. ej. 204 No Content). */
+async function bffVoid(
+  path: string,
+  tenantSlug: string,
+  init: RequestInit,
+): Promise<void> {
+  const response = await bffFetch(path, tenantSlug, init);
+
+  if (response.status === 204 || response.status === 205) {
+    return;
+  }
+
+  const body = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+
+  if (!response.ok) {
+    throw new ApiError({
+      message: catalogErrorMessage(
+        body,
+        "No se pudo completar la operación del catálogo.",
+      ),
+      status: response.status,
+      statusText: response.statusText,
+      url: path,
+      body,
+    });
+  }
 }
 
 export async function createCategory(
@@ -116,6 +165,15 @@ export async function updateCategory(
     { method: "PUT", body: JSON.stringify(data) },
   );
   return toCategory(dto);
+}
+
+export async function deleteCategory(
+  id: number,
+  tenantSlug: string,
+): Promise<void> {
+  await bffVoid(`/api/admin/categories/${id}`, tenantSlug, {
+    method: "DELETE",
+  });
 }
 
 /** Alta con FormData (multipart) cuando hay imagen o siempre en create. */
@@ -174,4 +232,13 @@ export async function toggleProductAvailability(
     { method: "PATCH" },
   );
   return toProduct(dto);
+}
+
+export async function deleteProduct(
+  uuid: string,
+  tenantSlug: string,
+): Promise<void> {
+  await bffVoid(`/api/admin/products/${uuid}`, tenantSlug, {
+    method: "DELETE",
+  });
 }

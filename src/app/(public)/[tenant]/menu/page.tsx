@@ -6,6 +6,7 @@ import { getPublicRestaurantProfileOrNull } from "@/services/publicRestaurantQue
 import { ApiError } from "@/services/apiClient";
 import type { Product, RestaurantProfile } from "@/types/api";
 import { MenuView } from "@/components/customer/menu-view";
+import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
 
 type TenantMenuPageProps = {
   params: Promise<{ tenant: string }>;
@@ -25,10 +26,13 @@ export async function generateMetadata({
   const { tenant } = await params;
   const profile = await getPublicRestaurantProfileOrNull(tenant);
   const name = profile?.name ?? prettifyTenant(tenant);
-  return {
+  return buildTenantPageMetadata({
     title: `${name} · Menú digital`,
-    description: `Explora el menú de ${name} y arma tu pedido.`,
-  };
+    description:
+      profile?.description?.trim() ||
+      `Explora el menú de ${name} y arma tu pedido.`,
+    profile,
+  });
 }
 
 type MenuLoadResult =

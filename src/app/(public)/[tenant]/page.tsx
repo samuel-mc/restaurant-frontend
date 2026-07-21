@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { RestaurantLanding } from "@/components/marketing/restaurant-landing";
 import { SiteNotCreated } from "@/components/customer/site-not-created";
 import { buildLandingBrand } from "@/lib/landing-brand";
+import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
 import {
   getTenantSite,
   prettifyTenantSlug,
@@ -22,15 +23,19 @@ export async function generateMetadata({
   const profile = await getPublicRestaurantProfileOrNull(tenant);
   const name = profile?.name ?? site?.name ?? prettifyTenantSlug(tenant);
 
-  return {
-    title: site
-      ? `${name} · Sitio oficial`
-      : `${name} · Sitio no publicado`,
-    description: site
-      ? profile?.description?.trim() ||
-        `Conoce ${name}: menú, reservaciones, ubicación y más.`
-      : `El website de ${name} aún no ha sido creado.`,
-  };
+  const title = site
+    ? `${name} · Sitio oficial`
+    : `${name} · Sitio no publicado`;
+  const description = site
+    ? profile?.description?.trim() ||
+      `Conoce ${name}: menú, reservaciones, ubicación y más.`
+    : `El website de ${name} aún no ha sido creado.`;
+
+  return buildTenantPageMetadata({
+    title,
+    description,
+    profile,
+  });
 }
 
 async function loadCatalog(tenant: string): Promise<Product[]> {

@@ -7,10 +7,13 @@
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import type { Category, Product } from "@/types/api";
 import { AvailabilityToggle } from "@/components/admin/availability-toggle";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ProductFormModal } from "@/components/admin/product-form-modal";
 import {
   createCategory,
   createProductWithForm,
+  deleteCategory,
+  deleteProduct,
   toggleProductAvailability,
   updateCategory,
   updateProductWithForm,
@@ -32,6 +35,20 @@ type ModalState =
 type CategoryDialogState =
   | { open: false }
   | { open: true; mode: "create" | "edit"; category: Category | null };
+
+type ConfirmState =
+  | { open: false }
+  | {
+      open: true;
+      kind: "product";
+      product: Product;
+    }
+  | {
+      open: true;
+      kind: "category";
+      category: Category;
+      productCount: number;
+    };
 
 export function MenuManager({
   tenantSlug,
@@ -56,6 +73,8 @@ export function MenuManager({
   });
   const [categoryNameDraft, setCategoryNameDraft] = useState("");
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState>({ open: false });
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const [, startTransition] = useTransition();
 
   const selectedCategory = useMemo(
@@ -107,6 +126,68 @@ export function MenuManager({
     if (categoryBusy) return;
     setCategoryDialog({ open: false });
     setCategoryError(null);
+  }
+
+  function requestDeleteProduct(product: Product) {
+    setConfirm({ open: true, kind: "product", product });
+  }
+
+  function requestDeleteCategory(category: Category) {
+    const productCount = products.filter(
+      (p) => p.categoryId === category.id,
+    ).length;
+    setConfirm({ open: true, kind: "category", category, productCount });
+  }
+
+  function closeConfirm() {
+    if (confirmBusy) return;
+    setConfirm({ open: false });
+  }
+
+  async function handleConfirmDelete() {
+    if (!confirm.open) return;
+    setConfirmBusy(true);
+
+    try {
+      if (confirm.kind === "product") {
+        const { product } = confirm;
+        await deleteProduct(product.uuid, tenantSlug);
+        startTransition(() => {
+          setProducts((prev) => prev.filter((p) => p.uuid !== product.uuid));
+        });
+        showBanner(`Platillo «${product.name}» eliminado`);
+      } else {
+        const { category, productCount } = confirm;
+        if (productCount > 0) {
+          showBanner(
+            `No se puede eliminar «${category.name}»: tiene ${productCount} platillo${productCount === 1 ? "" : "s"}. Elimínalos o muévelos primero.`,
+          );
+          setConfirm({ open: false });
+          return;
+        }
+        await deleteCategory(category.id, tenantSlug);
+        const nextCategories = categories.filter((c) => c.id !== category.id);
+        startTransition(() => {
+          setCategories(nextCategories);
+          setProducts((prev) =>
+            prev.filter((p) => p.categoryId !== category.id),
+          );
+          setSelectedCategoryId((current) =>
+            current === category.id ? (nextCategories[0]?.id ?? null) : current,
+          );
+        });
+        showBanner(`Categoría «${category.name}» eliminada`);
+      }
+      setConfirm({ open: false });
+    } catch (error) {
+      showBanner(
+        error instanceof ApiError
+          ? error.message
+          : "No se pudo eliminar. Intenta de nuevo.",
+      );
+    } finally {
+      setConfirmBusy(false);
+    }
   }
 
   async function handleProductSubmit(payload: ProductFormSubmitPayload) {
@@ -340,6 +421,7 @@ export function MenuManager({
               onSelect={selectCategory}
               onNewCategory={openCreateCategory}
               onEditCategory={openEditCategory}
+              onDeleteCategory={requestDeleteCategory}
               className="mt-2"
             />
           ) : null}
@@ -353,6 +435,7 @@ export function MenuManager({
             onSelect={selectCategory}
             onNewCategory={openCreateCategory}
             onEditCategory={openEditCategory}
+            onDeleteCategory={requestDeleteCategory}
           />
         </aside>
 
@@ -393,6 +476,7 @@ export function MenuManager({
                     toggling={togglingUuid === product.uuid}
                     onToggle={() => handleToggle(product)}
                     onEdit={() => openEditProduct(product)}
+                    onDelete={() => requestDeleteProduct(product)}
                   />
                 </li>
               ))}
@@ -411,6 +495,51 @@ export function MenuManager({
         error={formError}
         onClose={closeModal}
         onSubmit={handleProductSubmit}
+      />
+
+      <ConfirmDialog
+        open={confirm.open}
+        busy={confirmBusy}
+        title={
+          confirm.open && confirm.kind === "product"
+            ? "Eliminar platillo"
+            : "Eliminar categoría"
+        }
+        description={
+          !confirm.open
+            ? ""
+            : confirm.kind === "product"
+              ? `¿Eliminar «${confirm.product.name}»? Dejará de aparecer en el menú digital.`
+              : confirm.productCount > 0
+                ? `«${confirm.category.name}» tiene ${confirm.productCount} platillo${confirm.productCount === 1 ? "" : "s"}. Elimina o mueve los platillos antes de borrar la categoría.`
+                : `¿Eliminar la categoría «${confirm.category.name}»? Esta acción no se puede deshacer desde el panel.`
+        }
+        confirmLabel={
+          confirm.open &&
+          confirm.kind === "category" &&
+          confirm.productCount > 0
+            ? "Entendido"
+            : "Eliminar"
+        }
+        tone={
+          confirm.open &&
+          confirm.kind === "category" &&
+          confirm.productCount > 0
+            ? "neutral"
+            : "danger"
+        }
+        onCancel={closeConfirm}
+        onConfirm={() => {
+          if (
+            confirm.open &&
+            confirm.kind === "category" &&
+            confirm.productCount > 0
+          ) {
+            closeConfirm();
+            return;
+          }
+          void handleConfirmDelete();
+        }}
       />
 
       {categoryDialog.open ? (
@@ -484,6 +613,7 @@ function CategoryList({
   onSelect,
   onNewCategory,
   onEditCategory,
+  onDeleteCategory,
   className = "",
 }: {
   categories: Category[];
@@ -492,6 +622,7 @@ function CategoryList({
   onSelect: (id: number) => void;
   onNewCategory: () => void;
   onEditCategory: (category: Category) => void;
+  onDeleteCategory: (category: Category) => void;
   className?: string;
 }) {
   const counts = useMemo(() => {
@@ -523,7 +654,7 @@ function CategoryList({
             const active = category.id === selectedCategoryId;
             const count = counts.get(category.id) ?? 0;
             return (
-              <li key={category.id} className="group flex items-stretch gap-1">
+              <li key={category.id} className="group flex items-stretch gap-0.5">
                 <button
                   type="button"
                   onClick={() => onSelect(category.id)}
@@ -546,9 +677,17 @@ function CategoryList({
                   type="button"
                   aria-label={`Editar ${category.name}`}
                   onClick={() => onEditCategory(category)}
-                  className="shrink-0 rounded-2xl px-2.5 text-xs font-bold text-black/45 hover:bg-black/[0.04] hover:text-foreground dark:text-white/45 dark:hover:bg-white/5"
+                  className="shrink-0 rounded-2xl px-2 text-xs font-bold text-black/45 hover:bg-black/[0.04] hover:text-foreground dark:text-white/45 dark:hover:bg-white/5"
                 >
                   Editar
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Eliminar ${category.name}`}
+                  onClick={() => onDeleteCategory(category)}
+                  className="shrink-0 rounded-2xl px-2 text-xs font-bold text-red-600/80 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15"
+                >
+                  Borrar
                 </button>
               </li>
             );
@@ -564,11 +703,13 @@ function ProductAdminCard({
   toggling,
   onToggle,
   onEdit,
+  onDelete,
 }: {
   product: Product;
   toggling: boolean;
   onToggle: () => void;
   onEdit: () => void;
+  onDelete: () => void;
 }) {
   const available = product.isAvailable;
 
@@ -624,20 +765,29 @@ function ProductAdminCard({
           </p>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-black/5 pt-3 dark:border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/5 pt-3 dark:border-white/10">
           <AvailabilityToggle
             checked={available}
             busy={toggling}
             onChange={onToggle}
             productName={product.name}
           />
-          <button
-            type="button"
-            onClick={onEdit}
-            className="rounded-xl bg-black/5 px-3 py-1.5 text-xs font-bold hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
-          >
-            Editar
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-xl bg-black/5 px-3 py-1.5 text-xs font-bold hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="rounded-xl px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/15"
+            >
+              Eliminar
+            </button>
+          </div>
         </div>
       </div>
     </article>

@@ -18,3 +18,12 @@ export async function PUT(request: Request, context: RouteContext) {
     body,
   });
 }
+
+/** DELETE /api/admin/categories/[id] → Spring `/api/v1/admin/categories/{id}` (204) */
+export async function DELETE(request: Request, context: RouteContext) {
+  const { id } = await context.params;
+  return proxyAdminRequest(request, `/api/v1/admin/categories/${id}`, {
+    method: "DELETE",
+    emptyResponse: true,
+  });
+}

@@ -3,6 +3,8 @@ import { ClipboardList } from "lucide-react";
 import { getOrderByUuid } from "@/services/orderService";
 import { ApiError } from "@/services/apiClient";
 import { OrderTracker } from "@/components/customer/order-tracker";
+import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
+import { getPublicRestaurantProfileOrNull } from "@/services/publicRestaurantQueries";
 import type { Order } from "@/types/api";
 
 type OrderTrackingPageProps = {
@@ -22,11 +24,13 @@ export async function generateMetadata({
   params,
 }: OrderTrackingPageProps): Promise<Metadata> {
   const { tenant, uuid } = await params;
-  const name = prettifyTenant(tenant);
-  return {
+  const profile = await getPublicRestaurantProfileOrNull(tenant);
+  const name = profile?.name ?? prettifyTenant(tenant);
+  return buildTenantPageMetadata({
     title: `${name} · Pedido ${uuid.slice(0, 8)}`,
     description: `Sigue el estado de tu pedido en ${name} en tiempo real.`,
-  };
+    profile,
+  });
 }
 
 type OrderLoadResult =

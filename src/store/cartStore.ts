@@ -7,11 +7,14 @@
  * seleccionadas indexadas por `uuid` de producto, permite ajustar cantidades y
  * expone selectores derivados (conteo y subtotal) calculados en tiempo real.
  *
+ * Persistido en `localStorage` por origen (subdominio del tenant).
+ *
  * Los precios se operan como `number` (regla de arquitectura); el formateo de
  * moneda se hace en UI con `formatCurrency`.
  */
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { Product } from "@/types/api";
 
 /** Línea del carrito: el producto y su cantidad. */
@@ -33,47 +36,55 @@ interface CartState {
   clear: () => void;
 }
 
-export const useCartStore = create<CartState>((set) => ({
-  lines: {},
+export const useCartStore = create<CartState>()(
+  persist(
+    (set) => ({
+      lines: {},
 
-  addItem: (product) =>
-    set((state) => {
-      const existing = state.lines[product.uuid];
-      return {
-        lines: {
-          ...state.lines,
-          [product.uuid]: {
-            product,
-            quantity: (existing?.quantity ?? 0) + 1,
-          },
-        },
-      };
+      addItem: (product) =>
+        set((state) => {
+          const existing = state.lines[product.uuid];
+          return {
+            lines: {
+              ...state.lines,
+              [product.uuid]: {
+                product,
+                quantity: (existing?.quantity ?? 0) + 1,
+              },
+            },
+          };
+        }),
+
+      decrementItem: (uuid) =>
+        set((state) => {
+          const existing = state.lines[uuid];
+          if (!existing) return state;
+
+          const nextLines = { ...state.lines };
+          if (existing.quantity <= 1) {
+            delete nextLines[uuid];
+          } else {
+            nextLines[uuid] = { ...existing, quantity: existing.quantity - 1 };
+          }
+          return { lines: nextLines };
+        }),
+
+      removeItem: (uuid) =>
+        set((state) => {
+          if (!state.lines[uuid]) return state;
+          const nextLines = { ...state.lines };
+          delete nextLines[uuid];
+          return { lines: nextLines };
+        }),
+
+      clear: () => set({ lines: {} }),
     }),
-
-  decrementItem: (uuid) =>
-    set((state) => {
-      const existing = state.lines[uuid];
-      if (!existing) return state;
-
-      const nextLines = { ...state.lines };
-      if (existing.quantity <= 1) {
-        delete nextLines[uuid];
-      } else {
-        nextLines[uuid] = { ...existing, quantity: existing.quantity - 1 };
-      }
-      return { lines: nextLines };
-    }),
-
-  removeItem: (uuid) =>
-    set((state) => {
-      if (!state.lines[uuid]) return state;
-      const nextLines = { ...state.lines };
-      delete nextLines[uuid];
-      return { lines: nextLines };
-    }),
-
-  clear: () => set({ lines: {} }),
-}));
+    {
+      name: "platolisto-cart",
+      partialize: (state) => ({ lines: state.lines }),
+    },
+  ),
+);
 
 /* ----------------------------- Selectores ------------------------------- */
 

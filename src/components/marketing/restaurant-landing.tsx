@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent, ReactNode } from "react";
+import Link from "next/link";
 import {
   Search, ChevronDown, ChevronUp, Star, MapPin, Phone, Mail,
   Clock, Leaf, Heart, Menu, X, ArrowRight,
@@ -180,12 +181,12 @@ function Navbar() {
             Reservar Mesa
           </button>
         ) : (
-          <a
+          <Link
             href="/menu"
             className="hidden lg:inline-flex items-center gap-2 bg-accent text-white font-nunito-sans text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm hover:bg-[#a84e22] transition-colors"
           >
             Ordenar
-          </a>
+          </Link>
         )}
         <button className="lg:hidden text-[#f7f3eb]" onClick={() => setOpen(!open)}>
           {open ? <X size={22} /> : <Menu size={22} />}
@@ -396,12 +397,12 @@ function DigitalMenu() {
                       {item.description}
                     </p>
                   ) : null}
-                  <a
+                  <Link
                     href="/menu"
                     className="mt-4 inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
                   >
                     <ShoppingBag size={13} /> Pedir en menú digital
-                  </a>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -471,12 +472,12 @@ function Destacados() {
                 <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed">
                   {product.description?.trim() || product.categoryName}
                 </p>
-                <a
+                <Link
                   href="/menu"
                   className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-nunito-sans text-xs tracking-widest uppercase py-3 rounded-sm hover:bg-[#2d5c40] transition-colors"
                 >
                   <ShoppingBag size={14} /> Ordenar
-                </a>
+                </Link>
               </div>
             </div>
           ))}

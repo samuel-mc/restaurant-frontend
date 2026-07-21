@@ -232,7 +232,19 @@ export function SettingsForm({
   }
 
   return (
-    <div className="flex flex-col pb-6">
+    <div className="relative flex flex-col pb-6">
+      {savedBanner ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4 md:top-5"
+        >
+          <p className="pointer-events-auto max-w-lg rounded-2xl border border-emerald-500/20 bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white shadow-lg shadow-emerald-900/20">
+            {savedBanner}
+          </p>
+        </div>
+      ) : null}
+
       <header className="border-b border-black/5 px-4 py-5 md:px-6 dark:border-white/10">
         <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-3">
           <div>
@@ -247,14 +259,6 @@ export function SettingsForm({
             </p>
           </div>
         </div>
-        {savedBanner ? (
-          <p
-            role="status"
-            className="mx-auto mt-3 max-w-3xl rounded-xl bg-emerald-500/15 px-4 py-2 text-center text-sm font-bold text-emerald-800 dark:text-emerald-200"
-          >
-            {savedBanner}
-          </p>
-        ) : null}
       </header>
 
       <form

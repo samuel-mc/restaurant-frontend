@@ -11,12 +11,12 @@ import { ApiError } from "@/services/apiClient";
 import type { AnalyticsSummary } from "@/types/analytics";
 
 export const metadata: Metadata = {
-  title: "Analíticas · Panel",
+  title: "Dashboard · Métricas",
   description: "KPIs, facturación y top platillos del restaurante.",
 };
 
 /**
- * Módulo Analíticas — pantalla inicial del dashboard.
+ * Dashboard / métricas — pantalla inicial del panel.
  */
 export default async function AdminAnalyticsPage() {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";

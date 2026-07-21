@@ -191,7 +191,6 @@ export function RegisterForm() {
 
   return (
     <form
-      id="registro"
       onSubmit={handleSubmit}
       noValidate
       className="w-full rounded-3xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-neutral-900 sm:p-8"

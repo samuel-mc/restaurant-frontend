@@ -5,6 +5,7 @@
  */
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import type { Category, Product } from "@/types/api";
 import { AvailabilityToggle } from "@/components/admin/availability-toggle";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -676,18 +677,20 @@ function CategoryList({
                 <button
                   type="button"
                   aria-label={`Editar ${category.name}`}
+                  title="Editar"
                   onClick={() => onEditCategory(category)}
-                  className="shrink-0 rounded-2xl px-2 text-xs font-bold text-black/45 hover:bg-black/[0.04] hover:text-foreground dark:text-white/45 dark:hover:bg-white/5"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-2xl text-black/45 hover:bg-black/[0.04] hover:text-foreground dark:text-white/45 dark:hover:bg-white/5"
                 >
-                  Editar
+                  <Pencil className="size-3.5" aria-hidden />
                 </button>
                 <button
                   type="button"
                   aria-label={`Eliminar ${category.name}`}
+                  title="Eliminar"
                   onClick={() => onDeleteCategory(category)}
-                  className="shrink-0 rounded-2xl px-2 text-xs font-bold text-red-600/80 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-2xl text-red-600/80 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15"
                 >
-                  Borrar
+                  <Trash2 className="size-3.5" aria-hidden />
                 </button>
               </li>
             );
@@ -772,20 +775,24 @@ function ProductAdminCard({
             onChange={onToggle}
             productName={product.name}
           />
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={onEdit}
-              className="rounded-xl bg-black/5 px-3 py-1.5 text-xs font-bold hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
+              aria-label={`Editar ${product.name}`}
+              title="Editar"
+              className="inline-flex size-9 items-center justify-center rounded-xl bg-black/5 text-foreground hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
             >
-              Editar
+              <Pencil className="size-3.5" aria-hidden />
             </button>
             <button
               type="button"
               onClick={onDelete}
-              className="rounded-xl px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/15"
+              aria-label={`Eliminar ${product.name}`}
+              title="Eliminar"
+              className="inline-flex size-9 items-center justify-center rounded-xl text-red-700 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/15"
             >
-              Eliminar
+              <Trash2 className="size-3.5" aria-hidden />
             </button>
           </div>
         </div>

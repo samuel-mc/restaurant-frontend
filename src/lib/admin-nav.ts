@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
-  CookingPot,
+  ChefHat,
   Settings,
   UtensilsCrossed,
 } from "lucide-react";
@@ -11,37 +11,38 @@ export interface AdminNavItem {
   label: string;
   description: string;
   icon: LucideIcon;
-  /** Si es true, solo coincide la ruta exacta (home de analíticas). */
+  /** Si es true, solo coincide la ruta exacta (home de métricas). */
   exact?: boolean;
 }
 
-export const ADMIN_PRIMARY_NAV: readonly AdminNavItem[] = [
+/**
+ * Navegación oficial del panel admin.
+ * Orden = flujo operativo: métricas → cocina → menú → configuración.
+ */
+export const ADMIN_NAV: readonly AdminNavItem[] = [
   {
     href: "/admin/dashboard",
-    label: "Analíticas",
-    description: "KPIs y tendencias",
+    label: "Dashboard",
+    description: "Métricas y facturación",
     icon: BarChart3,
     exact: true,
   },
   {
     href: "/admin/dashboard/kitchen",
-    label: "Operación",
-    description: "Monitor de cocina",
-    icon: CookingPot,
+    label: "Cocina en vivo",
+    description: "Comandas en tiempo real",
+    icon: ChefHat,
   },
   {
     href: "/admin/dashboard/menu",
     label: "Menú",
-    description: "Categorías y platillos",
+    description: "Catálogo y platillos",
     icon: UtensilsCrossed,
   },
-] as const;
-
-export const ADMIN_SECONDARY_NAV: readonly AdminNavItem[] = [
   {
     href: "/admin/dashboard/settings",
-    label: "Ajustes",
-    description: "Marca y módulos",
+    label: "Configuración",
+    description: "Marca, horarios y módulos",
     icon: Settings,
   },
 ] as const;

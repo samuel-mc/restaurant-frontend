@@ -3,7 +3,13 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { prettifyTenantSlug } from "@/lib/admin-nav";
 
 /**
- * Layout compartido del dashboard: sidebar + módulos.
+ * Layout persistente del dashboard admin.
+ *
+ * Rutas hijas (todas envueltas por el sidebar):
+ * - `/admin/dashboard`           → métricas / analíticas
+ * - `/admin/dashboard/kitchen`   → cocina en vivo (WebSockets)
+ * - `/admin/dashboard/menu`      → catálogo
+ * - `/admin/dashboard/settings`  → configuración
  */
 export default async function AdminDashboardLayout({
   children,

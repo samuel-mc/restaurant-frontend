@@ -168,10 +168,10 @@ export function KitchenDashboard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Operación
+              Cocina en vivo
             </p>
             <h1 className="text-2xl font-black tracking-tight md:text-3xl">
-              Monitor de cocina
+              Monitor de comandas
             </h1>
             <p className="mt-1 text-sm font-medium text-black/50 dark:text-white/50">
               {restaurantName}

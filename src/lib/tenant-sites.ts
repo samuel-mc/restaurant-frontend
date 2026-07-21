@@ -15,7 +15,7 @@ import type { TenantSiteConfig } from "@/types/tenant-site";
  */
 const TENANT_SITES: Readonly<Record<string, TenantSiteConfig>> = {
   latrattoria: {
-    slug: "latrattoria",
+    slug: "la-trattoria",
     name: "La Trattoria",
     tagline: "Ristorante Italiano",
     templateId: "la-trattoria",

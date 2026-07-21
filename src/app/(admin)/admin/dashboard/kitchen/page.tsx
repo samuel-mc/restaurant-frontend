@@ -9,12 +9,12 @@ import { ApiError } from "@/services/apiClient";
 import type { Order } from "@/types/api";
 
 export const metadata: Metadata = {
-  title: "Operación · Cocina",
+  title: "Cocina en vivo",
   description: "Monitor en tiempo real de comandas activas.",
 };
 
 /**
- * Módulo Operación — monitor de cocina/caja.
+ * Cocina en vivo — monitor reactivo (WebSockets / STOMP).
  */
 export default async function AdminKitchenPage() {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";

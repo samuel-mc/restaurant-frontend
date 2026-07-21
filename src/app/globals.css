@@ -131,3 +131,46 @@ body {
     animation: none;
   }
 }
+
+/* SaaS marketing landing */
+.saas-landing {
+  --saas-ink: #0c1210;
+  --saas-panel: #141b18;
+  --saas-line: rgba(243, 239, 230, 0.12);
+  --saas-amber: #d4a853;
+  --saas-green: #3d7a55;
+  --saas-muted: rgba(243, 239, 230, 0.62);
+}
+
+@keyframes saas-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.saas-rise {
+  animation: saas-rise 0.7s ease-out both;
+}
+
+.saas-rise-delay-1 {
+  animation-delay: 0.12s;
+}
+
+.saas-rise-delay-2 {
+  animation-delay: 0.24s;
+}
+
+.saas-rise-delay-3 {
+  animation-delay: 0.36s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saas-rise {
+    animation: none;
+  }
+}

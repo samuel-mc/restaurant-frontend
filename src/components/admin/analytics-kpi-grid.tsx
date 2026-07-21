@@ -86,7 +86,7 @@ export function AnalyticsKpiGrid({
       <div className="flex items-end justify-between gap-3 px-1">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
-            Analíticas
+            Dashboard
           </p>
           <h2 className="text-xl font-black tracking-tight md:text-2xl">
             Métricas de negocio

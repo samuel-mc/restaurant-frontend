@@ -17,6 +17,13 @@ import {
   type RestaurantProfileFormPayload,
 } from "@/services/adminRestaurantService";
 import { ApiError } from "@/services/apiClient";
+import { redeemCoupon } from "@/services/adminBillingService";
+import {
+  canPublishWebsite,
+  isProPlan,
+  paymentStatusLabel,
+  planLabel,
+} from "@/lib/subscription-plan";
 
 interface SettingsFormProps {
   tenantSlug: string;
@@ -84,6 +91,9 @@ export function SettingsForm({
   const [savedBanner, setSavedBanner] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [profile, setProfile] = useState(initialProfile);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   function handleImageChange(
     kind: "logo" | "banner",
@@ -190,6 +200,38 @@ export function SettingsForm({
     };
   }
 
+  async function handleRedeemCoupon() {
+    const code = couponCode.trim();
+    if (!code || couponBusy) return;
+    setCouponBusy(true);
+    setCouponError(null);
+    try {
+      const result = await redeemCoupon(code, tenantSlug);
+      setProfile((prev) => ({
+        ...prev,
+        plan: result.plan,
+        paymentStatus: result.paymentStatus,
+        websitePublished: result.websitePublished,
+      }));
+      setWebsitePublished(result.websitePublished);
+      setCouponCode("");
+      setSavedBanner(result.message);
+      window.setTimeout(() => {
+        setSavedBanner((current) =>
+          current === result.message ? null : current,
+        );
+      }, 4000);
+    } catch (error) {
+      setCouponError(
+        error instanceof ApiError
+          ? error.message
+          : "No se pudo canjear el cupón.",
+      );
+    } finally {
+      setCouponBusy(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const payload = validate();
@@ -214,6 +256,7 @@ export function SettingsForm({
       setHasPickup(updated.hasPickup);
       setHasReservations(updated.hasReservations);
       setWebsitePublished(updated.websitePublished);
+      setProfile(updated);
       setLogoFile(null);
       setBannerFile(null);
       setLogoPreview(updated.logoUrl);
@@ -396,18 +439,89 @@ export function SettingsForm({
         </Section>
 
         <Section
-          title="Website institucional"
-          description="Controla si tu landing pública está visible en tu subdominio."
+          title="Plan y website"
+          description="Tu plan, estado de pago y visibilidad del sitio institucional."
         >
+          <div className="mb-4 rounded-2xl border border-black/5 bg-black/[0.02] px-4 py-3 dark:border-white/10 dark:bg-white/5">
+            <p className="text-xs font-bold uppercase tracking-wide text-black/45 dark:text-white/45">
+              Plan actual
+            </p>
+            <p className="mt-1 text-base font-extrabold tracking-tight">
+              {planLabel(profile.plan)}
+            </p>
+            <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+              Estado de pago:{" "}
+              <span className="font-semibold text-foreground">
+                {paymentStatusLabel(profile.paymentStatus)}
+              </span>
+            </p>
+            {profile.paymentStatus === "PENDING_PAYMENT" ? (
+              <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+                Early access: coordina el pago (efectivo o transferencia) y
+                canjea el cupón que te entreguen para activar el sitio.
+              </p>
+            ) : !isProPlan(profile.plan) ? (
+              <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+                El sitio institucional y el menú ilimitado están en el Plan Pro.
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+                Pro activo: puedes publicar el sitio y cargar menú sin límite.
+              </p>
+            )}
+          </div>
+
+          <div className="mb-5 rounded-2xl border border-black/5 bg-white p-4 dark:border-white/10 dark:bg-neutral-950/40">
+            <p className="text-sm font-bold tracking-tight">Canjear cupón</p>
+            <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+              Tras pagar en efectivo o transferencia, ingresa el código que te
+              compartimos.
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                value={couponCode}
+                disabled={couponBusy || submitting}
+                onChange={(e) =>
+                  setCouponCode(e.target.value.toUpperCase())
+                }
+                className={inputClass(Boolean(couponError))}
+                placeholder="PRO-DEMO-2026"
+                maxLength={40}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                disabled={couponBusy || submitting || !couponCode.trim()}
+                onClick={() => void handleRedeemCoupon()}
+                className="shrink-0 rounded-xl bg-foreground px-4 py-2.5 text-sm font-bold text-background disabled:opacity-50"
+              >
+                {couponBusy ? "Canjeando…" : "Canjear"}
+              </button>
+            </div>
+            {couponError ? (
+              <p role="alert" className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
+                {couponError}
+              </p>
+            ) : null}
+          </div>
+
           <ModuleSwitch
             label="Publicar sitio web"
             description={
-              websitePublished
-                ? "Visible en la raíz de tu subdominio (además del menú digital)."
-                : "Desactivado: los visitantes verán un aviso y podrán ir al menú."
+              !canPublishWebsite(profile.plan, profile.paymentStatus)
+                ? profile.paymentStatus === "PENDING_PAYMENT"
+                  ? "Disponible cuando el pago Pro esté activo (cupón)."
+                  : "Disponible solo en Plan Pro con pago activo."
+                : websitePublished
+                  ? "Visible en la raíz de tu subdominio (además del menú digital)."
+                  : "Desactivado: los visitantes verán un aviso y podrán ir al menú."
             }
             checked={websitePublished}
-            disabled={submitting}
+            disabled={
+              submitting ||
+              !canPublishWebsite(profile.plan, profile.paymentStatus)
+            }
             onChange={setWebsitePublished}
           />
         </Section>

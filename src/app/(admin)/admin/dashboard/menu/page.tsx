@@ -5,8 +5,10 @@ import { MenuManager } from "@/components/admin/menu-manager";
 import { prettifyTenantSlug } from "@/lib/admin-nav";
 import { getAdminAccessToken } from "@/lib/auth-server";
 import { getAdminCatalog } from "@/services/adminCatalogQueries";
+import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 import { ApiError } from "@/services/apiClient";
 import type { Category, Product } from "@/types/api";
+import type { SubscriptionPlan } from "@/lib/subscription-plan";
 
 export const metadata: Metadata = {
   title: "Menú · Panel",
@@ -39,12 +41,17 @@ export default async function AdminMenuManagementPage() {
 
   let categories: Category[] = [];
   let products: Product[] = [];
+  let plan: SubscriptionPlan = "BASIC";
   let loadError: string | null = null;
 
   try {
-    const catalog = await getAdminCatalog(tenantSlug);
+    const [catalog, profile] = await Promise.all([
+      getAdminCatalog(tenantSlug),
+      getRestaurantProfile(tenantSlug),
+    ]);
     categories = catalog.categories;
     products = catalog.products;
+    plan = profile.plan === "PRO" ? "PRO" : "BASIC";
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       redirect("/admin/login");
@@ -70,6 +77,7 @@ export default async function AdminMenuManagementPage() {
       restaurantName={prettifyTenantSlug(tenantSlug)}
       initialCategories={categories}
       initialProducts={products}
+      plan={plan}
     />
   );
 }

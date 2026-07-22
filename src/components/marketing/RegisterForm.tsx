@@ -36,6 +36,8 @@ interface FieldErrors {
 interface RegisterFormProps {
   /** `b2b` = estilos del landing charcoal/emerald (sin card exterior). */
   variant?: "default" | "b2b";
+  /** Plan preseleccionado desde la sección de precios. */
+  defaultPlan?: "BASIC" | "PRO";
 }
 
 function sanitizeSlugInput(raw: string): string {
@@ -110,17 +112,37 @@ const EMPTY_FORM: RegisterTenantDTO = {
   ownerEmail: "",
   ownerName: "",
   ownerPassword: "",
+  plan: "BASIC",
+  couponCode: "",
 };
 
-export function RegisterForm({ variant = "default" }: RegisterFormProps) {
+export function RegisterForm({
+  variant = "default",
+  defaultPlan = "BASIC",
+}: RegisterFormProps) {
   const isB2b = variant === "b2b";
-  const [form, setForm] = useState<RegisterTenantDTO>(EMPTY_FORM);
+  const [form, setForm] = useState<RegisterTenantDTO>({
+    ...EMPTY_FORM,
+    plan: defaultPlan,
+  });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdSlug, setCreatedSlug] = useState<string | null>(null);
+  const [createdPlan, setCreatedPlan] = useState<"BASIC" | "PRO">("BASIC");
+  const [createdPaymentStatus, setCreatedPaymentStatus] = useState<string>(
+    "ACTIVE",
+  );
   /** Sufijo de host estable en SSR; se ajusta en cliente tras montar (evita hydration mismatch). */
   const [hostSuffix, setHostSuffix] = useState(`.${ROOT_DOMAIN}`);
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      plan: defaultPlan,
+      couponCode: defaultPlan === "PRO" ? prev.couponCode : "",
+    }));
+  }, [defaultPlan]);
 
   useEffect(() => {
     const { hostname, port } = window.location;
@@ -158,7 +180,9 @@ export function RegisterForm({ variant = "default" }: RegisterFormProps) {
     try {
       const result = await registerRestaurant(form);
       setCreatedSlug(result.tenantSlug);
-      setForm(EMPTY_FORM);
+      setCreatedPlan(result.plan === "PRO" ? "PRO" : "BASIC");
+      setCreatedPaymentStatus(result.paymentStatus ?? "ACTIVE");
+      setForm({ ...EMPTY_FORM, plan: defaultPlan });
       setFieldErrors({});
     } catch (error) {
       setFormError(getRegisterErrorMessage(error));
@@ -226,6 +250,12 @@ export function RegisterForm({ variant = "default" }: RegisterFormProps) {
             {createdSlug}
           </span>{" "}
           con el correo y la contraseña que acabas de registrar.
+          {createdPlan === "PRO" && createdPaymentStatus === "PENDING_PAYMENT"
+            ? " Tu Plan Pro quedó con pago pendiente: coordina el cobro y canjea el cupón en Configuración para publicar el sitio."
+            : null}
+          {createdPlan === "PRO" && createdPaymentStatus === "ACTIVE"
+            ? " Tu Plan Pro ya está activo (cupón aplicado)."
+            : null}
         </p>
         <a
           href={panelUrl}
@@ -277,6 +307,104 @@ export function RegisterForm({ variant = "default" }: RegisterFormProps) {
             subdominio.
           </p>
         </div>
+      ) : null}
+
+      <fieldset className={isB2b ? "block" : "sm:col-span-2"}>
+        <legend className={labelClass}>Plan</legend>
+        <div className="mt-1.5 grid grid-cols-2 gap-2">
+          {(
+            [
+              {
+                id: "BASIC" as const,
+                title: "Básico",
+                hint: "Menú QR · hasta 30 platillos",
+              },
+              {
+                id: "PRO" as const,
+                title: "Pro",
+                hint: "Sitio web + menú ilimitado",
+              },
+            ] as const
+          ).map((option) => {
+            const selected = form.plan === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                disabled={isSubmitting}
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    plan: option.id,
+                    couponCode: option.id === "PRO" ? prev.couponCode : "",
+                  }))
+                }
+                className={
+                  isB2b
+                    ? `rounded-xl border px-3 py-3 text-left transition ${
+                        selected
+                          ? "border-emerald-400/60 bg-emerald-500/15 ring-2 ring-emerald-500/25"
+                          : "border-slate-700/80 bg-slate-950/60 hover:border-slate-500"
+                      }`
+                    : `rounded-xl border px-3 py-3 text-left transition ${
+                        selected
+                          ? "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-600/20 dark:bg-emerald-950/40"
+                          : "border-black/10 dark:border-white/10"
+                      }`
+                }
+              >
+                <span
+                  className={
+                    isB2b
+                      ? "block text-sm font-bold text-white"
+                      : "block text-sm font-bold"
+                  }
+                >
+                  {option.title}
+                </span>
+                <span
+                  className={
+                    isB2b
+                      ? "mt-0.5 block text-[11px] leading-snug text-slate-400"
+                      : "mt-0.5 block text-[11px] leading-snug text-black/50 dark:text-white/50"
+                  }
+                >
+                  {option.hint}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
+      {form.plan === "PRO" ? (
+        <label className={isB2b ? "block" : "flex flex-col gap-1.5 sm:col-span-2"}>
+          <span className={labelClass}>Cupón (opcional)</span>
+          <input
+            type="text"
+            name="couponCode"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={isSubmitting}
+            value={form.couponCode ?? ""}
+            onChange={(e) =>
+              updateField("couponCode", e.target.value.toUpperCase())
+            }
+            className={inputClass}
+            placeholder="Ej. SETUP-CASH-1000"
+            maxLength={40}
+          />
+          <span
+            className={
+              isB2b
+                ? "mt-1 block text-[11px] text-slate-500"
+                : "text-[11px] text-black/45 dark:text-white/45"
+            }
+          >
+            Si ya pagaste en efectivo o transferencia, pega aquí el código. Si
+            no, puedes canjearlo después en Configuración.
+          </span>
+        </label>
       ) : null}
 
       <div className={isB2b ? "space-y-4" : "grid gap-4 sm:grid-cols-2"}>

@@ -92,15 +92,16 @@ const PRICING: PricingPlan[] = [
   {
     name: "Plan Básico",
     price: "$0",
-    period: "Gratis para siempre",
+    period: "Gratis para empezar",
     badge: null,
     color: "#94A3B8",
     features: [
       "Menú QR hasta 30 platillos",
       "Gestión de comandas básica",
       "Panel de administración",
-      "Soporte por email",
+      "Monitor de cocina en vivo",
       "Subdominio platolisto.com",
+      "Soporte por email",
     ],
     cta: "Comenzar Gratis",
     highlight: false,
@@ -120,30 +121,12 @@ const PRICING: PricingPlan[] = [
       "Configuración inicial de marca y carga de menú",
       "Menú QR ilimitado",
       "Imágenes HD con Cloudflare R2",
-      "Monitor de Cocina en vivo",
       "Analytics básicos + Top 5",
       "Pedidos WhatsApp y Pickup",
       "Soporte prioritario",
     ],
     cta: "Activar Plan Pro",
     highlight: true,
-  },
-  {
-    name: "Plan Enterprise",
-    price: "Custom",
-    period: "según tu operación",
-    badge: null,
-    color: "#FBBF24",
-    features: [
-      "Dominio personalizado propio",
-      "Múltiples sucursales",
-      "Analytics avanzados + exportes",
-      "Integraciones personalizadas",
-      "Gestor de cuenta dedicado",
-      "SLA garantizado 99.9%",
-    ],
-    cta: "Hablar con Ventas",
-    highlight: false,
   },
 ];
 
@@ -768,7 +751,11 @@ function FeaturesSection() {
   )
 }
 
-function PricingSection({ onRegister }: { onRegister: () => void }) {
+function PricingSection({
+  onRegister,
+}: {
+  onRegister: (plan: "BASIC" | "PRO") => void;
+}) {
   return (
     <section id="precios" className="py-24 relative">
       <div
@@ -789,16 +776,17 @@ function PricingSection({ onRegister }: { onRegister: () => void }) {
                 "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
             }}
           >
-            Planes que crecen
+            Dos planes claros
             <br />
-            <span className="gradient-text">contigo</span>
+            <span className="gradient-text">para tu operación</span>
           </h2>
           <p className="text-lg text-slate-300">
-            Sin contratos anuales. Sin sorpresas. Cancela cuando quieras.
+            Empieza gratis. Pasa a Pro cuando quieras tu sitio institucional;
+            el cobro es early access (efectivo / transferencia + cupón).
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+        <div className="mx-auto grid max-w-4xl grid-cols-1 items-stretch gap-6 md:grid-cols-2">
           {PRICING.map((plan) => (
             <div
               key={plan.name}
@@ -833,9 +821,7 @@ function PricingSection({ onRegister }: { onRegister: () => void }) {
                       "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
                     color: plan.highlight
                       ? "#34D399"
-                      : plan.color === "#FBBF24"
-                        ? "#FBBF24"
-                        : "#F8FAFC",
+                      : "#F8FAFC",
                   }}
                 >
                   {plan.name}
@@ -923,8 +909,8 @@ function PricingSection({ onRegister }: { onRegister: () => void }) {
 
               <button
                 type="button"
-                onClick={
-                  plan.name !== "Plan Enterprise" ? onRegister : undefined
+                onClick={() =>
+                  onRegister(plan.highlight ? "PRO" : "BASIC")
                 }
                 className={`w-full cursor-pointer rounded-xl py-3.5 text-sm font-bold transition-all duration-200 ${
                   plan.highlight ? "btn-emerald text-white" : ""
@@ -945,13 +931,29 @@ function PricingSection({ onRegister }: { onRegister: () => void }) {
           ))}
         </div>
 
+        <div className="mx-auto mt-10 max-w-4xl rounded-2xl border border-amber-400/25 bg-amber-500/5 px-6 py-5 text-center">
+          <p className="text-sm font-semibold text-amber-200">
+            ¿Varias sucursales, dominio propio o integraciones a medida?
+          </p>
+          <p className="mt-1 text-sm text-slate-400">
+            Enterprise sigue en el roadmap.{" "}
+            <a
+              href="mailto:hola@platolisto.com?subject=PlatoListo%20Enterprise"
+              className="font-semibold text-amber-300 underline-offset-2 hover:underline"
+            >
+              Habla con ventas
+            </a>{" "}
+            y lo armamos contigo.
+          </p>
+        </div>
+
         {/* Trust strip */}
         <div className="mt-12 flex flex-wrap justify-center gap-6 text-sm text-slate-400">
           {[
-            "✓ Sin tarjeta de crédito requerida",
+            "✓ Sin tarjeta de crédito para empezar",
             "✓ Configuración en 2 minutos",
             "✓ Soporte en español",
-            "✓ Cancela cuando quieras",
+            "✓ Escala de Básico a Pro cuando quieras",
           ].map((t) => (
             <span key={t}>{t}</span>
           ))}
@@ -963,8 +965,10 @@ function PricingSection({ onRegister }: { onRegister: () => void }) {
 
 function RegisterSection({
   sectionRef,
+  defaultPlan,
 }: {
   sectionRef: RefObject<HTMLElement | null>;
+  defaultPlan: "BASIC" | "PRO";
 }) {
   return (
     <section
@@ -1015,16 +1019,15 @@ function RegisterSection({
               <span className="gradient-text">menos de 2 minutos</span>
             </h2>
             <p className="text-sm text-slate-400">
-              Sin tarjeta de crédito. Sin contratos. Gratis para siempre en el
-              plan básico.
+              Elige Básico o Pro. Early access: el cobro Pro es por transferencia
+              o efectivo; te damos un cupón para activar.
             </p>
           </div>
-          <RegisterForm variant="b2b" />
+          <RegisterForm variant="b2b" defaultPlan={defaultPlan} />
           <p className="mt-5 text-center text-[11px] leading-relaxed text-slate-500">
-            * El Plan Pro incluye la entrega de tu sitio web personalizado con
-            un pago único de instalación de{" "}
-            <span className="font-semibold text-emerald-400">$1,000 MXN</span>{" "}
-            al activar tu cuenta.
+            * Plan Pro: $999 MXN/mes + $1,000 MXN de setup (pago único). Tras
+            pagar, canjeas un cupón en Configuración (o al registrarte) y el
+            sitio queda activo. Cobro online llega después.
           </p>
         </div>
       </div>
@@ -1103,6 +1106,7 @@ function Footer() {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export function B2bLanding() {
   const registerRef = useRef<HTMLElement>(null)
+  const [selectedPlan, setSelectedPlan] = useState<"BASIC" | "PRO">("BASIC")
 
   useEffect(() => {
     document.documentElement.classList.add("scroll-smooth");
@@ -1115,7 +1119,8 @@ export function B2bLanding() {
     };
   }, []);
 
-  const scrollToRegister = () => {
+  const scrollToRegister = (plan: "BASIC" | "PRO" = "BASIC") => {
+    setSelectedPlan(plan)
     const target =
       registerRef.current ?? document.getElementById("registro")
     target?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -1126,11 +1131,11 @@ export function B2bLanding() {
       className="b2b-landing min-h-screen w-full max-w-full overflow-x-hidden font-[family-name:var(--font-jakarta)]"
       style={{ background: "#0F172A", color: "#F8FAFC" }}
     >
-      <Navbar onRegister={scrollToRegister} />
-      <HeroSection onRegister={scrollToRegister} />
+      <Navbar onRegister={() => scrollToRegister("BASIC")} />
+      <HeroSection onRegister={() => scrollToRegister("BASIC")} />
       <FeaturesSection />
       <PricingSection onRegister={scrollToRegister} />
-      <RegisterSection sectionRef={registerRef} />
+      <RegisterSection sectionRef={registerRef} defaultPlan={selectedPlan} />
       <Footer />
     </div>
   )

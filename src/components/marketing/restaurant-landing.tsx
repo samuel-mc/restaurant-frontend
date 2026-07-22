@@ -162,9 +162,9 @@ function Navbar() {
           ) : null}
           <span className="flex flex-col items-start">
             <span className="font-pinyon-script text-2xl text-[#d4a853]">{brand.name}</span>
-            <span className="font-nunito-sans text-[9px] tracking-[0.3em] uppercase text-[#f7f3eb] opacity-70">
+            {/* <span className="font-nunito-sans text-[9px] tracking-[0.3em] uppercase text-[#f7f3eb] opacity-70">
               {brand.tagline ?? "Restaurante"}
-            </span>
+            </span> */}
           </span>
         </button>
         <nav className="hidden lg:flex items-center gap-7">

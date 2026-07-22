@@ -10,6 +10,10 @@ export interface RegisterTenantDTO {
   ownerEmail: string;
   ownerName: string;
   ownerPassword: string;
+  /** Plan de onboarding. Default BASIC. */
+  plan: "BASIC" | "PRO";
+  /** Cupón opcional para activar Pro al registrar. */
+  couponCode?: string;
 }
 
 /** Respuesta 201 del backend tras crear el tenant. */
@@ -19,4 +23,6 @@ export interface RegisterTenantResponse {
   tenantSlug: string;
   ownerEmail: string;
   loginPath: string;
+  plan?: string;
+  paymentStatus?: string;
 }

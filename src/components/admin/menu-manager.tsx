@@ -21,12 +21,18 @@ import {
   type ProductFormSubmitPayload,
 } from "@/services/adminCatalogService";
 import { ApiError } from "@/services/apiClient";
+import {
+  BASIC_MAX_PRODUCTS,
+  isProPlan,
+  type SubscriptionPlan,
+} from "@/lib/subscription-plan";
 
 interface MenuManagerProps {
   tenantSlug: string;
   restaurantName: string;
   initialCategories: Category[];
   initialProducts: Product[];
+  plan: SubscriptionPlan;
 }
 
 type ModalState =
@@ -56,9 +62,12 @@ export function MenuManager({
   restaurantName,
   initialCategories,
   initialProducts,
+  plan,
 }: MenuManagerProps) {
   const [categories, setCategories] = useState(initialCategories);
   const [products, setProducts] = useState(initialProducts);
+  const atProductLimit =
+    !isProPlan(plan) && products.length >= BASIC_MAX_PRODUCTS;
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     () => initialCategories[0]?.id ?? null,
   );
@@ -96,6 +105,12 @@ export function MenuManager({
   }
 
   function openCreateProduct() {
+    if (atProductLimit) {
+      setFormError(
+        `El Plan Básico permite hasta ${BASIC_MAX_PRODUCTS} platillos. Actualiza a Pro para menú ilimitado.`,
+      );
+      return;
+    }
     setFormError(null);
     setModal({ open: true, mode: "create", product: null });
   }
@@ -379,12 +394,20 @@ export function MenuManager({
           <button
             type="button"
             onClick={openCreateProduct}
-            disabled={categories.length === 0}
+            disabled={categories.length === 0 || atProductLimit}
             className="rounded-full bg-foreground px-4 py-1.5 text-sm font-bold text-background disabled:opacity-40"
           >
             Agregar platillo
           </button>
         </div>
+        {!isProPlan(plan) ? (
+          <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-sm text-amber-900 dark:text-amber-100">
+            Plan Básico: {products.length}/{BASIC_MAX_PRODUCTS} platillos
+            {atProductLimit
+              ? " · Límite alcanzado. Pasa a Pro para continuar."
+              : "."}
+          </p>
+        ) : null}
         {banner ? (
           <p
             role="status"
@@ -464,7 +487,11 @@ export function MenuManager({
           ) : filteredProducts.length === 0 ? (
             <EmptyState
               title="Sin platillos en esta categoría"
-              description="Agrega el primer platillo o selecciona otra categoría."
+              description={
+                atProductLimit
+                  ? `Alcanzaste el límite de ${BASIC_MAX_PRODUCTS} platillos del Plan Básico.`
+                  : "Agrega el primer platillo o selecciona otra categoría."
+              }
               actionLabel="Agregar platillo"
               onAction={openCreateProduct}
             />

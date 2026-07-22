@@ -30,6 +30,9 @@ export function toRestaurantProfile(
     hasPickup: Boolean(dto.hasPickup),
     hasReservations: Boolean(dto.hasReservations),
     websitePublished: Boolean(dto.websitePublished),
+    plan: dto.plan === "PRO" ? "PRO" : "BASIC",
+    paymentStatus:
+      dto.paymentStatus === "PENDING_PAYMENT" ? "PENDING_PAYMENT" : "ACTIVE",
     updatedAt: dto.updatedAt,
   };
 }

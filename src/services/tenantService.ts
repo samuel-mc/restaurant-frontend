@@ -26,6 +26,10 @@ export async function registerRestaurant(
     ownerEmail: data.ownerEmail.trim().toLowerCase(),
     ownerName: data.ownerName.trim(),
     ownerPassword: data.ownerPassword,
+    plan: data.plan === "PRO" ? "PRO" : "BASIC",
+    ...(data.couponCode?.trim()
+      ? { couponCode: data.couponCode.trim().toUpperCase() }
+      : {}),
   };
 
   return apiClient.post<RegisterTenantResponse>(REGISTER_PATH, payload, {

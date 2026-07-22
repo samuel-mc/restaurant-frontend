@@ -107,6 +107,10 @@ export interface RestaurantProfileResponse {
   hasReservations: boolean;
   /** Website institucional visible al público. */
   websitePublished: boolean;
+  /** Plan comercial: BASIC | PRO. */
+  plan: string;
+  /** ACTIVE | PENDING_PAYMENT */
+  paymentStatus: string;
   updatedAt: string;
 }
 
@@ -273,5 +277,9 @@ export interface RestaurantProfile {
   hasReservations: boolean;
   /** Website institucional visible al público. */
   websitePublished: boolean;
+  /** Plan comercial: BASIC | PRO. */
+  plan: string;
+  /** ACTIVE | PENDING_PAYMENT */
+  paymentStatus: string;
   updatedAt: string;
 }

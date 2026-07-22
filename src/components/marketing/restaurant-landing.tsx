@@ -277,10 +277,14 @@ function Hero() {
 
 // ─── Menu ────────────────────────────────────────────────────────────────────
 
+const MENU_INITIAL_VISIBLE = 10;
+const MENU_LOAD_MORE_STEP = 20;
+
 function DigitalMenu() {
   const products = useCatalog();
   const [categoryId, setCategoryId] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(MENU_INITIAL_VISIBLE);
 
   const categories = useMemo(() => {
     const seen = new Map<number, string>();
@@ -304,6 +308,15 @@ function DigitalMenu() {
       return catOk && searchOk;
     });
   }, [products, categoryId, search]);
+
+  // Al cambiar filtros, volver a la primera página visual.
+  useEffect(() => {
+    setVisibleCount(MENU_INITIAL_VISIBLE);
+  }, [categoryId, search]);
+
+  const visible = filtered.slice(0, visibleCount);
+  const remaining = Math.max(0, filtered.length - visible.length);
+  const nextBatch = Math.min(MENU_LOAD_MORE_STEP, remaining);
 
   return (
     <section id="menu" className="py-24 bg-background">
@@ -366,47 +379,81 @@ function DigitalMenu() {
             No se encontraron platillos con esos filtros.
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((item) => (
-              <div
-                key={item.uuid}
-                className="bg-card border border-border rounded-sm overflow-hidden hover:shadow-lg transition-shadow group"
-              >
-                <div className="relative h-48 bg-muted overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.imageUrl || MENU_PLACEHOLDER_IMAGE}
-                    alt={item.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <span className="absolute top-3 left-3 font-nunito-sans text-[10px] tracking-widest uppercase bg-black/55 text-white px-2.5 py-1 rounded-sm">
-                    {item.categoryName}
-                  </span>
-                </div>
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-2 gap-3">
-                    <h3 className="font-playfair-display text-lg font-bold leading-tight">
-                      {item.name}
-                    </h3>
-                    <span className="font-playfair-display text-xl font-bold text-accent shrink-0 tabular-nums">
-                      {item.formattedPrice}
+          <>
+            <p className="mb-6 text-center font-nunito-sans text-xs tracking-wide text-muted-foreground">
+              Mostrando {visible.length} de {filtered.length} platillos
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {visible.map((item) => (
+                <div
+                  key={item.uuid}
+                  className="bg-card border border-border rounded-sm overflow-hidden hover:shadow-lg transition-shadow group"
+                >
+                  <div className="relative h-48 bg-muted overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.imageUrl || MENU_PLACEHOLDER_IMAGE}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <span className="absolute top-3 left-3 font-nunito-sans text-[10px] tracking-widest uppercase bg-black/55 text-white px-2.5 py-1 rounded-sm">
+                      {item.categoryName}
                     </span>
                   </div>
-                  {item.description ? (
-                    <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed">
-                      {item.description}
-                    </p>
-                  ) : null}
-                  <Link
-                    href="/menu"
-                    className="mt-4 inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
-                  >
-                    <ShoppingBag size={13} /> Pedir en menú digital
-                  </Link>
+                  <div className="p-5">
+                    <div className="flex items-start justify-between mb-2 gap-3">
+                      <h3 className="font-playfair-display text-lg font-bold leading-tight">
+                        {item.name}
+                      </h3>
+                      <span className="font-playfair-display text-xl font-bold text-accent shrink-0 tabular-nums">
+                        {item.formattedPrice}
+                      </span>
+                    </div>
+                    {item.description ? (
+                      <p className="font-nunito-sans text-sm text-muted-foreground leading-relaxed">
+                        {item.description}
+                      </p>
+                    ) : null}
+                    <Link
+                      href="/menu"
+                      className="mt-4 inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
+                    >
+                      <ShoppingBag size={13} /> Pedir en menú digital
+                    </Link>
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {remaining > 0 ? (
+              <div className="mt-10 flex flex-col items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleCount((n) => n + MENU_LOAD_MORE_STEP)
+                  }
+                  className="font-nunito-sans text-xs tracking-widest uppercase px-8 py-3.5 rounded-sm border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  Ver {nextBatch} más
+                </button>
+                <Link
+                  href="/menu"
+                  className="font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
+                >
+                  Ir al menú completo para pedir
+                </Link>
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="mt-10 text-center">
+                <Link
+                  href="/menu"
+                  className="inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase px-8 py-3.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  <ShoppingBag size={13} /> Pedir en el menú digital
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>

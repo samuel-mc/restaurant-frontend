@@ -41,7 +41,7 @@ const FEATURES = [
   {
     icon: '🛒',
     title: 'Canal Propio Sin Comisiones',
-    desc: 'Pedidos directos para Pickup y por WhatsApp. Deja de pagar 30% a plataformas.',
+    desc: 'Pedidos directos para Pickup y Delivery. Deja de pagar 30% a plataformas.',
     accent: '#10B981',
     tag: '0% comisión',
   },
@@ -122,7 +122,7 @@ const PRICING: PricingPlan[] = [
       "Menú QR ilimitado",
       "Imágenes HD con Cloudflare R2",
       "Analytics básicos + Top 5",
-      "Pedidos WhatsApp y Pickup",
+      "Pedidos Pickup y Delivery",
       "Soporte prioritario",
     ],
     cta: "Activar Plan Pro",

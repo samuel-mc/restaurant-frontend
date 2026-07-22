@@ -42,6 +42,13 @@ function extractSubdomain(host: string): string | null {
 }
 
 export function proxy(request: NextRequest): NextResponse {
+  const { pathname } = request.nextUrl;
+
+  // Backoffice global: sin resolución de tenant ni cabecera x-tenant-slug.
+  if (pathname === "/superadmin" || pathname.startsWith("/superadmin/")) {
+    return NextResponse.next();
+  }
+
   // En producción (Render/Vercel) el host real llega en `x-forwarded-host`;
   // `host` sirve como fallback en desarrollo o tras proxies simples.
   const host =
@@ -54,8 +61,6 @@ export function proxy(request: NextRequest): NextResponse {
   if (!subdomain) {
     return NextResponse.next();
   }
-
-  const { pathname } = request.nextUrl;
 
   // Propaga el tenant resuelto a los Server Components mediante una cabecera
   // interna. Imprescindible para la zona admin, cuyas rutas no llevan `[tenant]`.

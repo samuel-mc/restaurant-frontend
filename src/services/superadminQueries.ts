@@ -1,0 +1,41 @@
+/**
+ * Queries SuperAdmin (solo servidor).
+ */
+
+import "server-only";
+
+import type { SuperAdminMetrics, SuperAdminTenant } from "@/types/superadmin";
+import { getSuperAdminAuthHeaders } from "@/lib/superadmin-auth-server";
+import { apiClient, ApiError } from "@/services/apiClient";
+
+export async function getSuperAdminMetricsServer(): Promise<SuperAdminMetrics> {
+  const auth = await getSuperAdminAuthHeaders();
+  if (!("Authorization" in auth)) {
+    throw new ApiError({
+      message: "Sesión no encontrada.",
+      status: 401,
+      statusText: "Unauthorized",
+      url: "/api/v1/superadmin/metrics",
+    });
+  }
+  return apiClient.get<SuperAdminMetrics>("/api/v1/superadmin/metrics", {
+    headers: auth,
+    cache: "no-store",
+  });
+}
+
+export async function getSuperAdminTenantsServer(): Promise<SuperAdminTenant[]> {
+  const auth = await getSuperAdminAuthHeaders();
+  if (!("Authorization" in auth)) {
+    throw new ApiError({
+      message: "Sesión no encontrada.",
+      status: 401,
+      statusText: "Unauthorized",
+      url: "/api/v1/superadmin/tenants",
+    });
+  }
+  return apiClient.get<SuperAdminTenant[]>("/api/v1/superadmin/tenants", {
+    headers: auth,
+    cache: "no-store",
+  });
+}

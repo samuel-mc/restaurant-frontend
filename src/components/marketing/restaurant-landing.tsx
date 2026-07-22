@@ -1290,7 +1290,9 @@ type RestaurantLandingProps = {
 };
 
 /**
- * Sitio institucional (plantilla La Trattoria) alimentado por perfil + menú.
+ * Landing institucional dedicada (demo La Trattoria).
+ * Registrada en `lib/tenant-landings.ts` para el/los slug(s) de ese cliente.
+ * Nuevos clientes Pro = nuevo componente + entrada en el registro (fee de setup).
  */
 export function RestaurantLanding({
   brand = DEFAULT_RESTAURANT_BRAND,

@@ -24,6 +24,7 @@ import {
   paymentStatusLabel,
   planLabel,
 } from "@/lib/subscription-plan";
+import { hasTenantLanding } from "@/lib/tenant-landings";
 
 interface SettingsFormProps {
   tenantSlug: string;
@@ -94,6 +95,7 @@ export function SettingsForm({
   const [couponCode, setCouponCode] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
+  const landingDelivered = hasTenantLanding(tenantSlug);
 
   function handleImageChange(
     kind: "logo" | "banner",
@@ -440,7 +442,7 @@ export function SettingsForm({
 
         <Section
           title="Plan y website"
-          description="Tu plan, estado de pago y visibilidad del sitio institucional."
+          description="Tu plan, pago y sitio institucional a medida (incluido en el setup Pro)."
         >
           <div className="mb-4 rounded-2xl border border-black/5 bg-black/[0.02] px-4 py-3 dark:border-white/10 dark:bg-white/5">
             <p className="text-xs font-bold uppercase tracking-wide text-black/45 dark:text-white/45">
@@ -455,18 +457,32 @@ export function SettingsForm({
                 {paymentStatusLabel(profile.paymentStatus)}
               </span>
             </p>
+            <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+              Landing custom:{" "}
+              <span className="font-semibold text-foreground">
+                {landingDelivered ? "Entregada" : "En preparación / no asignada"}
+              </span>
+            </p>
             {profile.paymentStatus === "PENDING_PAYMENT" ? (
               <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
                 Early access: coordina el pago (efectivo o transferencia) y
-                canjea el cupón que te entreguen para activar el sitio.
+                canjea el cupón que te entreguen para activar Pro.
               </p>
             ) : !isProPlan(profile.plan) ? (
               <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-                El sitio institucional y el menú ilimitado están en el Plan Pro.
+                El sitio a medida y el menú ilimitado están en el Plan Pro (+
+                setup de instalación).
+              </p>
+            ) : landingDelivered ? (
+              <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+                Tu landing personalizada ya está en el deploy. Al publicar,
+                será visible en tu subdominio.
               </p>
             ) : (
               <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-                Pro activo: puedes publicar el sitio y cargar menú sin límite.
+                Pro activo: el menú digital ya opera. La landing a medida la
+                entrega el equipo PlatoListo tras el setup; mientras, los
+                visitantes verán “sitio en preparación”.
               </p>
             )}
           </div>
@@ -513,9 +529,11 @@ export function SettingsForm({
                 ? profile.paymentStatus === "PENDING_PAYMENT"
                   ? "Disponible cuando el pago Pro esté activo (cupón)."
                   : "Disponible solo en Plan Pro con pago activo."
-                : websitePublished
-                  ? "Visible en la raíz de tu subdominio (además del menú digital)."
-                  : "Desactivado: los visitantes verán un aviso y podrán ir al menú."
+                : !landingDelivered
+                  ? "Activado: los visitantes verán “en preparación” hasta que entreguemos tu landing."
+                  : websitePublished
+                    ? "Visible en la raíz de tu subdominio (además del menú digital)."
+                    : "Desactivado: los visitantes verán un aviso y podrán ir al menú."
             }
             checked={websitePublished}
             disabled={

@@ -1,19 +1,17 @@
 /**
  * Resolución del website institucional por tenant.
  *
- * Fuente de verdad: `RestaurantProfile.websitePublished` (backend).
- * La plantilla por defecto se usa hasta que exista multi-template.
+ * - `websitePublished` (backend) → el cliente activó / pagó el sitio.
+ * - `hasTenantLanding` (registro front) → ya entregamos el diseño custom.
  */
 
 import type { RestaurantProfile } from "@/types/api";
-import type { SiteTemplateId, TenantSiteConfig } from "@/types/tenant-site";
-
-/** Única plantilla MVP; se ampliará cuando haya multi-template. */
-export const DEFAULT_SITE_TEMPLATE_ID: SiteTemplateId = "la-trattoria";
+import type { TenantSiteConfig } from "@/types/tenant-site";
+import { hasTenantLanding } from "@/lib/tenant-landings";
 
 /**
  * Construye la config del sitio si el perfil tiene el website publicado.
- * Devuelve `null` si aún no está publicado (flujo bajo demanda).
+ * Devuelve `null` si aún no está publicado.
  */
 export function resolveTenantSite(
   tenantSlug: string,
@@ -28,8 +26,8 @@ export function resolveTenantSite(
     slug,
     name: profile.name.trim() || prettifyTenantSlug(slug),
     tagline: deriveTagline(profile),
-    templateId: DEFAULT_SITE_TEMPLATE_ID,
     status: "published",
+    hasCustomLanding: hasTenantLanding(slug),
   };
 }
 

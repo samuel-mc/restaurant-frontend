@@ -1,12 +1,12 @@
 /**
  * Modelo del website institucional de un restaurante (uno por tenant).
  *
- * La publicación la controla el backend (`websitePublished` en el perfil).
- * El front resuelve la config con `resolveTenantSite`.
+ * Estrategia producto: landing **custom por cliente** (fee de setup),
+ * no multi-template masivo. Cada Pro se registra en `tenant-landings`.
+ *
+ * Publicación: `websitePublished` en el perfil.
+ * Entrega: componente React registrado para ese subdominio.
  */
-
-/** Identificador de plantilla de website. Se ampliará conforme existan más diseños. */
-export type SiteTemplateId = "la-trattoria";
 
 /** Estado de publicación del website institucional. */
 export type SitePublishStatus = "published" | "draft" | "not_created";
@@ -19,8 +19,11 @@ export interface TenantSiteConfig {
   name: string;
   /** Subtítulo / categoría. */
   tagline: string;
-  /** Plantilla exclusiva que renderiza este sitio. */
-  templateId: SiteTemplateId;
   /** Si el sitio ya está publicado y visible al público. */
   status: SitePublishStatus;
+  /**
+   * Si existe landing custom registrada en código para este slug.
+   * Sin ella, el visitante ve “sitio en preparación”.
+   */
+  hasCustomLanding: boolean;
 }

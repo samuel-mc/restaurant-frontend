@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { RestaurantLanding } from "@/components/marketing/restaurant-landing";
+import { SiteInProgress } from "@/components/customer/site-in-progress";
 import { SiteNotCreated } from "@/components/customer/site-not-created";
 import { buildLandingBrand } from "@/lib/landing-brand";
+import { getTenantLanding } from "@/lib/tenant-landings";
 import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
 import {
   prettifyTenantSlug,
@@ -23,13 +24,21 @@ export async function generateMetadata({
   const site = resolveTenantSite(tenant, profile);
   const name = profile?.name ?? site?.name ?? prettifyTenantSlug(tenant);
 
-  const title = site
-    ? `${name} · Sitio oficial`
-    : `${name} · Sitio no publicado`;
-  const description = site
-    ? profile?.description?.trim() ||
-      `Conoce ${name}: menú, reservaciones, ubicación y más.`
-    : `El website de ${name} aún no ha sido publicado.`;
+  let title: string;
+  let description: string;
+
+  if (!site) {
+    title = `${name} · Sitio no publicado`;
+    description = `El website de ${name} aún no ha sido publicado.`;
+  } else if (!site.hasCustomLanding) {
+    title = `${name} · Sitio en preparación`;
+    description = `El website a medida de ${name} está en preparación.`;
+  } else {
+    title = `${name} · Sitio oficial`;
+    description =
+      profile?.description?.trim() ||
+      `Conoce ${name}: menú, reservaciones, ubicación y más.`;
+  }
 
   return buildTenantPageMetadata({
     title,
@@ -47,8 +56,10 @@ async function loadCatalog(tenant: string): Promise<Product[]> {
 }
 
 /**
- * Website institucional del restaurante (uno exclusivo por tenant).
- * Identidad, módulos y carta vienen del backend; publicación vía settings.
+ * Website institucional: landing **custom por tenant** (fee de setup).
+ * - No publicado → SiteNotCreated
+ * - Publicado sin componente registrado → SiteInProgress
+ * - Publicado + registro → landing dedicada
  */
 export default async function TenantWebsitePage({
   params,
@@ -59,24 +70,21 @@ export default async function TenantWebsitePage({
     loadCatalog(tenant),
   ]);
   const site = resolveTenantSite(tenant, profile);
+  const restaurantName = profile?.name ?? prettifyTenantSlug(tenant);
 
   if (!site) {
     return (
-      <SiteNotCreated
-        tenantSlug={tenant}
-        restaurantName={profile?.name ?? prettifyTenantSlug(tenant)}
-      />
+      <SiteNotCreated tenantSlug={tenant} restaurantName={restaurantName} />
+    );
+  }
+
+  const Landing = getTenantLanding(site.slug);
+  if (!Landing) {
+    return (
+      <SiteInProgress tenantSlug={tenant} restaurantName={restaurantName} />
     );
   }
 
   const brand = buildLandingBrand(site, profile);
-
-  switch (site.templateId) {
-    case "la-trattoria":
-      return <RestaurantLanding brand={brand} products={products} />;
-    default: {
-      const _exhaustive: never = site.templateId;
-      return _exhaustive;
-    }
-  }
+  return <Landing brand={brand} products={products} />;
 }

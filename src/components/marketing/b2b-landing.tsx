@@ -115,10 +115,10 @@ const PRICING: PricingPlan[] = [
     setupFee: "+$1,000 MXN (Pago único de instalación/sitio web)",
     features: [
       {
-        label: "Sitio Web / Landing Page Institucional Propia",
+        label: "Sitio web a medida (diseño propio por local)",
         highlight: true,
       },
-      "Configuración inicial de marca y carga de menú",
+      "Setup de instalación + carga inicial de marca/menú",
       "Menú QR ilimitado",
       "Imágenes HD con Cloudflare R2",
       "Analytics básicos + Top 5",
@@ -781,8 +781,8 @@ function PricingSection({
             <span className="gradient-text">para tu operación</span>
           </h2>
           <p className="text-lg text-slate-300">
-            Empieza gratis. Pasa a Pro cuando quieras tu sitio institucional;
-            el cobro es early access (efectivo / transferencia + cupón).
+            Empieza gratis. Pasa a Pro cuando quieras tu sitio a medida
+            (incluido en el setup) y menú sin límite.
           </p>
         </div>
 
@@ -1025,9 +1025,10 @@ function RegisterSection({
           </div>
           <RegisterForm variant="b2b" defaultPlan={defaultPlan} />
           <p className="mt-5 text-center text-[11px] leading-relaxed text-slate-500">
-            * Plan Pro: $999 MXN/mes + $1,000 MXN de setup (pago único). Tras
-            pagar, canjeas un cupón en Configuración (o al registrarte) y el
-            sitio queda activo. Cobro online llega después.
+            * Plan Pro: $999 MXN/mes + $1,000 MXN de setup (pago único) por el
+            diseño e instalación de tu landing a medida. Tras pagar, canjeas un
+            cupón; el menú opera de inmediato y el sitio se publica cuando
+            entregamos tu diseño. Cobro online llega después.
           </p>
         </div>
       </div>

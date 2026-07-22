@@ -105,6 +105,8 @@ export interface RestaurantProfileResponse {
   hasDelivery: boolean;
   hasPickup: boolean;
   hasReservations: boolean;
+  /** Website institucional visible al público. */
+  websitePublished: boolean;
   updatedAt: string;
 }
 
@@ -121,6 +123,7 @@ export interface RestaurantProfileRequest {
   hasDelivery?: boolean;
   hasPickup?: boolean;
   hasReservations?: boolean;
+  websitePublished?: boolean;
 }
 
 /** Línea de creación de pedido hacia el backend (`OrderDetailRequest.java`). */
@@ -268,5 +271,7 @@ export interface RestaurantProfile {
   hasDelivery: boolean;
   hasPickup: boolean;
   hasReservations: boolean;
+  /** Website institucional visible al público. */
+  websitePublished: boolean;
   updatedAt: string;
 }

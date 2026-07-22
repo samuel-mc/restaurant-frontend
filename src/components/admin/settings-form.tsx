@@ -67,6 +67,9 @@ export function SettingsForm({
   const [hasReservations, setHasReservations] = useState(
     initialProfile.hasReservations,
   );
+  const [websitePublished, setWebsitePublished] = useState(
+    initialProfile.websitePublished,
+  );
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -181,6 +184,7 @@ export function SettingsForm({
       hasDelivery,
       hasPickup,
       hasReservations,
+      websitePublished,
       logoFile,
       bannerFile,
     };
@@ -209,6 +213,7 @@ export function SettingsForm({
       setHasDelivery(updated.hasDelivery);
       setHasPickup(updated.hasPickup);
       setHasReservations(updated.hasReservations);
+      setWebsitePublished(updated.websitePublished);
       setLogoFile(null);
       setBannerFile(null);
       setLogoPreview(updated.logoUrl);
@@ -388,6 +393,23 @@ export function SettingsForm({
               />
             </Field>
           </div>
+        </Section>
+
+        <Section
+          title="Website institucional"
+          description="Controla si tu landing pública está visible en tu subdominio."
+        >
+          <ModuleSwitch
+            label="Publicar sitio web"
+            description={
+              websitePublished
+                ? "Visible en la raíz de tu subdominio (además del menú digital)."
+                : "Desactivado: los visitantes verán un aviso y podrán ir al menú."
+            }
+            checked={websitePublished}
+            disabled={submitting}
+            onChange={setWebsitePublished}
+          />
         </Section>
 
         <Section

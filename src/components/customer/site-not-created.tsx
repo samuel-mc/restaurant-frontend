@@ -26,9 +26,9 @@ export function SiteNotCreated({
         </p>
         <h1 className="text-3xl font-bold tracking-tight">{restaurantName}</h1>
         <p className="max-w-sm text-sm leading-relaxed text-foreground/65">
-          Este restaurante aún no tiene su website institucional. Cada local
-          tiene un sitio propio (como La Trattoria) y se crea bajo demanda desde
-          el panel de administración.
+          Este restaurante aún no tiene su website institucional publicado.
+          El dueño puede activarlo desde Configuración en el panel de
+          administración.
         </p>
       </div>
       <a

@@ -4,7 +4,7 @@
  * Formulario de onboarding SaaS B2B: crea restaurante + owner.
  */
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   getRegisterErrorMessage,
   registerRestaurant,
@@ -31,6 +31,11 @@ interface FieldErrors {
   ownerName?: string;
   ownerEmail?: string;
   ownerPassword?: string;
+}
+
+interface RegisterFormProps {
+  /** `b2b` = estilos del landing charcoal/emerald (sin card exterior). */
+  variant?: "default" | "b2b";
 }
 
 function sanitizeSlugInput(raw: string): string {
@@ -107,21 +112,31 @@ const EMPTY_FORM: RegisterTenantDTO = {
   ownerPassword: "",
 };
 
-export function RegisterForm() {
+export function RegisterForm({ variant = "default" }: RegisterFormProps) {
+  const isB2b = variant === "b2b";
   const [form, setForm] = useState<RegisterTenantDTO>(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdSlug, setCreatedSlug] = useState<string | null>(null);
+  /** Sufijo de host estable en SSR; se ajusta en cliente tras montar (evita hydration mismatch). */
+  const [hostSuffix, setHostSuffix] = useState(`.${ROOT_DOMAIN}`);
+
+  useEffect(() => {
+    const { hostname, port } = window.location;
+    const isLocal =
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "127.0.0.1";
+    if (isLocal) {
+      setHostSuffix(`.localhost${port ? `:${port}` : ""}`);
+    }
+  }, []);
 
   const previewHost = useMemo(() => {
     const slug = form.tenantSlug.trim().toLowerCase() || "tu-restaurante";
-    const isLocal =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname.endsWith(".localhost"));
-    return isLocal ? `${slug}.localhost:3000` : `${slug}.${ROOT_DOMAIN}`;
-  }, [form.tenantSlug]);
+    return `${slug}${hostSuffix}`;
+  }, [form.tenantSlug, hostSuffix]);
 
   function updateField<K extends keyof RegisterTenantDTO>(
     key: K,
@@ -152,36 +167,86 @@ export function RegisterForm() {
     }
   }
 
+  const labelClass = isB2b
+    ? "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400"
+    : "text-sm font-medium";
+
+  const inputClass = isB2b
+    ? "w-full rounded-xl border border-slate-700/80 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"
+    : "rounded-xl border border-black/10 bg-black/2 px-3.5 py-2.5 text-sm outline-none ring-neutral-900/20 focus:ring-2 disabled:opacity-60 dark:border-white/10 dark:bg-white/5";
+
+  const errorClass = isB2b
+    ? "mt-1 text-xs text-red-400"
+    : "text-xs text-red-600 dark:text-red-400";
+
   if (createdSlug) {
     const panelUrl = buildAdminLoginUrl(createdSlug);
     return (
       <section
         aria-live="polite"
-        className="w-full rounded-3xl border border-emerald-500/25 bg-white p-6 text-left shadow-sm dark:border-emerald-400/20 dark:bg-neutral-900 sm:p-8"
+        className={
+          isB2b
+            ? "w-full py-4 text-center"
+            : "w-full rounded-3xl border border-emerald-500/25 bg-white p-6 text-left shadow-sm dark:border-emerald-400/20 dark:bg-neutral-900 sm:p-8"
+        }
       >
-        <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+        <p
+          className={
+            isB2b
+              ? "text-xs font-semibold uppercase tracking-wider text-emerald-400"
+              : "text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300"
+          }
+        >
           Listo
         </p>
-        <h2 className="mt-2 text-2xl font-extrabold tracking-tight">
+        <h2
+          className={
+            isB2b
+              ? "mt-3 text-3xl font-black text-white"
+              : "mt-2 text-2xl font-extrabold tracking-tight"
+          }
+        >
           ¡Tu restaurante ha sido creado con éxito!
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-black/60 dark:text-white/60">
+        <p
+          className={
+            isB2b
+              ? "mt-3 text-sm leading-relaxed text-slate-400"
+              : "mt-2 text-sm leading-relaxed text-black/60 dark:text-white/60"
+          }
+        >
           Ya puedes entrar al panel de{" "}
-          <span className="font-semibold text-foreground">{createdSlug}</span>{" "}
+          <span
+            className={
+              isB2b
+                ? "font-semibold text-emerald-400"
+                : "font-semibold text-foreground"
+            }
+          >
+            {createdSlug}
+          </span>{" "}
           con el correo y la contraseña que acabas de registrar.
         </p>
         <a
           href={panelUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-600/25 transition-transform active:scale-[0.98] sm:w-auto"
+          className={
+            isB2b
+              ? "btn-emerald mt-6 inline-flex w-full items-center justify-center rounded-xl px-5 py-3.5 text-sm font-bold text-white"
+              : "mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-600/25 transition-transform active:scale-[0.98] sm:w-auto"
+          }
         >
           Ir a mi Panel de Control
         </a>
         <button
           type="button"
           onClick={() => setCreatedSlug(null)}
-          className="mt-3 block w-full text-center text-sm font-medium text-black/50 transition hover:text-foreground dark:text-white/50 sm:mt-4 sm:w-auto sm:text-left"
+          className={
+            isB2b
+              ? "mt-4 block w-full text-center text-sm font-medium text-slate-500 transition hover:text-emerald-400"
+              : "mt-3 block w-full text-center text-sm font-medium text-black/50 transition hover:text-foreground dark:text-white/50 sm:mt-4 sm:w-auto sm:text-left"
+          }
         >
           Registrar otro restaurante
         </button>
@@ -193,24 +258,30 @@ export function RegisterForm() {
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="w-full rounded-3xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-neutral-900 sm:p-8"
+      className={
+        isB2b
+          ? "w-full space-y-4"
+          : "w-full rounded-3xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-neutral-900 sm:p-8"
+      }
     >
-      <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 dark:text-white/45">
-          Onboarding
-        </p>
-        <h2 className="mt-1 text-2xl font-extrabold tracking-tight">
-          Crea tu restaurante
-        </h2>
-        <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-          En minutos tendrás menú digital, panel de cocina y tu propio
-          subdominio.
-        </p>
-      </div>
+      {!isB2b ? (
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 dark:text-white/45">
+            Onboarding
+          </p>
+          <h2 className="mt-1 text-2xl font-extrabold tracking-tight">
+            Crea tu restaurante
+          </h2>
+          <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+            En minutos tendrás menú digital, panel de cocina y tu propio
+            subdominio.
+          </p>
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5 sm:col-span-2">
-          <span className="text-sm font-medium">Nombre del restaurante</span>
+      <div className={isB2b ? "space-y-4" : "grid gap-4 sm:grid-cols-2"}>
+        <label className={isB2b ? "block" : "flex flex-col gap-1.5 sm:col-span-2"}>
+          <span className={labelClass}>Nombre del restaurante</span>
           <input
             type="text"
             name="restaurantName"
@@ -218,19 +289,23 @@ export function RegisterForm() {
             disabled={isSubmitting}
             value={form.restaurantName}
             onChange={(e) => updateField("restaurantName", e.target.value)}
-            className="rounded-xl border border-black/10 bg-black/2 px-3.5 py-2.5 text-sm outline-none ring-neutral-900/20 focus:ring-2 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
-            placeholder="La Parrilla de Mario"
+            className={inputClass}
+            placeholder="La Taquería del Sol"
           />
           {fieldErrors.restaurantName ? (
-            <span className="text-xs text-red-600 dark:text-red-400">
-              {fieldErrors.restaurantName}
-            </span>
+            <span className={errorClass}>{fieldErrors.restaurantName}</span>
           ) : null}
         </label>
 
-        <label className="flex flex-col gap-1.5 sm:col-span-2">
-          <span className="text-sm font-medium">Subdominio deseado</span>
-          <div className="flex items-center gap-0 overflow-hidden rounded-xl border border-black/10 focus-within:ring-2 focus-within:ring-neutral-900/20 dark:border-white/10">
+        <label className={isB2b ? "block" : "flex flex-col gap-1.5 sm:col-span-2"}>
+          <span className={labelClass}>Subdominio deseado</span>
+          <div
+            className={
+              isB2b
+                ? "flex items-center overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/80 focus-within:border-emerald-500/60 focus-within:ring-2 focus-within:ring-emerald-500/20"
+                : "flex items-center gap-0 overflow-hidden rounded-xl border border-black/10 focus-within:ring-2 focus-within:ring-neutral-900/20 dark:border-white/10"
+            }
+          >
             <input
               type="text"
               name="tenantSlug"
@@ -241,68 +316,80 @@ export function RegisterForm() {
               onChange={(e) =>
                 updateField("tenantSlug", sanitizeSlugInput(e.target.value))
               }
-              className="min-w-0 flex-1 bg-black/2 px-3.5 py-2.5 text-sm outline-none disabled:opacity-60 dark:bg-white/5"
-              placeholder="mario"
+              className={
+                isB2b
+                  ? "min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 disabled:opacity-60"
+                  : "min-w-0 flex-1 bg-black/2 px-3.5 py-2.5 text-sm outline-none disabled:opacity-60 dark:bg-white/5"
+              }
+              placeholder="mi-restaurante"
               aria-describedby="slug-preview"
             />
-            <span className="shrink-0 bg-black/5 px-3 py-2.5 text-sm text-black/50 dark:bg-white/10 dark:text-white/50">
+            <span
+              className={
+                isB2b
+                  ? "shrink-0 border-l border-slate-700/60 bg-emerald-500/5 px-3 py-3 text-xs font-semibold whitespace-nowrap text-emerald-400"
+                  : "shrink-0 bg-black/5 px-3 py-2.5 text-sm text-black/50 dark:bg-white/10 dark:text-white/50"
+              }
+            >
               .{ROOT_DOMAIN}
             </span>
           </div>
           <p
             id="slug-preview"
-            className="text-xs text-black/50 dark:text-white/50"
+            className={
+              isB2b
+                ? "mt-1 text-[11px] text-emerald-400"
+                : "text-xs text-black/50 dark:text-white/50"
+            }
           >
             Tu sitio será:{" "}
-            <span className="font-semibold text-foreground">{previewHost}</span>
+            <span className={isB2b ? "font-semibold" : "font-semibold text-foreground"}>
+              {previewHost}
+            </span>
           </p>
           {fieldErrors.tenantSlug ? (
-            <span className="text-xs text-red-600 dark:text-red-400">
-              {fieldErrors.tenantSlug}
-            </span>
+            <span className={errorClass}>{fieldErrors.tenantSlug}</span>
           ) : null}
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Tu nombre</span>
-          <input
-            type="text"
-            name="ownerName"
-            autoComplete="name"
-            disabled={isSubmitting}
-            value={form.ownerName}
-            onChange={(e) => updateField("ownerName", e.target.value)}
-            className="rounded-xl border border-black/10 bg-black/2 px-3.5 py-2.5 text-sm outline-none ring-neutral-900/20 focus:ring-2 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
-            placeholder="Mario López"
-          />
-          {fieldErrors.ownerName ? (
-            <span className="text-xs text-red-600 dark:text-red-400">
-              {fieldErrors.ownerName}
-            </span>
-          ) : null}
-        </label>
+        <div className={isB2b ? "grid gap-4 sm:grid-cols-2" : "contents"}>
+          <label className={isB2b ? "block" : "flex flex-col gap-1.5"}>
+            <span className={labelClass}>Nombre del dueño</span>
+            <input
+              type="text"
+              name="ownerName"
+              autoComplete="name"
+              disabled={isSubmitting}
+              value={form.ownerName}
+              onChange={(e) => updateField("ownerName", e.target.value)}
+              className={inputClass}
+              placeholder="Carlos Mendoza"
+            />
+            {fieldErrors.ownerName ? (
+              <span className={errorClass}>{fieldErrors.ownerName}</span>
+            ) : null}
+          </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Correo del administrador</span>
-          <input
-            type="email"
-            name="ownerEmail"
-            autoComplete="email"
-            disabled={isSubmitting}
-            value={form.ownerEmail}
-            onChange={(e) => updateField("ownerEmail", e.target.value)}
-            className="rounded-xl border border-black/10 bg-black/2 px-3.5 py-2.5 text-sm outline-none ring-neutral-900/20 focus:ring-2 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
-            placeholder="mario@parrilla.com"
-          />
-          {fieldErrors.ownerEmail ? (
-            <span className="text-xs text-red-600 dark:text-red-400">
-              {fieldErrors.ownerEmail}
-            </span>
-          ) : null}
-        </label>
+          <label className={isB2b ? "block" : "flex flex-col gap-1.5"}>
+            <span className={labelClass}>Correo electrónico</span>
+            <input
+              type="email"
+              name="ownerEmail"
+              autoComplete="email"
+              disabled={isSubmitting}
+              value={form.ownerEmail}
+              onChange={(e) => updateField("ownerEmail", e.target.value)}
+              className={inputClass}
+              placeholder="carlos@taqueria.com"
+            />
+            {fieldErrors.ownerEmail ? (
+              <span className={errorClass}>{fieldErrors.ownerEmail}</span>
+            ) : null}
+          </label>
+        </div>
 
-        <label className="flex flex-col gap-1.5 sm:col-span-2">
-          <span className="text-sm font-medium">Contraseña</span>
+        <label className={isB2b ? "block" : "flex flex-col gap-1.5 sm:col-span-2"}>
+          <span className={labelClass}>Contraseña</span>
           <input
             type="password"
             name="ownerPassword"
@@ -310,13 +397,11 @@ export function RegisterForm() {
             disabled={isSubmitting}
             value={form.ownerPassword}
             onChange={(e) => updateField("ownerPassword", e.target.value)}
-            className="rounded-xl border border-black/10 bg-black/2 px-3.5 py-2.5 text-sm outline-none ring-neutral-900/20 focus:ring-2 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+            className={inputClass}
             placeholder="Mínimo 8 caracteres"
           />
           {fieldErrors.ownerPassword ? (
-            <span className="text-xs text-red-600 dark:text-red-400">
-              {fieldErrors.ownerPassword}
-            </span>
+            <span className={errorClass}>{fieldErrors.ownerPassword}</span>
           ) : null}
         </label>
       </div>
@@ -324,7 +409,11 @@ export function RegisterForm() {
       {formError ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl bg-red-500/10 px-3.5 py-3 text-sm leading-snug text-red-700 dark:text-red-300"
+          className={
+            isB2b
+              ? "rounded-xl bg-red-500/10 px-3.5 py-3 text-sm leading-snug text-red-300"
+              : "mt-4 rounded-xl bg-red-500/10 px-3.5 py-3 text-sm leading-snug text-red-700 dark:text-red-300"
+          }
         >
           {formError}
         </p>
@@ -333,12 +422,25 @@ export function RegisterForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="mt-6 w-full rounded-xl bg-neutral-900 px-5 py-3.5 text-sm font-bold text-white transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 dark:bg-white dark:text-neutral-900"
+        className={
+          isB2b
+            ? "btn-emerald mt-2 flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl py-4 text-base font-bold text-white disabled:cursor-wait disabled:opacity-80"
+            : "mt-6 w-full rounded-xl bg-neutral-900 px-5 py-3.5 text-sm font-bold text-white transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 dark:bg-white dark:text-neutral-900"
+        }
       >
         {isSubmitting
-          ? "Creando infraestructura de tu restaurante..."
-          : "Crear mi restaurante"}
+          ? "Configurando tu restaurante..."
+          : isB2b
+            ? "Lanzar mi Restaurante"
+            : "Crear mi restaurante"}
       </button>
+
+      {isB2b ? (
+        <p className="text-center text-[11px] text-slate-600">
+          Al registrarte aceptas nuestros términos de servicio y política de
+          privacidad.
+        </p>
+      ) : null}
     </form>
   );
 }

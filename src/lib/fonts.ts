@@ -1,4 +1,9 @@
-import { Nunito_Sans, Pinyon_Script, Playfair_Display } from "next/font/google";
+import {
+  Nunito_Sans,
+  Pinyon_Script,
+  Playfair_Display,
+  Plus_Jakarta_Sans,
+} from "next/font/google";
 
 /**
  * Fuentes de la plantilla de landing (Playfair / Nunito / Pinyon).
@@ -26,9 +31,18 @@ export const fontPinyon = Pinyon_Script({
   display: "swap",
 });
 
+/** Tipografía principal del landing B2B SaaS. */
+export const fontJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-jakarta",
+  display: "swap",
+});
+
 /** Clases CSS variables para `<html>`. */
 export const landingFontVariables = [
   fontPlayfair.variable,
   fontNunito.variable,
   fontPinyon.variable,
+  fontJakarta.variable,
 ].join(" ");

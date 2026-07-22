@@ -1,9 +1,8 @@
 /**
  * Modelo del website institucional de un restaurante (uno por tenant).
  *
- * Cada sitio se crea bajo demanda (admin/settings o onboarding). No todos los
- * tenants comparten el mismo contenido: La Trattoria es un sitio exclusivo,
- * otro restaurante tendrá el suyo propio.
+ * La publicación la controla el backend (`websitePublished` en el perfil).
+ * El front resuelve la config con `resolveTenantSite`.
  */
 
 /** Identificador de plantilla de website. Se ampliará conforme existan más diseños. */

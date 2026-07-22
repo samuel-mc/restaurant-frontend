@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { SaasLanding } from "@/components/marketing/saas-landing";
+import { B2bLanding } from "@/components/marketing/b2b-landing";
 
 export const metadata: Metadata = {
-  title: "PlatoListo · Menú digital y cocina en tiempo real",
+  title: "PlatoListo · Menú QR, cocina en vivo y cero comisiones",
   description:
-    "SaaS multi-tenant para restaurantes: menú QR, monitor de cocina, marca propia y cero comisiones por pedido.",
+    "SaaS multi-tenant para restaurantes: menú QR ultrarrápido, monitor de cocina con WebSockets y canal propio sin comisiones.",
   openGraph: {
-    title: "PlatoListo · Tu restaurante en internet. Cero comisiones.",
+    title: "PlatoListo · Tu menú en la mesa. Tu cocina en vivo.",
     description:
-      "Acelera la cocina, multiplica tickets y controla tu marca sin marketplaces.",
+      "Transforma tu restaurante con menús QR, comandas en tiempo real y cero comisiones.",
     type: "website",
     locale: "es_MX",
     siteName: "PlatoListo",
@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 
 /**
  * Landing global del SaaS (dominio principal sin subdominio).
- * Los websites institucionales viven en `(public)/[tenant]`.
+ * Diseño: B2B_Landing integrado en Next.js.
  */
 export default function MarketingPage() {
-  return <SaasLanding />;
+  return <B2bLanding />;
 }

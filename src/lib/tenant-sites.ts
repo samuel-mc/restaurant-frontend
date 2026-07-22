@@ -1,39 +1,44 @@
 /**
- * Registro local de websites institucionales por tenant.
+ * Resolución del website institucional por tenant.
  *
- * Fuente de verdad temporal (hasta que el backend/settings exponga el sitio).
- * - Solo los tenants con entrada aquí tienen website propio.
- * - La clave del mapa DEBE coincidir con el subdominio (ej. `latrattoria`).
- * - Un restaurante nuevo no hereda ese contenido: su sitio se crea bajo demanda.
+ * Fuente de verdad: `RestaurantProfile.websitePublished` (backend).
+ * La plantilla por defecto se usa hasta que exista multi-template.
  */
 
-import type { TenantSiteConfig } from "@/types/tenant-site";
+import type { RestaurantProfile } from "@/types/api";
+import type { SiteTemplateId, TenantSiteConfig } from "@/types/tenant-site";
+
+/** Única plantilla MVP; se ampliará cuando haya multi-template. */
+export const DEFAULT_SITE_TEMPLATE_ID: SiteTemplateId = "la-trattoria";
 
 /**
- * Sitios publicados conocidos.
- * Agregar aquí (o vía API más adelante) cuando se cree un website bajo demanda.
+ * Construye la config del sitio si el perfil tiene el website publicado.
+ * Devuelve `null` si aún no está publicado (flujo bajo demanda).
  */
-const TENANT_SITES: Readonly<Record<string, TenantSiteConfig>> = {
-  latrattoria: {
-    slug: "la-trattoria",
-    name: "La Trattoria",
-    tagline: "Ristorante Italiano",
-    templateId: "la-trattoria",
+export function resolveTenantSite(
+  tenantSlug: string,
+  profile: RestaurantProfile | null,
+): TenantSiteConfig | null {
+  if (!profile?.websitePublished) return null;
+
+  const slug = (profile.subdomain || tenantSlug).trim().toLowerCase();
+  if (!slug) return null;
+
+  return {
+    slug,
+    name: profile.name.trim() || prettifyTenantSlug(slug),
+    tagline: deriveTagline(profile),
+    templateId: DEFAULT_SITE_TEMPLATE_ID,
     status: "published",
-  },
-};
+  };
+}
 
-/**
- * Resuelve el website institucional de un tenant.
- * Devuelve `null` si el sitio aún no fue creado (flujo bajo demanda).
- */
-export function getTenantSite(slug: string): TenantSiteConfig | null {
-  const normalized = slug.trim().toLowerCase();
-  if (!normalized) return null;
-
-  const site = TENANT_SITES[normalized];
-  if (!site || site.status !== "published") return null;
-  return site;
+function deriveTagline(profile: RestaurantProfile): string {
+  const desc = profile.description?.trim();
+  if (!desc) return "Restaurante";
+  const firstLine = desc.split(/\n/)[0]?.trim() || desc;
+  if (firstLine.length <= 80) return firstLine;
+  return `${firstLine.slice(0, 77)}…`;
 }
 
 /** Convierte el slug en un nombre legible para placeholders / SEO. */

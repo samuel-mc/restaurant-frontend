@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "base"
+    "base",
+    "B2B_Landing"
   ]
 }

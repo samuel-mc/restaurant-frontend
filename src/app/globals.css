@@ -70,11 +70,12 @@
   --color-input-background: var(--input-background);
   --color-ring: var(--ring);
 
-  /* Landing: Playfair Display / Nunito Sans / Pinyon Script (next/font) */
+  /* Landing: Playfair Display / Nunito Sans / Pinyon Script / Jakarta (next/font) */
   --font-playfair-display: var(--font-playfair), ui-serif, Georgia,
     "Times New Roman", serif;
   --font-nunito-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
   --font-pinyon-script: var(--font-pinyon), ui-serif, cursive;
+  --font-jakarta-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
@@ -132,45 +133,182 @@ body {
   }
 }
 
-/* SaaS marketing landing */
-.saas-landing {
-  --saas-ink: #0c1210;
-  --saas-panel: #141b18;
-  --saas-line: rgba(243, 239, 230, 0.12);
-  --saas-amber: #d4a853;
-  --saas-green: #3d7a55;
-  --saas-muted: rgba(243, 239, 230, 0.62);
+/* B2B marketing landing (diseño B2B_Landing) */
+.b2b-landing {
+  font-family: var(--font-jakarta-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
-@keyframes saas-rise {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
+.b2b-landing ::-webkit-scrollbar {
+  width: 6px;
+}
+.b2b-landing ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+.b2b-landing ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+.b2b-landing ::-webkit-scrollbar-thumb:hover {
+  background: #10b981;
+}
+
+@keyframes b2b-float {
+  0%,
+  100% {
     transform: translateY(0);
   }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
-.saas-rise {
-  animation: saas-rise 0.7s ease-out both;
+@keyframes b2b-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 20px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
-.saas-rise-delay-1 {
-  animation-delay: 0.12s;
+@keyframes b2b-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
-.saas-rise-delay-2 {
-  animation-delay: 0.24s;
+@keyframes b2b-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
 }
 
-.saas-rise-delay-3 {
-  animation-delay: 0.36s;
+.b2b-landing .animate-float {
+  animation: b2b-float 4s ease-in-out infinite;
+}
+
+.b2b-landing .animate-float-delayed {
+  animation: b2b-float 4s ease-in-out infinite 1s;
+}
+
+.b2b-landing .animate-pulse-ring {
+  animation: b2b-pulse-ring 2s ease-out infinite;
+}
+
+.b2b-landing .animate-blink {
+  animation: b2b-blink 1.5s ease-in-out infinite;
+}
+
+.b2b-landing .gradient-text {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding-block: 0.06em;
+}
+
+.b2b-landing .shimmer-text {
+  background: linear-gradient(90deg, #10b981, #f59e0b, #10b981);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: b2b-shimmer 3s linear infinite;
+}
+
+.b2b-landing .card-glow:hover {
+  box-shadow:
+    0 0 30px rgba(16, 185, 129, 0.15),
+    0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.b2b-landing .btn-emerald {
+  background: linear-gradient(135deg, #10b981, #059669);
+  transition: all 0.2s ease;
+}
+.b2b-landing .btn-emerald:hover {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
+}
+
+.b2b-landing .btn-outline {
+  border: 1.5px solid rgba(16, 185, 129, 0.5);
+  transition: all 0.2s ease;
+}
+.b2b-landing .btn-outline:hover {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  transform: translateY(-1px);
+}
+
+.b2b-landing .nav-link {
+  position: relative;
+  transition: color 0.2s ease;
+}
+.b2b-landing .nav-link::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background: #10b981;
+  transition: width 0.25s ease;
+}
+.b2b-landing .nav-link:hover::after {
+  width: 100%;
+}
+.b2b-landing .nav-link:hover {
+  color: #10b981;
+}
+
+.b2b-landing .order-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.b2b-landing .badge-new {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+.b2b-landing .badge-preparing {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+.b2b-landing .badge-ready {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .saas-rise {
+  .b2b-landing .animate-float,
+  .b2b-landing .animate-float-delayed,
+  .b2b-landing .animate-pulse-ring,
+  .b2b-landing .animate-blink,
+  .b2b-landing .shimmer-text {
     animation: none;
   }
 }

@@ -29,6 +29,7 @@ export function toRestaurantProfile(
     hasDelivery: Boolean(dto.hasDelivery),
     hasPickup: Boolean(dto.hasPickup),
     hasReservations: Boolean(dto.hasReservations),
+    websitePublished: Boolean(dto.websitePublished),
     updatedAt: dto.updatedAt,
   };
 }

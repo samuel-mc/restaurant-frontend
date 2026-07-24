@@ -29,6 +29,7 @@ export function toRestaurantProfile(
     hasDelivery: Boolean(dto.hasDelivery),
     hasPickup: Boolean(dto.hasPickup),
     hasReservations: Boolean(dto.hasReservations),
+    orderingEnabled: dto.orderingEnabled !== false,
     websitePublished: Boolean(dto.websitePublished),
     plan: dto.plan === "PRO" ? "PRO" : "BASIC",
     paymentStatus:

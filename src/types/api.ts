@@ -105,6 +105,8 @@ export interface RestaurantProfileResponse {
   hasDelivery: boolean;
   hasPickup: boolean;
   hasReservations: boolean;
+  /** Si el menú digital acepta pedidos; si es false, solo consulta. */
+  orderingEnabled: boolean;
   /** Website institucional visible al público. */
   websitePublished: boolean;
   /** Plan comercial: BASIC | PRO. */
@@ -127,6 +129,7 @@ export interface RestaurantProfileRequest {
   hasDelivery?: boolean;
   hasPickup?: boolean;
   hasReservations?: boolean;
+  orderingEnabled?: boolean;
   websitePublished?: boolean;
 }
 
@@ -275,6 +278,8 @@ export interface RestaurantProfile {
   hasDelivery: boolean;
   hasPickup: boolean;
   hasReservations: boolean;
+  /** Si el menú digital acepta pedidos; si es false, solo consulta. */
+  orderingEnabled: boolean;
   /** Website institucional visible al público. */
   websitePublished: boolean;
   /** Plan comercial: BASIC | PRO. */

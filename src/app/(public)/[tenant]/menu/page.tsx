@@ -30,7 +30,9 @@ export async function generateMetadata({
     title: `${name} · Menú digital`,
     description:
       profile?.description?.trim() ||
-      `Explora el menú de ${name} y arma tu pedido.`,
+      (profile?.orderingEnabled === false
+        ? `Consulta el menú de ${name}.`
+        : `Explora el menú de ${name} y arma tu pedido.`),
     profile,
   });
 }
@@ -108,6 +110,7 @@ export default async function TenantMenuPage({ params }: TenantMenuPageProps) {
         <MenuView
           products={menu.products}
           tenantSlug={tenant}
+          orderingEnabled={profile?.orderingEnabled !== false}
           modules={{
             hasDelivery: profile?.hasDelivery ?? false,
             hasPickup: profile?.hasPickup ?? true,
@@ -138,6 +141,9 @@ function headerStyleFromProfile(
 }
 
 function menuSubtitle(profile: RestaurantProfile | null): string {
+  if (profile?.orderingEnabled === false) {
+    return "Consulta el catálogo. Los pedidos desde esta carta están desactivados.";
+  }
   const bits: string[] = [];
   if (profile?.hasPickup) bits.push("para llevar");
   if (profile?.hasDelivery) bits.push("delivery");

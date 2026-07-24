@@ -75,6 +75,9 @@ export function SettingsForm({
   const [hasReservations, setHasReservations] = useState(
     initialProfile.hasReservations,
   );
+  const [orderingEnabled, setOrderingEnabled] = useState(
+    initialProfile.orderingEnabled,
+  );
   const [websitePublished, setWebsitePublished] = useState(
     initialProfile.websitePublished,
   );
@@ -196,6 +199,7 @@ export function SettingsForm({
       hasDelivery,
       hasPickup,
       hasReservations,
+      orderingEnabled,
       websitePublished,
       logoFile,
       bannerFile,
@@ -257,6 +261,7 @@ export function SettingsForm({
       setHasDelivery(updated.hasDelivery);
       setHasPickup(updated.hasPickup);
       setHasReservations(updated.hasReservations);
+      setOrderingEnabled(updated.orderingEnabled);
       setWebsitePublished(updated.websitePublished);
       setProfile(updated);
       setLogoFile(null);
@@ -550,17 +555,28 @@ export function SettingsForm({
         >
           <div className="flex flex-col gap-3">
             <ModuleSwitch
+              label="Ordenar desde el menú digital"
+              description={
+                orderingEnabled
+                  ? "Los comensales pueden armar pedidos desde /menu."
+                  : "Menú en modo consulta: se ve el catálogo sin carrito ni checkout."
+              }
+              checked={orderingEnabled}
+              disabled={submitting}
+              onChange={setOrderingEnabled}
+            />
+            <ModuleSwitch
               label="Delivery"
               description="Pedidos a domicilio"
               checked={hasDelivery}
-              disabled={submitting}
+              disabled={submitting || !orderingEnabled}
               onChange={setHasDelivery}
             />
             <ModuleSwitch
               label="Pickup"
               description="Para llevar / recoger en local"
               checked={hasPickup}
-              disabled={submitting}
+              disabled={submitting || !orderingEnabled}
               onChange={setHasPickup}
             />
             <ModuleSwitch

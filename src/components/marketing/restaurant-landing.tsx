@@ -185,7 +185,7 @@ function Navbar() {
             href="/menu"
             className="hidden lg:inline-flex items-center gap-2 bg-accent text-white font-nunito-sans text-xs tracking-widest uppercase px-5 py-2.5 rounded-sm hover:bg-[#a84e22] transition-colors"
           >
-            Ordenar
+            {brand.orderingEnabled !== false ? "Ordenar" : "Ver menú"}
           </Link>
         )}
         <button className="lg:hidden text-[#f7f3eb]" onClick={() => setOpen(!open)}>
@@ -219,7 +219,9 @@ function Hero() {
 
   const ctas = [
     { label: "Ver Menú", id: "menu", primary: true },
-    { label: "Ordenar Ahora", id: "ordenar", primary: false },
+    ...(brand.orderingEnabled !== false
+      ? [{ label: "Ordenar Ahora", id: "ordenar", primary: false }]
+      : []),
     ...(brand.hasReservations
       ? [{ label: "Reservar Mesa", id: "reservaciones", primary: false }]
       : []),
@@ -281,6 +283,7 @@ const MENU_INITIAL_VISIBLE = 10;
 const MENU_LOAD_MORE_STEP = 20;
 
 function DigitalMenu() {
+  const brand = useBrand();
   const products = useCatalog();
   const [categoryId, setCategoryId] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
@@ -418,7 +421,10 @@ function DigitalMenu() {
                       href="/menu"
                       className="mt-4 inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
                     >
-                      <ShoppingBag size={13} /> Pedir en menú digital
+                      <ShoppingBag size={13} />{" "}
+                      {brand.orderingEnabled !== false
+                        ? "Pedir en menú digital"
+                        : "Ver en menú digital"}
                     </Link>
                   </div>
                 </div>
@@ -440,7 +446,9 @@ function DigitalMenu() {
                   href="/menu"
                   className="font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
                 >
-                  Ir al menú completo para pedir
+                  {brand.orderingEnabled !== false
+                    ? "Ir al menú completo para pedir"
+                    : "Ir al menú completo"}
                 </Link>
               </div>
             ) : (
@@ -449,7 +457,10 @@ function DigitalMenu() {
                   href="/menu"
                   className="inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase px-8 py-3.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
                 >
-                  <ShoppingBag size={13} /> Pedir en el menú digital
+                  <ShoppingBag size={13} />{" "}
+                  {brand.orderingEnabled !== false
+                    ? "Pedir en el menú digital"
+                    : "Ver menú digital"}
                 </Link>
               </div>
             )}
@@ -463,6 +474,7 @@ function DigitalMenu() {
 // ─── Destacados ──────────────────────────────────────────────────────────────
 
 function Destacados() {
+  const brand = useBrand();
   const products = useCatalog();
   const badges = [
     { badge: "Más Vendido", badgeCls: "bg-accent text-white" },
@@ -523,7 +535,8 @@ function Destacados() {
                   href="/menu"
                   className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-nunito-sans text-xs tracking-widest uppercase py-3 rounded-sm hover:bg-[#2d5c40] transition-colors"
                 >
-                  <ShoppingBag size={14} /> Ordenar
+                  <ShoppingBag size={14} />{" "}
+                  {brand.orderingEnabled !== false ? "Ordenar" : "Ver en menú"}
                 </Link>
               </div>
             </div>
@@ -583,8 +596,12 @@ function Ordenar() {
   const modalityBits: string[] = [];
   if (brand.hasDelivery) modalityBits.push("Delivery");
   if (brand.hasPickup) modalityBits.push("Pickup");
-  const eyebrow =
-    modalityBits.length > 0 ? modalityBits.join(" & ") : "Pedidos";
+  const canOrder = brand.orderingEnabled !== false;
+  const eyebrow = canOrder
+    ? modalityBits.length > 0
+      ? modalityBits.join(" & ")
+      : "Pedidos"
+    : "Menú digital";
 
   const platforms = [
     ...(wa
@@ -601,12 +618,14 @@ function Ordenar() {
         ]
       : []),
     {
-      name: "Pedido en menú",
-      desc: brand.hasPickup
-        ? "Recoge o pide en mesa"
-        : brand.hasDelivery
-          ? "Pide a domicilio"
-          : "Ordena desde la mesa",
+      name: canOrder ? "Pedido en menú" : "Ver menú digital",
+      desc: canOrder
+        ? brand.hasPickup
+          ? "Recoge o pide en mesa"
+          : brand.hasDelivery
+            ? "Pide a domicilio"
+            : "Ordena desde la mesa"
+        : "Consulta el catálogo completo",
       color: "bg-primary",
       hov: "hover:opacity-90",
       icon: <Award size={28} />,
@@ -623,12 +642,14 @@ function Ordenar() {
             {eyebrow}
           </p>
           <h2 className="font-playfair-display text-4xl md:text-5xl font-bold text-white leading-tight">
-            Ordena en Línea
+            {canOrder ? "Ordena en Línea" : "Consulta nuestro menú"}
           </h2>
           <p className="mt-4 text-white/60 font-nunito-sans max-w-md mx-auto">
-            {brand.hasDelivery || brand.hasPickup
-              ? "Recibe tus platillos favoritos donde estés, o pídelos para recoger."
-              : "Arma tu pedido desde la mesa con nuestro menú digital."}
+            {canOrder
+              ? brand.hasDelivery || brand.hasPickup
+                ? "Recibe tus platillos favoritos donde estés, o pídelos para recoger."
+                : "Arma tu pedido desde la mesa con nuestro menú digital."
+              : "Explora el catálogo. Por ahora el menú digital es solo consulta."}
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto">

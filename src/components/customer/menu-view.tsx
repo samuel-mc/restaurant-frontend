@@ -31,9 +31,16 @@ interface MenuViewProps {
   tenantSlug: string;
   /** Módulos activos (pickup / delivery) desde el perfil público. */
   modules?: OrderModules;
+  /** Si es false, el menú es solo consulta (sin carrito). */
+  orderingEnabled?: boolean;
 }
 
-export function MenuView({ products, tenantSlug, modules }: MenuViewProps) {
+export function MenuView({
+  products,
+  tenantSlug,
+  modules,
+  orderingEnabled = true,
+}: MenuViewProps) {
   const sections = useMemo<MenuSection[]>(() => {
     const byCategory = new Map<string, MenuSection>();
     for (const product of products) {
@@ -142,7 +149,10 @@ export function MenuView({ products, tenantSlug, modules }: MenuViewProps) {
             <ul className="flex flex-col gap-3">
               {section.products.map((product) => (
                 <li key={product.uuid}>
-                  <ProductCard product={product} />
+                  <ProductCard
+                    product={product}
+                    orderingEnabled={orderingEnabled}
+                  />
                 </li>
               ))}
             </ul>
@@ -150,7 +160,15 @@ export function MenuView({ products, tenantSlug, modules }: MenuViewProps) {
         ))}
       </div>
 
-      <CartBar tenantSlug={tenantSlug} modules={modules} />
+      {orderingEnabled ? (
+        <CartBar tenantSlug={tenantSlug} modules={modules} />
+      ) : (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-black/5 bg-white/95 px-4 py-3 text-center backdrop-blur dark:border-white/10 dark:bg-neutral-950/95">
+          <p className="text-xs font-medium text-black/55 dark:text-white/55">
+            Menú en modo consulta — los pedidos desde esta carta están desactivados.
+          </p>
+        </div>
+      )}
     </>
   );
 }

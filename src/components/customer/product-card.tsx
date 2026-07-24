@@ -14,6 +14,8 @@ import { QuantityStepper } from "@/components/customer/quantity-stepper";
 
 interface ProductCardProps {
   product: Product;
+  /** Si es false, se ocultan CTAs de carrito (solo consulta). */
+  orderingEnabled?: boolean;
 }
 
 function ProductImage({
@@ -53,7 +55,10 @@ function ProductImage({
   );
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({
+  product,
+  orderingEnabled = true,
+}: ProductCardProps) {
   const quantity = useProductQuantity(product.uuid);
   const addItem = useCartStore((state) => state.addItem);
   const decrementItem = useCartStore((state) => state.decrementItem);
@@ -90,7 +95,7 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.formattedPrice}
           </span>
 
-          {unavailable ? null : quantity > 0 ? (
+          {!orderingEnabled || unavailable ? null : quantity > 0 ? (
             <QuantityStepper
               quantity={quantity}
               label={product.name}

@@ -18,6 +18,8 @@ export interface RestaurantBrand {
   hasDelivery?: boolean;
   hasPickup?: boolean;
   hasReservations?: boolean;
+  /** Si el menú digital acepta pedidos. */
+  orderingEnabled?: boolean;
 }
 
 export const DEFAULT_RESTAURANT_BRAND: RestaurantBrand = {
@@ -29,4 +31,5 @@ export const DEFAULT_RESTAURANT_BRAND: RestaurantBrand = {
   hasDelivery: false,
   hasPickup: true,
   hasReservations: false,
+  orderingEnabled: true,
 };

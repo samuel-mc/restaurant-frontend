@@ -24,5 +24,6 @@ export function buildLandingBrand(
     hasDelivery: profile?.hasDelivery ?? false,
     hasPickup: profile?.hasPickup ?? true,
     hasReservations: profile?.hasReservations ?? false,
+    orderingEnabled: profile?.orderingEnabled !== false,
   };
 }

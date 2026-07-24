@@ -2,7 +2,13 @@
  * Normalización de pedidos (wire → dominio).
  */
 
-import type { Order, OrderItemStatus, OrderResponse } from "@/types/api";
+import type {
+  Order,
+  OrderItemStatus,
+  OrderPage,
+  OrderPageResponse,
+  OrderResponse,
+} from "@/types/api";
 import { formatCurrency } from "@/lib/format";
 
 function resolveItemStatus(
@@ -16,6 +22,7 @@ function resolveItemStatus(
 
 export function toOrder(dto: OrderResponse): Order {
   return {
+    id: dto.id ?? null,
     uuid: dto.uuid,
     customerName: dto.customerName,
     customerPhone: dto.customerPhone ?? null,
@@ -26,9 +33,10 @@ export function toOrder(dto: OrderResponse): Order {
     totalAmount: dto.totalAmount,
     formattedTotal: formatCurrency(dto.totalAmount),
     createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt ?? null,
     items: (dto.details ?? []).map((detail) => ({
       id: detail.id ?? null,
-      productUuid: detail.productUuid,
+      productUuid: detail.productUuid ?? "",
       productName: detail.productName,
       quantity: detail.quantity,
       unitPrice: detail.unitPrice,
@@ -38,6 +46,19 @@ export function toOrder(dto: OrderResponse): Order {
       batchNumber: detail.batchNumber ?? 1,
       status: resolveItemStatus(detail.status),
     })),
+  };
+}
+
+export function toOrderPage(dto: OrderPageResponse): OrderPage {
+  return {
+    content: (dto.content ?? []).map(toOrder),
+    totalElements: dto.totalElements ?? 0,
+    totalPages: dto.totalPages ?? 0,
+    size: dto.size ?? 0,
+    number: dto.number ?? 0,
+    first: Boolean(dto.first),
+    last: Boolean(dto.last),
+    empty: Boolean(dto.empty),
   };
 }
 

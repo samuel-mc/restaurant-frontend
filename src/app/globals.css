@@ -312,3 +312,41 @@ body {
     animation: none;
   }
 }
+
+/* Códigos QR admin — hoja de impresión A4/Carta con guías de corte */
+@media print {
+  @page {
+    size: letter;
+    margin: 10mm;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .qr-print-sheet {
+    display: block !important;
+  }
+
+  .qr-print-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10mm 10mm;
+    align-items: start;
+  }
+
+  .qr-print-cell {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .qr-acrylic-card {
+    box-shadow: none !important;
+    border: 1px dashed #a3a3a3 !important;
+    overflow: visible !important;
+    height: auto !important;
+    aspect-ratio: auto !important;
+    gap: 10px !important;
+    padding: 14px 14px 18px !important;
+  }
+}

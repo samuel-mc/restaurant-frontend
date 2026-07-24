@@ -2,6 +2,8 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   ChefHat,
+  ClipboardList,
+  QrCode,
   Settings,
   UtensilsCrossed,
 } from "lucide-react";
@@ -17,7 +19,7 @@ export interface AdminNavItem {
 
 /**
  * Navegación oficial del panel admin.
- * Orden = flujo operativo: métricas → cocina → menú → configuración.
+ * Orden = flujo operativo: métricas → cocina → pedidos → QR → menú → configuración.
  */
 export const ADMIN_NAV: readonly AdminNavItem[] = [
   {
@@ -32,6 +34,18 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
     label: "Cocina en vivo",
     description: "Comandas en tiempo real",
     icon: ChefHat,
+  },
+  {
+    href: "/admin/dashboard/orders",
+    label: "Pedidos / Cuentas",
+    description: "Listado, cobro y cierre",
+    icon: ClipboardList,
+  },
+  {
+    href: "/admin/dashboard/qr",
+    label: "Códigos QR",
+    description: "Menú y mesas para escanear",
+    icon: QrCode,
   },
   {
     href: "/admin/dashboard/menu",

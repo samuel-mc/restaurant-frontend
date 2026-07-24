@@ -189,7 +189,7 @@ export interface CreateOrderDTO {
 /** Respuesta cruda de una línea de pedido (`OrderDetailResponse.java`). */
 export interface OrderDetailResponse {
   id?: number;
-  productUuid: string;
+  productUuid: string | null;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -201,6 +201,7 @@ export interface OrderDetailResponse {
 
 /** Respuesta cruda de un pedido (`OrderResponse.java`). */
 export interface OrderResponse {
+  id?: number | null;
   uuid: string;
   customerName: string;
   customerPhone: string | null;
@@ -210,6 +211,7 @@ export interface OrderResponse {
   status: OrderStatus;
   totalAmount: number;
   createdAt: string;
+  updatedAt?: string | null;
   details: OrderDetailResponse[];
 }
 
@@ -261,6 +263,7 @@ export interface OrderItem {
 
 /** Pedido de dominio, con total formateado y líneas normalizadas. */
 export interface Order {
+  id: number | null;
   uuid: string;
   customerName: string;
   customerPhone: string | null;
@@ -271,7 +274,33 @@ export interface Order {
   totalAmount: number;
   formattedTotal: string;
   createdAt: string;
+  updatedAt: string | null;
   items: OrderItem[];
+}
+
+/** Página Spring Data de pedidos admin. */
+export interface OrderPageResponse {
+  content: OrderResponse[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+export type AdminOrderListFilter = "ALL" | "OPEN" | "CLOSED" | "PICKUP";
+
+export interface OrderPage {
+  content: Order[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
 }
 
 /** Perfil de dominio del restaurante (settings / identidad). */

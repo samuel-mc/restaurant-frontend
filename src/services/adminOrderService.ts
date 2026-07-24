@@ -1,18 +1,76 @@
 /**
- * Mutaciones de pedidos admin desde el cliente (vía BFF same-origin).
+ * Mutaciones / listado de pedidos admin desde el cliente (vía BFF same-origin).
  */
 
 import type {
+  AdminOrderListFilter,
   Order,
   OrderItemStatus,
+  OrderPage,
+  OrderPageResponse,
   OrderResponse,
   OrderStatus,
 } from "@/types/api";
-import { toOrder } from "@/lib/order-mapper";
+import { toOrder, toOrderPage } from "@/lib/order-mapper";
 import { resolveTenantSlug } from "@/lib/tenant";
 import { ApiError } from "@/services/apiClient";
 
-const BFF_STATUS_PATH = "/api/admin/orders";
+const BFF_ORDERS_PATH = "/api/admin/orders";
+
+export interface ClientListOrdersParams {
+  tenantSlug: string;
+  filter?: AdminOrderListFilter;
+  page?: number;
+  size?: number;
+}
+
+/** Listado paginado (cliente → BFF). */
+export async function listOrders(
+  params: ClientListOrdersParams,
+): Promise<OrderPage> {
+  const slug = resolveTenantSlug(params.tenantSlug);
+  const page = params.page ?? 0;
+  const size = params.size ?? 20;
+  const filter = params.filter ?? "ALL";
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    filter,
+    sort: "updatedAt,desc",
+  });
+  const url = `${BFF_ORDERS_PATH}?${query.toString()}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "x-tenant-slug": slug,
+    },
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | OrderPageResponse
+    | { error?: string }
+    | null;
+
+  if (!response.ok) {
+    const message =
+      body && typeof body === "object" && "error" in body && body.error
+        ? String(body.error)
+        : "No se pudieron cargar los pedidos.";
+    throw new ApiError({
+      message,
+      status: response.status,
+      statusText: response.statusText,
+      url,
+      body,
+    });
+  }
+
+  return toOrderPage(body as OrderPageResponse);
+}
 
 /**
  * Avanza el estado de una comanda (BFF inyecta JWT HttpOnly + X-Tenant).
@@ -23,7 +81,7 @@ export async function updateOrderStatus(
   tenantSlug: string,
 ): Promise<Order> {
   const slug = resolveTenantSlug(tenantSlug);
-  const response = await fetch(`${BFF_STATUS_PATH}/${orderUuid}/status`, {
+  const response = await fetch(`${BFF_ORDERS_PATH}/${orderUuid}/status`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -48,7 +106,7 @@ export async function updateOrderStatus(
       message,
       status: response.status,
       statusText: response.statusText,
-      url: `${BFF_STATUS_PATH}/${orderUuid}/status`,
+      url: `${BFF_ORDERS_PATH}/${orderUuid}/status`,
       body,
     });
   }
@@ -64,7 +122,7 @@ export async function updateOrderItemStatus(
   tenantSlug: string,
 ): Promise<Order> {
   const slug = resolveTenantSlug(tenantSlug);
-  const url = `${BFF_STATUS_PATH}/${orderUuid}/items/${detailId}/status`;
+  const url = `${BFF_ORDERS_PATH}/${orderUuid}/items/${detailId}/status`;
   const response = await fetch(url, {
     method: "PATCH",
     headers: {
@@ -104,7 +162,7 @@ export async function closeOrder(
   tenantSlug: string,
 ): Promise<Order> {
   const slug = resolveTenantSlug(tenantSlug);
-  const url = `${BFF_STATUS_PATH}/${orderUuid}/close`;
+  const url = `${BFF_ORDERS_PATH}/${orderUuid}/close`;
   const response = await fetch(url, {
     method: "PATCH",
     headers: {

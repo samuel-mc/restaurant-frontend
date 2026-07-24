@@ -2,7 +2,7 @@
 
 /**
  * Shell del panel admin: sidebar persistente + drawer móvil.
- * Navegación oficial: Dashboard, Cocina, Menú, Configuración + logout.
+ * Navegación oficial: Dashboard, Cocina, Pedidos, QR, Menú, Configuración + logout.
  */
 
 import Link from "next/link";
@@ -62,7 +62,7 @@ export function AdminShell({
 
   return (
     <div className="flex min-h-screen bg-neutral-100 dark:bg-neutral-950">
-      <aside className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col border-r border-black/5 bg-white md:flex lg:w-64 dark:border-white/10 dark:bg-neutral-900">
+      <aside className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col border-r border-black/5 bg-white print:hidden md:flex lg:w-64 dark:border-white/10 dark:bg-neutral-900">
         <SidebarBrand restaurantName={restaurantName} tenantSlug={tenantSlug} />
         <nav
           className="flex flex-1 flex-col overflow-y-auto px-3 py-4"
@@ -76,7 +76,7 @@ export function AdminShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-black/5 bg-white/95 px-4 py-3 backdrop-blur md:hidden dark:border-white/10 dark:bg-neutral-900/95">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-black/5 bg-white/95 px-4 py-3 backdrop-blur print:hidden md:hidden dark:border-white/10 dark:bg-neutral-900/95">
           <div className="min-w-0">
             <p className="truncate text-sm font-black tracking-tight">
               {restaurantName}

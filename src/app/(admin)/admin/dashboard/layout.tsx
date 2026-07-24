@@ -8,6 +8,8 @@ import { prettifyTenantSlug } from "@/lib/admin-nav";
  * Rutas hijas (todas envueltas por el sidebar):
  * - `/admin/dashboard`           → métricas / analíticas
  * - `/admin/dashboard/kitchen`   → cocina en vivo (WebSockets)
+ * - `/admin/dashboard/orders`    → pedidos / cuentas
+ * - `/admin/dashboard/qr`        → códigos QR de menú y mesas
  * - `/admin/dashboard/menu`      → catálogo
  * - `/admin/dashboard/settings`  → configuración
  */

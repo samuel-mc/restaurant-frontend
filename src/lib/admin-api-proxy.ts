@@ -194,3 +194,58 @@ export async function proxyAdminMultipart(
 
   return NextResponse.json(payload, { status: upstream.status });
 }
+
+/**
+ * Descarga binaria autenticada (p. ej. plantilla Excel).
+ */
+export async function proxyAdminBinaryDownload(
+  request: Request,
+  upstreamPath: string,
+): Promise<NextResponse> {
+  const ctx = await requireAdminProxyContext(request);
+  if (!ctx.ok) return ctx.response;
+
+  const path = upstreamPath.startsWith("/")
+    ? upstreamPath
+    : `/${upstreamPath}`;
+
+  const upstream = await fetch(`${ctx.apiUrl}${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${ctx.token}`,
+      "X-Tenant": ctx.tenantSlug,
+    },
+    cache: "no-store",
+  });
+
+  if (!upstream.ok) {
+    const payload = await upstream.json().catch(() => null);
+    return NextResponse.json(
+      {
+        error: upstreamErrorMessage(
+          payload,
+          "No se pudo descargar el archivo.",
+        ),
+      },
+      { status: upstream.status },
+    );
+  }
+
+  const buffer = await upstream.arrayBuffer();
+  const headers = new Headers();
+  const contentType =
+    upstream.headers.get("content-type") ??
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  headers.set("Content-Type", contentType);
+  const disposition = upstream.headers.get("content-disposition");
+  if (disposition) {
+    headers.set("Content-Disposition", disposition);
+  } else {
+    headers.set(
+      "Content-Disposition",
+      'attachment; filename="plantilla_menu_platolisto.xlsx"',
+    );
+  }
+
+  return new NextResponse(buffer, { status: 200, headers });
+}

@@ -5,10 +5,12 @@
  */
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { FileSpreadsheet, Pencil, Trash2, Upload } from "lucide-react";
 import type { Category, Product } from "@/types/api";
+import type { MenuImportResult } from "@/types/menu-import";
 import { AvailabilityToggle } from "@/components/admin/availability-toggle";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { ImportMenuModal } from "@/components/admin/import-menu-modal";
 import { ProductFormModal } from "@/components/admin/product-form-modal";
 import {
   createCategory,
@@ -20,6 +22,7 @@ import {
   updateProductWithForm,
   type ProductFormSubmitPayload,
 } from "@/services/adminCatalogService";
+import { downloadMenuExcelTemplate } from "@/services/adminMenuImportService";
 import { ApiError } from "@/services/apiClient";
 import {
   BASIC_MAX_PRODUCTS,
@@ -85,6 +88,8 @@ export function MenuManager({
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState>({ open: false });
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
   const [, startTransition] = useTransition();
 
   const selectedCategory = useMemo(
@@ -113,6 +118,63 @@ export function MenuManager({
     }
     setFormError(null);
     setModal({ open: true, mode: "create", product: null });
+  }
+
+  async function handleDownloadTemplate() {
+    if (templateBusy) return;
+    setTemplateBusy(true);
+    try {
+      await downloadMenuExcelTemplate(tenantSlug);
+      showBanner("Plantilla Excel descargada");
+    } catch (error) {
+      showBanner(
+        error instanceof ApiError
+          ? error.message
+          : "No se pudo descargar la plantilla.",
+      );
+    } finally {
+      setTemplateBusy(false);
+    }
+  }
+
+  function handleMenuImported(result: MenuImportResult) {
+    startTransition(() => {
+      if (result.categoriesCreated.length > 0) {
+        setCategories((prev) => {
+          const byId = new Map(prev.map((c) => [c.id, c]));
+          for (const created of result.categoriesCreated) {
+            byId.set(created.id, created);
+          }
+          return Array.from(byId.values()).sort(
+            (a, b) =>
+              a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
+          );
+        });
+        if (selectedCategoryId == null && result.categoriesCreated[0]) {
+          setSelectedCategoryId(result.categoriesCreated[0].id);
+        }
+      }
+
+      if (result.products.length > 0) {
+        setProducts((prev) => {
+          const byUuid = new Map(prev.map((p) => [p.uuid, p]));
+          for (const created of result.products) {
+            byUuid.set(created.uuid, created);
+          }
+          return Array.from(byUuid.values()).sort((a, b) =>
+            a.name.localeCompare(b.name),
+          );
+        });
+        const first = result.products[0];
+        if (first) setSelectedCategoryId(first.categoryId);
+      }
+    });
+
+    if (result.creadosExitosamente > 0) {
+      showBanner(
+        `${result.creadosExitosamente} platillo${result.creadosExitosamente === 1 ? "" : "s"} importado${result.creadosExitosamente === 1 ? "" : "s"}`,
+      );
+    }
   }
 
   function openEditProduct(product: Product) {
@@ -391,14 +453,34 @@ export function MenuManager({
               {restaurantName}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openCreateProduct}
-            disabled={categories.length === 0 || atProductLimit}
-            className="rounded-full bg-foreground px-4 py-1.5 text-sm font-bold text-background disabled:opacity-40"
-          >
-            Agregar platillo
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleDownloadTemplate()}
+              disabled={templateBusy}
+              className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-white px-3.5 py-1.5 text-sm font-bold text-foreground disabled:opacity-40 dark:border-white/15 dark:bg-neutral-900"
+            >
+              <FileSpreadsheet className="size-4" />
+              {templateBusy ? "Descargando…" : "Descargar Plantilla Excel"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              disabled={atProductLimit}
+              className="inline-flex items-center gap-1.5 rounded-full border border-foreground/25 bg-transparent px-3.5 py-1.5 text-sm font-bold text-foreground disabled:opacity-40"
+            >
+              <Upload className="size-4" />
+              Cargar Menú Excel
+            </button>
+            <button
+              type="button"
+              onClick={openCreateProduct}
+              disabled={categories.length === 0 || atProductLimit}
+              className="rounded-full bg-foreground px-4 py-1.5 text-sm font-bold text-background disabled:opacity-40"
+            >
+              + Nuevo Platillo
+            </button>
+          </div>
         </div>
         {!isProPlan(plan) ? (
           <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-sm text-amber-900 dark:text-amber-100">
@@ -523,6 +605,14 @@ export function MenuManager({
         error={formError}
         onClose={closeModal}
         onSubmit={handleProductSubmit}
+      />
+
+      <ImportMenuModal
+        open={importOpen}
+        tenantSlug={tenantSlug}
+        busy={false}
+        onClose={() => setImportOpen(false)}
+        onImported={handleMenuImported}
       />
 
       <ConfirmDialog

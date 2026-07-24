@@ -2,8 +2,17 @@
  * Normalización de pedidos (wire → dominio).
  */
 
-import type { Order, OrderResponse } from "@/types/api";
+import type { Order, OrderItemStatus, OrderResponse } from "@/types/api";
 import { formatCurrency } from "@/lib/format";
+
+function resolveItemStatus(
+  status: OrderItemStatus | undefined,
+): OrderItemStatus {
+  if (status === "PREPARING" || status === "DELIVERED" || status === "PENDING") {
+    return status;
+  }
+  return "PENDING";
+}
 
 export function toOrder(dto: OrderResponse): Order {
   return {
@@ -18,6 +27,7 @@ export function toOrder(dto: OrderResponse): Order {
     formattedTotal: formatCurrency(dto.totalAmount),
     createdAt: dto.createdAt,
     items: (dto.details ?? []).map((detail) => ({
+      id: detail.id ?? null,
       productUuid: detail.productUuid,
       productName: detail.productName,
       quantity: detail.quantity,
@@ -25,6 +35,13 @@ export function toOrder(dto: OrderResponse): Order {
       subtotal: detail.subtotal,
       formattedSubtotal: formatCurrency(detail.subtotal),
       notes: detail.notes ?? null,
+      batchNumber: detail.batchNumber ?? 1,
+      status: resolveItemStatus(detail.status),
     })),
   };
+}
+
+export function maxBatchNumber(order: Order): number {
+  if (order.items.length === 0) return 0;
+  return Math.max(...order.items.map((item) => item.batchNumber));
 }

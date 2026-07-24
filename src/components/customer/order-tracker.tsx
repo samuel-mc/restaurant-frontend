@@ -7,9 +7,9 @@
  * Stepper: Recibido → En Cocina → En preparación → Entregado.
  */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChefHat, Clock, Sparkles, XCircle } from "lucide-react";
-import type { Order, OrderStatus } from "@/types/api";
+import type { Order, OrderItem, OrderStatus } from "@/types/api";
 import {
   getStatusDescription,
   getStatusIndex,
@@ -18,6 +18,8 @@ import {
   toTrackingStepKey,
   TRACKING_STEPS,
 } from "@/lib/order-status";
+import { maxBatchNumber } from "@/lib/order-mapper";
+import { useCartStore } from "@/store/cartStore";
 import {
   useOrderStatusSubscription,
   type OrderConnectionState,
@@ -28,6 +30,21 @@ interface OrderTrackerProps {
   restaurantName: string;
 }
 
+function groupByBatch(items: OrderItem[]): Array<{
+  batch: number;
+  items: OrderItem[];
+}> {
+  const map = new Map<number, OrderItem[]>();
+  for (const item of items) {
+    const list = map.get(item.batchNumber) ?? [];
+    list.push(item);
+    map.set(item.batchNumber, list);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([batch, batchItems]) => ({ batch, items: batchItems }));
+}
+
 export function OrderTracker({
   initialOrder,
   restaurantName,
@@ -35,9 +52,39 @@ export function OrderTracker({
   const [order, setOrder] = useState(initialOrder);
   const [connection, setConnection] =
     useState<OrderConnectionState>("connecting");
+  const clearActiveOrderSession = useCartStore(
+    (state) => state.clearActiveOrderSession,
+  );
+  const setActiveOrderSession = useCartStore(
+    (state) => state.setActiveOrderSession,
+  );
 
   const isTerminal =
-    order.status === "DELIVERED" || order.status === "CANCELLED";
+    order.status === "DELIVERED" ||
+    order.status === "CLOSED" ||
+    order.status === "CANCELLED";
+
+  useEffect(() => {
+    if (isTerminal) {
+      clearActiveOrderSession();
+      return;
+    }
+    if (order.orderType === "IN_TABLE" && order.tableNumber) {
+      setActiveOrderSession({
+        activeOrderId: order.uuid,
+        tableNumber: order.tableNumber,
+        customerName: order.customerName,
+      });
+    }
+  }, [
+    clearActiveOrderSession,
+    isTerminal,
+    order.customerName,
+    order.orderType,
+    order.tableNumber,
+    order.uuid,
+    setActiveOrderSession,
+  ]);
 
   useOrderStatusSubscription({
     orderUuid: order.uuid,
@@ -51,12 +98,13 @@ export function OrderTracker({
   const stepKey = toTrackingStepKey(order.status);
   const isCancelled = order.status === "CANCELLED";
   const isDelivered = order.status === "DELIVERED";
-  const isCooking = stepKey === "READY"; // IN_KITCHEN → "En preparación"
+  const isCooking = stepKey === "READY";
   const isAccepted = stepKey === "IN_PREPARATION";
+  const latestBatch = maxBatchNumber(order);
+  const rounds = useMemo(() => groupByBatch(order.items), [order.items]);
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      {/* Hero de estado */}
       <section
         aria-live="polite"
         className={`-mx-4 bg-linear-to-br px-6 pb-10 pt-10 text-white shadow-sm transition-[background] duration-700 ${theme.hero}`}
@@ -69,13 +117,11 @@ export function OrderTracker({
         </h1>
         <p className="mt-1 break-all font-mono text-xs text-white/75">
           #{order.uuid.slice(0, 8)}
+          {order.tableNumber ? ` · Mesa ${order.tableNumber}` : ""}
         </p>
 
         <div className="mt-8 flex flex-col items-center text-center">
-          <StatusGlyph
-            status={order.status}
-            highlight={isDelivered}
-          />
+          <StatusGlyph status={order.status} highlight={isDelivered} />
           <p
             key={order.status}
             className="mt-4 animate-[fade-up_0.45s_ease-out] text-2xl font-extrabold tracking-tight"
@@ -108,7 +154,6 @@ export function OrderTracker({
         <ConnectionHint state={connection} terminal={isTerminal} />
       </section>
 
-      {/* Stepper */}
       {!isCancelled ? (
         <ol
           className="flex items-start justify-between gap-1 px-1"
@@ -173,14 +218,13 @@ export function OrderTracker({
         </ol>
       ) : null}
 
-      {/* Resumen de la comanda */}
       <section
         aria-label="Resumen del pedido"
         className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10"
       >
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold">Resumen</h2>
+            <h2 className="text-base font-bold">Cuenta de la mesa</h2>
             <p className="text-xs text-black/45 dark:text-white/45">
               {order.customerName}
               {order.tableNumber ? ` · Mesa ${order.tableNumber}` : ""}
@@ -193,31 +237,68 @@ export function OrderTracker({
           </span>
         </div>
 
-        <ul className="divide-y divide-black/5 dark:divide-white/10">
-          {order.items.map((item) => (
-            <li
-              key={`${item.productUuid}-${item.quantity}`}
-              className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium">
-                  <span className="tabular-nums text-black/40 dark:text-white/40">
-                    {item.quantity}×
-                  </span>{" "}
-                  {item.productName}
-                </p>
-                {item.notes ? (
-                  <p className="mt-0.5 text-xs text-black/45 dark:text-white/45">
-                    {item.notes}
-                  </p>
-                ) : null}
+        <div className="space-y-5">
+          {rounds.map(({ batch, items }) => {
+            const isLatest = batch === latestBatch && latestBatch > 1;
+            return (
+              <div key={batch}>
+                <div className="mb-2 flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
+                    Ronda {batch}
+                  </h3>
+                  {isLatest ? (
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800 dark:text-amber-200">
+                      Adición reciente
+                    </span>
+                  ) : null}
+                </div>
+                <ul className="divide-y divide-black/5 dark:divide-white/10">
+                  {items.map((item, index) => {
+                    const delivered = item.status === "DELIVERED";
+                    return (
+                      <li
+                        key={item.id ?? `${item.productUuid}-${batch}-${index}`}
+                        className={`flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 ${
+                          delivered ? "opacity-60" : ""
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p
+                            className={`text-sm font-medium ${
+                              delivered ? "line-through" : ""
+                            }`}
+                          >
+                            <span className="tabular-nums text-black/40 dark:text-white/40">
+                              {item.quantity}×
+                            </span>{" "}
+                            {item.productName}
+                          </p>
+                          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-black/40 dark:text-white/40">
+                            {delivered
+                              ? "Servido"
+                              : item.status === "PREPARING"
+                                ? "En cocina"
+                                : isLatest
+                                  ? "Pedido ahora"
+                                  : "Pendiente"}
+                          </p>
+                          {item.notes ? (
+                            <p className="mt-0.5 text-xs text-black/45 dark:text-white/45">
+                              {item.notes}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span className="shrink-0 text-sm tabular-nums text-black/60 dark:text-white/60">
+                          {item.formattedSubtotal}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-              <span className="shrink-0 text-sm tabular-nums text-black/60 dark:text-white/60">
-                {item.formattedSubtotal}
-              </span>
-            </li>
-          ))}
-        </ul>
+            );
+          })}
+        </div>
 
         <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-4 dark:border-white/10">
           <span className="text-sm font-semibold">Total</span>
@@ -225,6 +306,13 @@ export function OrderTracker({
             {order.formattedTotal}
           </span>
         </div>
+
+        {!isTerminal && order.orderType === "IN_TABLE" ? (
+          <p className="mt-3 text-center text-xs text-black/45 dark:text-white/45">
+            ¿Quieres pedir más? Vuelve al menú y usa{" "}
+            <span className="font-semibold">Enviar Adición a la Cocina</span>.
+          </p>
+        ) : null}
       </section>
     </div>
   );

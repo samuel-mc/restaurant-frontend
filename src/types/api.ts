@@ -16,7 +16,11 @@ export type OrderStatus =
   | "ACCEPTED"
   | "IN_KITCHEN"
   | "DELIVERED"
+  | "CLOSED"
   | "CANCELLED";
+
+/** Estado individual de un ítem (`OrderItemStatus.java`). */
+export type OrderItemStatus = "PENDING" | "PREPARING" | "DELIVERED";
 
 /** Modalidad del pedido. Debe coincidir con `OrderType` del backend. */
 export type OrderType = "IN_TABLE" | "PICKUP" | "DELIVERY";
@@ -150,6 +154,7 @@ export interface OrderRequest {
   orderType: OrderType;
   tableNumber?: string | null;
   deliveryAddress?: string | null;
+  activeOrderUuid?: string | null;
   details: OrderDetailRequest[];
 }
 
@@ -177,16 +182,21 @@ export interface CreateOrderDTO {
   /** Modalidad; por defecto `IN_TABLE` en el menú digital. */
   orderType?: OrderType;
   customerPhone?: string | null;
+  /** UUID de orden activa para enviar adición (misma cuenta). */
+  activeOrderUuid?: string | null;
 }
 
 /** Respuesta cruda de una línea de pedido (`OrderDetailResponse.java`). */
 export interface OrderDetailResponse {
+  id?: number;
   productUuid: string;
   productName: string;
   quantity: number;
   unitPrice: number;
   subtotal: number;
   notes: string | null;
+  batchNumber?: number;
+  status?: OrderItemStatus;
 }
 
 /** Respuesta cruda de un pedido (`OrderResponse.java`). */
@@ -237,6 +247,7 @@ export interface Product {
 
 /** Línea de un pedido normalizada, con subtotal formateado. */
 export interface OrderItem {
+  id: number | null;
   productUuid: string;
   productName: string;
   quantity: number;
@@ -244,6 +255,8 @@ export interface OrderItem {
   subtotal: number;
   formattedSubtotal: string;
   notes: string | null;
+  batchNumber: number;
+  status: OrderItemStatus;
 }
 
 /** Pedido de dominio, con total formateado y líneas normalizadas. */

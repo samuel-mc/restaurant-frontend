@@ -15,7 +15,7 @@ import type {
   OrderRequest,
   OrderResponse,
 } from "@/types/api";
-import { formatCurrency } from "@/lib/format";
+import { toOrder } from "@/lib/order-mapper";
 import { resolveTenantSlug } from "@/lib/tenant";
 import { apiClient, ApiError } from "@/services/apiClient";
 
@@ -31,31 +31,6 @@ const ORDERS_PATH = "/api/v1/orders";
 /** Nombre por defecto cuando el comensal no lo indica (el backend exige `@NotBlank`). */
 const DEFAULT_CUSTOMER_NAME = "Cliente";
 
-/** Normaliza la respuesta wire al modelo de dominio `Order`. */
-function toOrder(dto: OrderResponse): Order {
-  return {
-    uuid: dto.uuid,
-    customerName: dto.customerName,
-    customerPhone: dto.customerPhone ?? null,
-    orderType: dto.orderType,
-    tableNumber: dto.tableNumber ?? null,
-    deliveryAddress: dto.deliveryAddress ?? null,
-    status: dto.status,
-    totalAmount: dto.totalAmount,
-    formattedTotal: formatCurrency(dto.totalAmount),
-    createdAt: dto.createdAt,
-    items: (dto.details ?? []).map((detail) => ({
-      productUuid: detail.productUuid,
-      productName: detail.productName,
-      quantity: detail.quantity,
-      unitPrice: detail.unitPrice,
-      subtotal: detail.subtotal,
-      formattedSubtotal: formatCurrency(detail.subtotal),
-      notes: detail.notes ?? null,
-    })),
-  };
-}
-
 /**
  * Mapea el DTO de aplicación al contrato `OrderRequest` del backend.
  * `productId` (app) → `productUuid` (wire). El total del cliente no se envía:
@@ -65,6 +40,7 @@ function toOrderRequest(orderData: CreateOrderDTO): OrderRequest {
   const customerName =
     orderData.customerName?.trim() || DEFAULT_CUSTOMER_NAME;
   const tableNumber = orderData.tableNumber?.trim() || null;
+  const activeOrderUuid = orderData.activeOrderUuid?.trim() || null;
 
   return {
     customerName,
@@ -72,6 +48,7 @@ function toOrderRequest(orderData: CreateOrderDTO): OrderRequest {
     orderType: orderData.orderType ?? "IN_TABLE",
     tableNumber,
     deliveryAddress: orderData.deliveryAddress?.trim() || null,
+    activeOrderUuid,
     details: orderData.items.map((item) => ({
       productUuid: item.productId,
       quantity: item.quantity,
@@ -164,6 +141,42 @@ export async function getOrderByUuid(
   });
 
   return toOrder(response);
+}
+
+export interface ActiveSessionResult {
+  hasActiveOrder: boolean;
+  order: Order | null;
+}
+
+/**
+ * Consulta si la mesa ya tiene una cuenta abierta (adiciones).
+ * 204 → sin sesión; 200 → orden activa.
+ */
+export async function getActiveOrderSession(
+  tableNumber: string,
+  tenantSlug?: string | null,
+): Promise<ActiveSessionResult> {
+  const table = tableNumber.trim();
+  if (!table) {
+    return { hasActiveOrder: false, order: null };
+  }
+
+  const slug = requireTenantSlug(tenantSlug, `${ORDERS_PATH}/active-session`);
+  const path = `${ORDERS_PATH}/active-session?tableNumber=${encodeURIComponent(table)}`;
+
+  const payload = await apiClient.get<{
+    hasActiveOrder?: boolean;
+    order?: OrderResponse | null;
+  } | null>(path, {
+    headers: { [TENANT_HEADER]: slug },
+    cache: "no-store",
+  });
+
+  if (!payload?.hasActiveOrder || !payload.order?.uuid) {
+    return { hasActiveOrder: false, order: null };
+  }
+
+  return { hasActiveOrder: true, order: toOrder(payload.order) };
 }
 
 /** Mensaje amigable a partir de un fallo al crear el pedido. */

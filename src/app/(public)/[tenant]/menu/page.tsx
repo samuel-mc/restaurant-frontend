@@ -10,6 +10,7 @@ import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
 
 type TenantMenuPageProps = {
   params: Promise<{ tenant: string }>;
+  searchParams: Promise<{ m?: string | string[] }>;
 };
 
 function prettifyTenant(slug: string): string {
@@ -67,8 +68,20 @@ async function loadMenu(tenant: string): Promise<MenuLoadResult> {
  * Menú digital interactivo + carrito.
  * Cabecera y modalidades de pedido según perfil público.
  */
-export default async function TenantMenuPage({ params }: TenantMenuPageProps) {
+export default async function TenantMenuPage({
+  params,
+  searchParams,
+}: TenantMenuPageProps) {
   const { tenant } = await params;
+  const query = await searchParams;
+  const rawM = query.m;
+  const tableFromQuery =
+    typeof rawM === "string"
+      ? rawM
+      : Array.isArray(rawM)
+        ? rawM[0]
+        : null;
+
   const [menu, profile] = await Promise.all([
     loadMenu(tenant),
     getPublicRestaurantProfileOrNull(tenant),
@@ -110,6 +123,7 @@ export default async function TenantMenuPage({ params }: TenantMenuPageProps) {
         <MenuView
           products={menu.products}
           tenantSlug={tenant}
+          tableFromQuery={tableFromQuery}
           orderingEnabled={profile?.orderingEnabled !== false}
           modules={{
             hasDelivery: profile?.hasDelivery ?? false,

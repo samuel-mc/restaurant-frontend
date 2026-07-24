@@ -57,6 +57,7 @@ export function toTrackingStepKey(
     case "IN_KITCHEN":
       return "READY";
     case "DELIVERED":
+    case "CLOSED":
       return "DELIVERED";
     case "CANCELLED":
       return "CANCELLED";
@@ -78,6 +79,7 @@ export function getStatusIndex(status: OrderStatus): number {
 
 export function getStatusLabel(status: OrderStatus): string {
   if (status === "CANCELLED") return "Cancelado";
+  if (status === "CLOSED") return "Cuenta cerrada";
   const key = toTrackingStepKey(status);
   return TRACKING_STEPS.find((step) => step.key === key)?.label ?? status;
 }
@@ -85,6 +87,9 @@ export function getStatusLabel(status: OrderStatus): string {
 export function getStatusDescription(status: OrderStatus): string {
   if (status === "CANCELLED") {
     return "Este pedido fue cancelado. Habla con el personal si necesitas ayuda.";
+  }
+  if (status === "CLOSED") {
+    return "La cuenta de la mesa ya fue cobrada. ¡Gracias por tu visita!";
   }
   const key = toTrackingStepKey(status);
   return TRACKING_STEPS.find((step) => step.key === key)?.description ?? "";

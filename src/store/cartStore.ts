@@ -1,16 +1,7 @@
 "use client";
 
 /**
- * Carrito de compras local del comensal.
- *
- * Estado global ligero (Zustand) que vive solo en cliente. Guarda las líneas
- * seleccionadas indexadas por `uuid` de producto, permite ajustar cantidades y
- * expone selectores derivados (conteo y subtotal) calculados en tiempo real.
- *
- * Persistido en `localStorage` por origen (subdominio del tenant).
- *
- * Los precios se operan como `number` (regla de arquitectura); el formateo de
- * moneda se hace en UI con `formatCurrency`.
+ * Carrito de compras local del comensal + sesión de orden activa (adiciones).
  */
 
 import { create } from "zustand";
@@ -23,23 +14,36 @@ export interface CartLine {
   quantity: number;
 }
 
+/** Sesión de mesa: permite enviar adiciones al mismo ticket. */
+export interface ActiveOrderSession {
+  activeOrderId: string;
+  tableNumber: string;
+  customerName: string;
+}
+
 interface CartState {
-  /** Líneas indexadas por `product.uuid` (acceso O(1) y referencia estable). */
   lines: Record<string, CartLine>;
-  /** Agrega una unidad del producto (o crea la línea si no existe). */
+  activeOrderId: string | null;
+  tableNumber: string | null;
+  customerName: string | null;
   addItem: (product: Product) => void;
-  /** Resta una unidad; elimina la línea al llegar a 0. */
   decrementItem: (uuid: string) => void;
-  /** Elimina por completo una línea. */
   removeItem: (uuid: string) => void;
-  /** Vacía el carrito. */
   clear: () => void;
+  setActiveOrderSession: (session: ActiveOrderSession) => void;
+  clearActiveOrderSession: () => void;
+  /** Libera el ticket activo pero conserva la mesa anclada (QR). */
+  releaseActiveOrder: () => void;
+  setTableNumber: (tableNumber: string | null) => void;
 }
 
 export const useCartStore = create<CartState>()(
   persist(
     (set) => ({
       lines: {},
+      activeOrderId: null,
+      tableNumber: null,
+      customerName: null,
 
       addItem: (product) =>
         set((state) => {
@@ -78,23 +82,46 @@ export const useCartStore = create<CartState>()(
         }),
 
       clear: () => set({ lines: {} }),
+
+      setActiveOrderSession: (session) =>
+        set({
+          activeOrderId: session.activeOrderId,
+          tableNumber: session.tableNumber,
+          customerName: session.customerName,
+        }),
+
+      clearActiveOrderSession: () =>
+        set({
+          activeOrderId: null,
+          tableNumber: null,
+          customerName: null,
+        }),
+
+      releaseActiveOrder: () =>
+        set({
+          activeOrderId: null,
+          customerName: null,
+        }),
+
+      setTableNumber: (tableNumber) => set({ tableNumber }),
     }),
     {
       name: "platolisto-cart",
-      partialize: (state) => ({ lines: state.lines }),
+      partialize: (state) => ({
+        lines: state.lines,
+        activeOrderId: state.activeOrderId,
+        tableNumber: state.tableNumber,
+        customerName: state.customerName,
+      }),
     },
   ),
 );
 
-/* ----------------------------- Selectores ------------------------------- */
-
-/** Cantidad total de unidades en el carrito. */
 export const useCartCount = (): number =>
   useCartStore((state) =>
     Object.values(state.lines).reduce((total, line) => total + line.quantity, 0),
   );
 
-/** Subtotal exacto (suma de precio × cantidad de cada línea). */
 export const useCartSubtotal = (): number =>
   useCartStore((state) =>
     Object.values(state.lines).reduce(
@@ -103,6 +130,8 @@ export const useCartSubtotal = (): number =>
     ),
   );
 
-/** Cantidad de un producto puntual (0 si no está en el carrito). */
 export const useProductQuantity = (uuid: string): number =>
   useCartStore((state) => state.lines[uuid]?.quantity ?? 0);
+
+export const useHasActiveOrder = (): boolean =>
+  useCartStore((state) => Boolean(state.activeOrderId));

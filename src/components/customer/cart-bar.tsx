@@ -1,15 +1,13 @@
 "use client";
 
 /**
- * Botón flotante del carrito + drawer inferior (bottom sheet) con el resumen.
- *
- * Visible solo si `totalItems > 0`. Al confirmar, publica el pedido vía
- * `orderService.createOrder`, limpia el carrito y redirige al tracking.
+ * Botón flotante del carrito + drawer: pedido nuevo o adición a mesa.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
+import { formatTableLabel } from "@/lib/table-session";
 import {
   useCartCount,
   useCartStore,
@@ -30,6 +28,9 @@ export interface OrderModules {
 interface CartBarProps {
   tenantSlug: string;
   modules?: OrderModules;
+  /** Mesa anclada por QR (?m=): campo bloqueado. */
+  tableLockedFromQr?: boolean;
+  onChangeTable?: () => void;
 }
 
 type OrderTypeOption = {
@@ -50,7 +51,12 @@ function resolveOrderTypes(modules: OrderModules | undefined): OrderTypeOption[]
   return options;
 }
 
-export function CartBar({ tenantSlug, modules }: CartBarProps) {
+export function CartBar({
+  tenantSlug,
+  modules,
+  tableLockedFromQr = false,
+  onChangeTable,
+}: CartBarProps) {
   const router = useRouter();
   const orderTypes = useMemo(() => resolveOrderTypes(modules), [modules]);
   const [isOpen, setIsOpen] = useState(false);
@@ -67,10 +73,17 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
   const count = useCartCount();
   const subtotal = useCartSubtotal();
   const lines = useCartStore((state) => state.lines);
+  const activeOrderId = useCartStore((state) => state.activeOrderId);
+  const sessionTable = useCartStore((state) => state.tableNumber);
+  const sessionName = useCartStore((state) => state.customerName);
   const addItem = useCartStore((state) => state.addItem);
   const decrementItem = useCartStore((state) => state.decrementItem);
   const clearCart = useCartStore((state) => state.clear);
+  const setActiveOrderSession = useCartStore(
+    (state) => state.setActiveOrderSession,
+  );
 
+  const isAddition = Boolean(activeOrderId);
   const orderedLines = useMemo(() => Object.values(lines), [lines]);
   const itemLabel = count === 1 ? "1 ítem" : `${count} ítems`;
 
@@ -79,6 +92,14 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
       setOrderType(orderTypes[0]?.value ?? "IN_TABLE");
     }
   }, [orderTypes, orderType]);
+
+  useEffect(() => {
+    if (isAddition || tableLockedFromQr) {
+      setOrderType("IN_TABLE");
+      if (sessionTable) setTableNumber(sessionTable);
+      if (sessionName) setCustomerName(sessionName);
+    }
+  }, [isAddition, tableLockedFromQr, sessionTable, sessionName]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -93,7 +114,18 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
     if (isSubmitting || orderedLines.length === 0) return;
     setErrorMessage(null);
 
-    if (orderType === "DELIVERY" && !deliveryAddress.trim()) {
+    const effectiveType = isAddition ? "IN_TABLE" : orderType;
+    const effectiveTable = tableNumber.trim();
+
+    if (effectiveType === "IN_TABLE" && !effectiveTable && !isAddition) {
+      setErrorMessage("Indica el número de mesa para tu pedido.");
+      return;
+    }
+    if (isAddition && !activeOrderId) {
+      setErrorMessage("No hay una orden activa para agregar platillos.");
+      return;
+    }
+    if (effectiveType === "DELIVERY" && !deliveryAddress.trim()) {
       setErrorMessage("Indica la dirección de entrega.");
       return;
     }
@@ -106,17 +138,27 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
         quantity,
       })),
       tableNumber:
-        orderType === "IN_TABLE" ? tableNumber.trim() || null : null,
+        effectiveType === "IN_TABLE"
+          ? effectiveTable || sessionTable || null
+          : null,
       deliveryAddress:
-        orderType === "DELIVERY" ? deliveryAddress.trim() || null : null,
-      customerName: customerName.trim() || null,
+        effectiveType === "DELIVERY" ? deliveryAddress.trim() || null : null,
+      customerName: customerName.trim() || sessionName || null,
       customerPhone: customerPhone.trim() || null,
       total: subtotal,
-      orderType,
+      orderType: effectiveType,
+      activeOrderUuid: isAddition ? activeOrderId : null,
     };
 
     try {
       const order = await createOrder(orderData, tenantSlug);
+      if (order.orderType === "IN_TABLE" && order.tableNumber) {
+        setActiveOrderSession({
+          activeOrderId: order.uuid,
+          tableNumber: order.tableNumber,
+          customerName: order.customerName,
+        });
+      }
       clearCart();
       setIsOpen(false);
       router.push(`/orders/${order.uuid}`);
@@ -128,6 +170,14 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
   }
 
   if (count === 0) return null;
+
+  const confirmLabel = isSubmitting
+    ? isAddition
+      ? "Enviando adición…"
+      : "Procesando pedido…"
+    : isAddition
+      ? "Enviar Adición a la Cocina"
+      : "Confirmar pedido";
 
   return (
     <>
@@ -144,7 +194,9 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
             <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white/25 px-2 text-sm tabular-nums">
               {count}
             </span>
-            <span className="truncate">Ver Pedido · {itemLabel}</span>
+            <span className="truncate">
+              {isAddition ? `Adición · ${itemLabel}` : `Ver Pedido · ${itemLabel}`}
+            </span>
           </span>
           <span className="shrink-0 tabular-nums">
             {formatCurrency(subtotal)}
@@ -174,7 +226,16 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
             />
 
             <div className="flex items-center justify-between px-5 pb-2 pt-3">
-              <h2 className="text-lg font-bold">Tu pedido</h2>
+              <div>
+                <h2 className="text-lg font-bold">
+                  {isAddition ? "Adición a tu mesa" : "Tu pedido"}
+                </h2>
+                {isAddition && sessionTable ? (
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                    Se suma a la cuenta · Mesa {sessionTable}
+                  </p>
+                ) : null}
+              </div>
               <button
                 type="button"
                 disabled={isSubmitting}
@@ -214,7 +275,7 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
             </ul>
 
             <div className="space-y-3 border-t border-black/5 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:border-white/10">
-              {orderTypes.length > 1 ? (
+              {!isAddition && !tableLockedFromQr && orderTypes.length > 1 ? (
                 <fieldset>
                   <legend className="mb-2 text-xs font-medium text-black/50 dark:text-white/50">
                     Tipo de pedido
@@ -279,26 +340,47 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
                 </label>
               </div>
 
-              {orderType === "IN_TABLE" ? (
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-black/50 dark:text-white/50">
-                    Mesa
-                  </span>
-                  <input
-                    type="text"
-                    name="tableNumber"
-                    inputMode="numeric"
-                    maxLength={10}
-                    placeholder="Opcional"
-                    value={tableNumber}
-                    disabled={isSubmitting}
-                    onChange={(event) => setTableNumber(event.target.value)}
-                    className="rounded-xl bg-black/5 px-3 py-2.5 text-sm outline-none ring-amber-500/40 focus:ring-2 disabled:opacity-50 dark:bg-white/10"
-                  />
-                </label>
+              {(isAddition || tableLockedFromQr || orderType === "IN_TABLE") ? (
+                <div className="space-y-1.5">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-black/50 dark:text-white/50">
+                      Mesa
+                    </span>
+                    <input
+                      type="text"
+                      name="tableNumber"
+                      inputMode="numeric"
+                      maxLength={10}
+                      placeholder="Ej. 12"
+                      value={tableNumber}
+                      readOnly={tableLockedFromQr || isAddition}
+                      disabled={isSubmitting || tableLockedFromQr || isAddition}
+                      onChange={(event) => setTableNumber(event.target.value)}
+                      className="rounded-xl bg-black/5 px-3 py-2.5 text-sm outline-none ring-amber-500/40 focus:ring-2 disabled:opacity-70 dark:bg-white/10"
+                    />
+                  </label>
+                  {tableLockedFromQr ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:text-emerald-200">
+                        📍 {formatTableLabel(tableNumber || "")} (Detectada por
+                        QR)
+                      </span>
+                      {onChangeTable ? (
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={onChangeTable}
+                          className="text-[11px] font-medium text-black/45 underline dark:text-white/45"
+                        >
+                          ¿No es tu mesa? Cambiar
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
 
-              {orderType === "DELIVERY" ? (
+              {!isAddition && orderType === "DELIVERY" ? (
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-black/50 dark:text-white/50">
                     Dirección de entrega
@@ -339,7 +421,7 @@ export function CartBar({ tenantSlug, modules }: CartBarProps) {
                 }}
                 className="w-full rounded-2xl bg-amber-500 px-5 py-4 font-semibold text-white shadow-lg shadow-amber-500/30 transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
               >
-                {isSubmitting ? "Procesando pedido..." : "Confirmar pedido"}
+                {confirmLabel}
               </button>
             </div>
           </div>

@@ -5,17 +5,27 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { Order, OrderStatus } from "@/types/api";
+import type { Order, OrderItem, OrderItemStatus, OrderStatus } from "@/types/api";
 import { OrderTicket } from "@/components/admin/order-ticket";
 import {
   useKitchenOrdersSubscription,
   type KitchenConnectionState,
 } from "@/hooks/useKitchenOrdersSubscription";
 import { useKitchenAlertSound } from "@/hooks/useKitchenAlertSound";
-import { updateOrderStatus } from "@/services/adminOrderService";
+import {
+  closeOrder,
+  updateOrderItemStatus,
+  updateOrderStatus,
+} from "@/services/adminOrderService";
 import { ApiError } from "@/services/apiClient";
+import { maxBatchNumber } from "@/lib/order-mapper";
 
-const ACTIVE_STATUSES: OrderStatus[] = ["PENDING", "ACCEPTED", "IN_KITCHEN"];
+const ACTIVE_STATUSES: OrderStatus[] = [
+  "PENDING",
+  "ACCEPTED",
+  "IN_KITCHEN",
+  "DELIVERED",
+];
 
 const COLUMNS: Array<{
   status: OrderStatus;
@@ -36,6 +46,11 @@ const COLUMNS: Array<{
     status: "IN_KITCHEN",
     title: "En cocina",
     accent: "border-orange-400 bg-orange-50 dark:bg-orange-500/10",
+  },
+  {
+    status: "DELIVERED",
+    title: "Por cobrar",
+    accent: "border-emerald-400 bg-emerald-50 dark:bg-emerald-500/10",
   },
 ];
 
@@ -70,16 +85,24 @@ export function KitchenDashboard({
   const [connection, setConnection] =
     useState<KitchenConnectionState>("connecting");
   const [flashUuid, setFlashUuid] = useState<string | null>(null);
+  const [additionUuid, setAdditionUuid] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
+  const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
   const [ticketErrors, setTicketErrors] = useState<Record<string, string>>({});
   const knownUuidsRef = useRef(new Set(initialOrders.map((o) => o.uuid)));
+  const batchByUuidRef = useRef(
+    new Map(initialOrders.map((o) => [o.uuid, maxBatchNumber(o)])),
+  );
   const playNewOrderCue = useKitchenAlertSound();
 
   const handleOrderEvent = useCallback(
     (incoming: Order) => {
       const isActive = ACTIVE_STATUSES.includes(incoming.status);
       const isNew = !knownUuidsRef.current.has(incoming.uuid);
+      const prevBatch = batchByUuidRef.current.get(incoming.uuid) ?? 0;
+      const nextBatch = maxBatchNumber(incoming);
+      const isAddition = !isNew && nextBatch > prevBatch;
 
       setOrders((prev) => {
         const without = prev.filter((o) => o.uuid !== incoming.uuid);
@@ -88,6 +111,8 @@ export function KitchenDashboard({
           ? [incoming, ...without]
           : sortByCreatedAt([...without, incoming]);
       });
+
+      batchByUuidRef.current.set(incoming.uuid, nextBatch);
 
       if (isNew && isActive) {
         knownUuidsRef.current.add(incoming.uuid);
@@ -104,10 +129,26 @@ export function KitchenDashboard({
               : current,
           );
         }, 4_000);
+      } else if (isAddition && isActive) {
+        knownUuidsRef.current.add(incoming.uuid);
+        setAdditionUuid(incoming.uuid);
+        setBanner(
+          `Adición · Mesa ${incoming.tableNumber ?? "—"} · Ronda ${nextBatch}`,
+        );
+        playNewOrderCue();
+        window.setTimeout(() => {
+          setAdditionUuid((current) =>
+            current === incoming.uuid ? null : current,
+          );
+          setBanner((current) =>
+            current?.includes(`Ronda ${nextBatch}`) ? null : current,
+          );
+        }, 5_000);
       } else if (isActive) {
         knownUuidsRef.current.add(incoming.uuid);
       } else {
         knownUuidsRef.current.delete(incoming.uuid);
+        batchByUuidRef.current.delete(incoming.uuid);
       }
     },
     [playNewOrderCue],
@@ -148,12 +189,83 @@ export function KitchenDashboard({
     }
   }
 
+  async function handleItemStatus(
+    order: Order,
+    item: OrderItem,
+    status: OrderItemStatus,
+  ) {
+    if (item.id == null || updatingUuid) return;
+    setUpdatingUuid(order.uuid);
+    setUpdatingItemId(item.id);
+    setTicketErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[order.uuid];
+      return copy;
+    });
+
+    const optimistic: Order = {
+      ...order,
+      items: order.items.map((line) =>
+        line.id === item.id ? { ...line, status } : line,
+      ),
+    };
+    handleOrderEvent(optimistic);
+
+    try {
+      const updated = await updateOrderItemStatus(
+        order.uuid,
+        item.id,
+        status,
+        tenantSlug,
+      );
+      handleOrderEvent(updated);
+    } catch (error) {
+      handleOrderEvent(order);
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "No se pudo actualizar el platillo.";
+      setTicketErrors((prev) => ({ ...prev, [order.uuid]: message }));
+    } finally {
+      setUpdatingUuid(null);
+      setUpdatingItemId(null);
+    }
+  }
+
+  async function handleCloseAccount(order: Order) {
+    if (updatingUuid) return;
+    setUpdatingUuid(order.uuid);
+    setTicketErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[order.uuid];
+      return copy;
+    });
+
+    try {
+      const updated = await closeOrder(order.uuid, tenantSlug);
+      handleOrderEvent(updated);
+      setBanner(
+        `Cuenta cerrada · Mesa ${order.tableNumber ?? "—"} · #${order.uuid.slice(0, 8).toUpperCase()}`,
+      );
+      window.setTimeout(() => setBanner(null), 3_500);
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "No se pudo cerrar la cuenta.";
+      setTicketErrors((prev) => ({ ...prev, [order.uuid]: message }));
+    } finally {
+      setUpdatingUuid(null);
+    }
+  }
+
   const grouped = useMemo(() => {
     const map: Record<OrderStatus, Order[]> = {
       PENDING: [],
       ACCEPTED: [],
       IN_KITCHEN: [],
       DELIVERED: [],
+      CLOSED: [],
       CANCELLED: [],
     };
     for (const order of orders) {
@@ -194,7 +306,7 @@ export function KitchenDashboard({
         ) : null}
       </header>
 
-      <div className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-3 md:gap-5 md:p-6">
+      <div className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:p-6">
         {COLUMNS.map((column) => {
           const columnOrders = grouped[column.status] ?? [];
           return (
@@ -223,9 +335,15 @@ export function KitchenDashboard({
                       key={order.uuid}
                       order={order}
                       isNew={flashUuid === order.uuid}
+                      isAddition={additionUuid === order.uuid}
                       isUpdating={updatingUuid === order.uuid}
+                      updatingItemId={
+                        updatingUuid === order.uuid ? updatingItemId : null
+                      }
                       errorMessage={ticketErrors[order.uuid] ?? null}
                       onAdvance={handleAdvance}
+                      onCloseAccount={handleCloseAccount}
+                      onItemStatus={handleItemStatus}
                     />
                   ))
                 )}

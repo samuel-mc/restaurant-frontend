@@ -7,6 +7,7 @@ const VALID_STATUSES = new Set<OrderStatus>([
   "ACCEPTED",
   "IN_KITCHEN",
   "DELIVERED",
+  "CLOSED",
   "CANCELLED",
 ]);
 

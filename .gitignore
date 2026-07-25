@@ -44,3 +44,6 @@ base/
 FRONTEND_ROADMAP.md
 B2B_Landing/
 .cursor/
+.impeccable/
+DESIGN.md
+public/brand/.gitkeep

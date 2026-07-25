@@ -10,8 +10,24 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { RegisterForm } from "@/components/marketing/RegisterForm";
+import dynamic from "next/dynamic";
+import Link from "next/link";
 
+const RegisterForm = dynamic(
+  () =>
+    import("@/components/marketing/RegisterForm").then((mod) => ({
+      default: mod.RegisterForm,
+    })),
+  {
+    loading: () => (
+      <div
+        className="min-h-[28rem] rounded-xl bg-slate-800/50"
+        aria-busy="true"
+        aria-label="Cargando formulario de registro"
+      />
+    ),
+  },
+);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface OrderItem {
@@ -23,50 +39,21 @@ interface OrderItem {
 }
 
 // ─── Data ────────────────────────────────────────────────────────────────────
-const FEATURES = [
+/** Tres trabajos operativos — el sitio Pro va en su propio beat, no en esta lista. */
+const OPERATING_JOBS = [
   {
-    icon: '📱',
-    title: 'Menú QR Interactivo',
-    desc: 'Carga ultrarrápida con imágenes en Cloudflare R2. Sin apps, sin fricción para tus comensales.',
-    accent: '#10B981',
-    tag: 'Zero friction',
+    title: "Menú QR en mesa",
+    desc: "El comensal abre el menú en el celular, pide sin descargar app y ve el pedido avanzar.",
   },
   {
-    icon: '📡',
-    title: 'Monitor de Cocina en Tiempo Real',
-    desc: 'Comandas vía WebSockets, badges de estado y alertas de sonido. Tu cocina siempre sincronizada.',
-    accent: '#F59E0B',
-    tag: 'Live WebSocket',
+    title: "Cocina en vivo",
+    desc: "Las comandas llegan al instante al monitor de cocina, con estado y alerta de sonido.",
   },
   {
-    icon: '🛒',
-    title: 'Canal Propio Sin Comisiones',
-    desc: 'Pedidos directos para Pickup y Delivery. Deja de pagar 30% a plataformas.',
-    accent: '#10B981',
-    tag: '0% comisión',
+    title: "Canal propio, sin comisión",
+    desc: "Pickup y delivery por tu subdominio. Dejas de pagar el 30% a las plataformas.",
   },
-  {
-    icon: '📦',
-    title: 'Control Total de Stock',
-    desc: 'Activa o desactiva platillos y categorías al instante. Nunca más "ya no hay" de sorpresa.',
-    accent: '#F59E0B',
-    tag: 'Tiempo real',
-  },
-  {
-    icon: '📊',
-    title: 'Analíticas Financieras',
-    desc: 'Métricas de ventas, ticket promedio y top 5 platillos más vendidos en un solo dashboard.',
-    accent: '#10B981',
-    tag: 'Insights',
-  },
-  {
-    icon: '🎨',
-    title: 'Identidad de Marca',
-    desc: 'Logo, banner, colores y horarios de tu negocio. Tu restaurante, tu imagen, a tu estilo.',
-    accent: '#F59E0B',
-    tag: 'Personalizable',
-  },
-]
+];
 
 type PricingFeature =
   | string
@@ -103,16 +90,16 @@ const PRICING: PricingPlan[] = [
       "Subdominio platolisto.com",
       "Soporte por email",
     ],
-    cta: "Comenzar Gratis",
+    cta: "Crear con Básico",
     highlight: false,
   },
   {
     name: "Plan Pro",
-    price: "$999",
+    price: "$1,000",
     period: "por mes / restaurante",
-    badge: "Más Popular",
+    badge: "Sitio a medida",
     color: "#34D399",
-    setupFee: "+$1,000 MXN (Pago único de instalación/sitio web)",
+    setupFee: "+$2,000 MXN de creación de sitio web (pago único)",
     features: [
       {
         label: "Sitio web a medida (diseño propio por local)",
@@ -120,12 +107,12 @@ const PRICING: PricingPlan[] = [
       },
       "Setup de instalación + carga inicial de marca/menú",
       "Menú QR ilimitado",
-      "Imágenes HD con Cloudflare R2",
-      "Analytics básicos + Top 5",
+      "Imágenes HD en el menú",
+      "Ventas y top 5 platillos",
       "Pedidos Pickup y Delivery",
       "Soporte prioritario",
     ],
-    cta: "Activar Plan Pro",
+    cta: "Crear con Pro",
     highlight: true,
   },
 ];
@@ -149,32 +136,128 @@ const INITIAL_ORDERS: OrderItem[] = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function BrandMark({ size = "md" }: { size?: "sm" | "md" }) {
+  const box = size === "sm" ? "size-8 rounded-lg" : "size-9 rounded-xl";
+  const icon = size === "sm" ? 14 : 16;
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center ${box}`}
+      style={{
+        background:
+          "linear-gradient(135deg, var(--b2b-action), var(--b2b-action-hover))",
+      }}
+      aria-hidden
+    >
+      <svg width={icon} height={icon} viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="5.25" stroke="#fff" strokeWidth="1.5" />
+        <circle cx="8" cy="8" r="2" fill="#fff" />
+      </svg>
+    </span>
+  );
+}
+
 function Navbar({ onRegister }: { onRegister: () => void }) {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const menuId = "b2b-mobile-nav"
+  const menuRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const wasOpenRef = useRef(false)
 
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', fn)
-    return () => window.removeEventListener('scroll', fn)
+    let ticking = false
+    const fn = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 20)
+        ticking = false
+      })
+    }
+    window.addEventListener("scroll", fn, { passive: true })
+    return () => window.removeEventListener("scroll", fn)
   }, [])
 
+  useEffect(() => {
+    document.body.classList.toggle("overflow-hidden", mobileOpen)
+    return () => {
+      document.body.classList.remove("overflow-hidden")
+    }
+  }, [mobileOpen])
+
+  useEffect(() => {
+    if (!mobileOpen) {
+      if (wasOpenRef.current) {
+        menuButtonRef.current?.focus()
+      }
+      wasOpenRef.current = false
+      return
+    }
+
+    wasOpenRef.current = true
+    const menu = menuRef.current
+    const firstInMenu = menu?.querySelector<HTMLElement>(
+      "a[href], button:not([disabled])",
+    )
+    firstInMenu?.focus()
+
+    const getFocusable = () => {
+      const inMenu = menu
+        ? Array.from(
+            menu.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled])',
+            ),
+          )
+        : []
+      const toggle = menuButtonRef.current
+      return toggle ? [toggle, ...inMenu] : inMenu
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setMobileOpen(false)
+        return
+      }
+      if (event.key !== "Tab") return
+
+      const items = getFocusable()
+      if (items.length === 0) return
+
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+
+      if (event.shiftKey) {
+        if (active === first) {
+          event.preventDefault()
+          last.focus()
+        }
+      } else if (active === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [mobileOpen])
+
   const links = [
-    { label: 'Beneficios', href: '#beneficios' },
-    { label: 'Características', href: '#caracteristicas' },
-    { label: 'Precios', href: '#precios' },
-    { label: 'Demo', href: '#demo' },
+    { label: "Inicio", href: "#contenido-principal" },
+    { label: "Cómo opera", href: "#caracteristicas" },
+    { label: "Precios", href: "#precios" },
   ]
 
   return (
     <nav
-      className="fixed inset-x-0 top-0 z-50 w-full max-w-full overflow-x-hidden transition-all duration-300"
+      aria-label="Principal"
+      className="fixed inset-x-0 top-0 z-50 w-full max-w-full overflow-x-hidden transition-[background-color,border-color] duration-300"
       style={{
         background:
           scrolled || mobileOpen
-            ? "rgba(15, 23, 42, 0.97)"
+            ? "rgba(15, 23, 42, 0.98)"
             : "transparent",
-        backdropFilter: scrolled || mobileOpen ? "blur(12px)" : "none",
         borderBottom:
           scrolled || mobileOpen
             ? "1px solid rgba(51, 65, 85, 0.6)"
@@ -183,32 +266,24 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
     >
       <div className="mx-auto w-full min-w-0 max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 min-w-0 items-center justify-between gap-3 lg:h-20">
-          {/* Logo */}
           <a
-            href="#demo"
-            className="group flex min-w-0 items-center gap-2 sm:gap-2.5"
+            href="#contenido-principal"
+            className="group flex min-w-0 items-center gap-2 rounded-lg sm:gap-2.5"
           >
-            <div
-              className="flex size-9 shrink-0 items-center justify-center rounded-xl text-lg transition-transform group-hover:scale-110"
-              style={{
-                background: "linear-gradient(135deg, #10B981, #059669)",
-              }}
-            >
-              🍽️
-            </div>
+            <span className="transition-transform group-hover:scale-105">
+              <BrandMark />
+            </span>
             <span
-              className="truncate text-lg font-black tracking-tight sm:text-xl"
+              className="truncate text-lg font-black tracking-tight text-[var(--b2b-fg)] sm:text-xl"
               style={{
                 fontFamily:
                   "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
-                color: "#F8FAFC",
               }}
             >
-              Plato<span style={{ color: "#10B981" }}>Listo</span>
+              Plato<span className="accent-text">Listo</span>
             </span>
           </a>
 
-          {/* Desktop nav */}
           <div className="hidden items-center gap-8 md:flex">
             {links.map((l) => (
               <a
@@ -221,15 +296,20 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
             ))}
           </div>
 
-          {/* CTA */}
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onRegister}
-              className="btn-emerald hidden cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white md:flex"
+              className="btn-emerald hidden min-h-11 cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white md:flex"
             >
-              <span>Registrar mi Restaurante</span>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <span>Crear mi restaurante</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                aria-hidden
+              >
                 <path
                   d="M1 7h12M7 1l6 6-6 6"
                   stroke="currentColor"
@@ -239,41 +319,45 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
                 />
               </svg>
             </button>
-            {/* Mobile hamburger */}
             <button
+              ref={menuButtonRef}
               type="button"
-              className="p-2 text-slate-300 md:hidden"
+              className="flex size-11 items-center justify-center rounded-lg text-slate-300 md:hidden"
               aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
               aria-expanded={mobileOpen}
-              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-controls={menuId}
+              onClick={() => setMobileOpen((open) => !open)}
             >
-              <div
-                className="mb-1.5 h-0.5 w-5 bg-current transition-all"
-                style={{
-                  transform: mobileOpen
-                    ? "rotate(45deg) translate(1.5px, 6px)"
-                    : "none",
-                }}
-              />
-              <div
-                className="mb-1.5 h-0.5 w-5 bg-current transition-all"
-                style={{ opacity: mobileOpen ? 0 : 1 }}
-              />
-              <div
-                className="h-0.5 w-5 bg-current transition-all"
-                style={{
-                  transform: mobileOpen
-                    ? "rotate(-45deg) translate(1.5px, -6px)"
-                    : "none",
-                }}
-              />
+              <span className="flex w-5 flex-col" aria-hidden>
+                <span
+                  className="mb-1.5 h-0.5 w-5 bg-current transition-transform"
+                  style={{
+                    transform: mobileOpen
+                      ? "rotate(45deg) translate(1.5px, 6px)"
+                      : "none",
+                  }}
+                />
+                <span
+                  className="mb-1.5 h-0.5 w-5 bg-current transition-opacity"
+                  style={{ opacity: mobileOpen ? 0 : 1 }}
+                />
+                <span
+                  className="h-0.5 w-5 bg-current transition-transform"
+                  style={{
+                    transform: mobileOpen
+                      ? "rotate(-45deg) translate(1.5px, -6px)"
+                      : "none",
+                  }}
+                />
+              </span>
             </button>
           </div>
         </div>
 
-        {/* Mobile menu */}
         {mobileOpen ? (
           <div
+            ref={menuRef}
+            id={menuId}
             className="mt-2 border-t border-slate-700/50 pb-4 md:hidden"
             style={{ background: "rgba(15, 23, 42, 0.97)" }}
           >
@@ -282,7 +366,7 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
                 key={l.label}
                 href={l.href}
                 onClick={() => setMobileOpen(false)}
-                className="block py-3 text-sm font-medium text-slate-200 transition-colors hover:text-emerald-400"
+                className="block min-h-11 break-words py-3 text-sm font-medium text-slate-200 transition-colors hover:text-emerald-300"
               >
                 {l.label}
               </a>
@@ -293,9 +377,9 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
                 onRegister();
                 setMobileOpen(false);
               }}
-              className="btn-emerald mt-3 w-full cursor-pointer rounded-xl py-2.5 text-sm font-semibold text-white"
+              className="btn-emerald mt-3 min-h-11 w-full cursor-pointer rounded-xl py-2.5 text-sm font-semibold text-white"
             >
-              Registrar mi Restaurante
+              Crear mi restaurante
             </button>
           </div>
         ) : null}
@@ -306,27 +390,74 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
 
 function HeroMockup() {
   const [orders, setOrders] = useState<OrderItem[]>(INITIAL_ORDERS)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setOrders((prev) => {
-        const next = [...prev]
-        const idx = Math.floor(Math.random() * next.length)
-        const statuses: OrderItem['status'][] = ['new', 'preparing', 'ready']
-        const cur = statuses.indexOf(next[idx].status)
-        next[idx] = { ...next[idx], status: statuses[Math.min(cur + 1, 2)] }
-        return next
-      })
-    }, 2200)
-    return () => clearInterval(interval)
+    const root = rootRef.current
+    if (!root) return
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
+    let intervalId: number | undefined
+
+    const stop = () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId)
+        intervalId = undefined
+      }
+    }
+
+    const start = () => {
+      if (reduceMotion.matches || intervalId !== undefined) return
+      intervalId = window.setInterval(() => {
+        setOrders((prev) => {
+          const next = [...prev]
+          const idx = Math.floor(Math.random() * next.length)
+          const statuses: OrderItem["status"][] = ["new", "preparing", "ready"]
+          const cur = statuses.indexOf(next[idx].status)
+          next[idx] = {
+            ...next[idx],
+            status: statuses[Math.min(cur + 1, 2)],
+          }
+          return next
+        })
+      }, 2200)
+    }
+
+    const sync = (visible: boolean) => {
+      const motionOn = visible && !reduceMotion.matches
+      root.dataset.motion = motionOn ? "on" : "off"
+      if (motionOn) start()
+      else stop()
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => sync(Boolean(entry?.isIntersecting)),
+      { threshold: 0.2 },
+    )
+    observer.observe(root)
+
+    const onMotionChange = () =>
+      sync(root.getBoundingClientRect().top < window.innerHeight)
+    reduceMotion.addEventListener("change", onMotionChange)
+    sync(false)
+
+    return () => {
+      observer.disconnect()
+      reduceMotion.removeEventListener("change", onMotionChange)
+      stop()
+    }
   }, [])
 
   const statusLabel = { new: 'Nuevo', preparing: 'Preparando', ready: 'Listo' }
   const statusClass = { new: 'badge-new', preparing: 'badge-preparing', ready: 'badge-ready' }
-  const statusDot = { new: '#10B981', preparing: '#F59E0B', ready: '#60A5FA' }
+  const statusDot = { new: '#34D399', preparing: '#FBBF24', ready: '#93C5FD' }
 
   return (
-    <div className="relative mx-auto flex w-full max-w-full items-end justify-center gap-4 px-1 pb-4 pt-2 lg:justify-end lg:gap-5 lg:px-0 lg:pb-2 lg:pt-8">
+    <div
+      ref={rootRef}
+      className="relative mx-auto flex w-full max-w-full items-end justify-center gap-4 px-1 pb-4 pt-2 lg:justify-end lg:gap-5 lg:px-0 lg:pb-2 lg:pt-8"
+      aria-hidden
+    >
       {/* Phone — QR Menu (siempre visible) */}
       <div className="animate-float relative z-[2] w-[10.5rem] shrink-0 sm:w-[12rem] lg:w-[11.25rem]">
         <div
@@ -356,7 +487,7 @@ function HeroMockup() {
                 key={c}
                 className="rounded-full px-2 py-1 text-[9px] font-semibold whitespace-nowrap"
                 style={{
-                  background: i === 0 ? "#10B981" : "rgba(51,65,85,0.8)",
+                  background: i === 0 ? "#047857" : "rgba(51,65,85,0.8)",
                   color: i === 0 ? "white" : "#94A3B8",
                 }}
               >
@@ -388,7 +519,7 @@ function HeroMockup() {
               </div>
               <span
                 className="flex size-5 items-center justify-center rounded-full text-xs font-bold text-white"
-                style={{ background: "#10B981", fontSize: 14, lineHeight: 1 }}
+                style={{ background: "#047857", fontSize: 14, lineHeight: 1 }}
               >
                 +
               </span>
@@ -397,7 +528,7 @@ function HeroMockup() {
           <div
             className="mt-2 rounded-lg py-2 text-center text-[10px] font-bold text-white"
             style={{
-              background: "linear-gradient(135deg, #10B981, #059669)",
+              background: "#047857",
             }}
           >
             🛒 Ver mi Pedido (3)
@@ -444,7 +575,7 @@ function HeroMockup() {
               <div className="mt-0.5 flex items-center gap-1.5">
                 <span className="animate-blink inline-block size-1.5 rounded-full bg-emerald-400" />
                 <span className="text-[9px] font-medium text-emerald-400">
-                  EN VIVO • WebSocket
+                  EN VIVO
                 </span>
               </div>
             </div>
@@ -452,7 +583,7 @@ function HeroMockup() {
               className="rounded-lg px-2 py-1 text-xs font-bold"
               style={{
                 background: "rgba(16,185,129,0.15)",
-                color: "#10B981",
+                color: "#34D399",
               }}
             >
               {orders.length} activas
@@ -488,7 +619,7 @@ function HeroMockup() {
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-400">{order.item}</div>
-                <div className="mt-0.5 text-[9px] text-slate-500">
+                <div className="mt-0.5 text-[9px] text-slate-400">
                   {order.time} hrs
                 </div>
               </div>
@@ -501,15 +632,15 @@ function HeroMockup() {
           >
             <div className="text-center">
               <div className="text-xs font-bold text-emerald-400">$4,230</div>
-              <div className="text-[8px] text-slate-500">Ventas hoy</div>
+              <div className="text-[8px] text-slate-400">Ventas hoy</div>
             </div>
             <div className="text-center">
               <div className="text-xs font-bold text-amber-400">$147</div>
-              <div className="text-[8px] text-slate-500">Ticket prom.</div>
+              <div className="text-[8px] text-slate-400">Ticket prom.</div>
             </div>
             <div className="text-center">
-              <div className="text-xs font-bold text-blue-400">28</div>
-              <div className="text-[8px] text-slate-500">Pedidos</div>
+              <div className="text-xs font-bold text-blue-300">28</div>
+              <div className="text-[8px] text-slate-400">Pedidos</div>
             </div>
           </div>
         </div>
@@ -517,20 +648,23 @@ function HeroMockup() {
 
       {/* Notificación — solo desktop, dentro del flujo visual sin salirse */}
       <div
-        className="absolute top-0 right-2 z-[3] hidden rounded-xl px-3 py-2 shadow-lg animate-pulse-ring lg:block"
+        className="absolute top-0 right-2 z-[3] hidden rounded-xl px-3 py-2 shadow-lg lg:block"
         style={{
-          background: "rgba(16,185,129,0.95)",
-          backdropFilter: "blur(8px)",
+          background: "rgba(4, 120, 87, 0.98)",
           minWidth: 148,
+          boxShadow: "0 10px 28px rgba(0, 0, 0, 0.35)",
         }}
       >
         <div className="flex items-center gap-2">
-          <span className="text-base">🔔</span>
+          <span
+            className="size-2 shrink-0 rounded-full bg-white"
+            aria-hidden
+          />
           <div>
             <div className="text-[10px] font-bold text-white">
-              ¡Nueva Comanda!
+              Nueva comanda
             </div>
-            <div className="text-[9px] text-emerald-100">Mesa 12 • Birria x2</div>
+            <div className="text-[9px] text-emerald-100">Mesa 12 · Birria x2</div>
           </div>
         </div>
       </div>
@@ -542,10 +676,10 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
   return (
     <section
       id="demo"
+      aria-label="PlatoListo"
       className="relative flex items-start overflow-x-hidden lg:min-h-[100svh] lg:items-center"
       style={{ paddingTop: 80 }}
     >
-      {/* Grid background */}
       <div
         className="pointer-events-none absolute inset-0 opacity-20"
         style={{
@@ -554,7 +688,6 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
           backgroundSize: "60px 60px",
         }}
       />
-      {/* Radial glow */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -572,99 +705,44 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
 
       <div className="relative z-10 mx-auto w-full max-w-7xl px-5 py-16 sm:px-6 sm:py-24 lg:px-8">
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-8">
-          {/* Text */}
           <div className="relative z-10 min-w-0 overflow-visible">
-            {/* Live badge */}
-            <div className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-3 py-1.5 sm:mb-6 sm:px-4">
-              <span className="animate-blink inline-block size-2 shrink-0 rounded-full bg-emerald-400" />
-              <span className="text-[10px] font-semibold tracking-wide text-emerald-400 uppercase sm:text-xs">
-                Plataforma activa en +200 restaurantes
-              </span>
-            </div>
-
             <h1
-              className="mb-5 max-w-full overflow-visible text-[1.75rem] leading-[1.2] font-black tracking-tight text-pretty sm:mb-6 sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl"
+              className="mb-4 text-[1.75rem] leading-none font-black tracking-tight sm:mb-5 sm:text-4xl md:text-5xl lg:text-6xl"
               style={{
                 fontFamily:
                   "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
               }}
             >
-              Tu Menú en{" "}
-              <span className="gradient-text inline">la Mesa.</span>
-              <br />
-              Tu Cocina{" "}
-              <span className="inline" style={{ color: "#F59E0B" }}>
-                en Vivo.
-              </span>
-              <br />
-              <span className="inline text-white">Cero Comisiones.</span>
+              Plato<span className="accent-text">Listo</span>
             </h1>
 
-            <p className="mb-7 max-w-lg text-base leading-relaxed text-slate-400 sm:mb-8 sm:text-lg">
-              Transforma tu restaurante con menús QR ultrarrápidos, comandas en
-              tiempo real vía WebSockets y tu propio canal de venta{" "}
-              <span className="font-semibold text-white">sin pagar el 30%</span>{" "}
-              a aplicaciones.
+            <p
+              className="mb-5 max-w-xl text-xl leading-snug font-bold tracking-tight text-pretty text-white sm:mb-6 sm:text-2xl md:text-3xl lg:text-4xl"
+              style={{
+                fontFamily:
+                  "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
+              }}
+            >
+              Tu menú en la mesa.{" "}
+              <span style={{ color: "var(--b2b-warn)" }}>Tu cocina en vivo.</span>
             </p>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-              <button
-                type="button"
-                onClick={onRegister}
-                className="btn-emerald flex cursor-pointer items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white sm:px-7 sm:py-4 sm:text-base"
-              >
-                <span className="text-center">
-                  🚀 Crear Mi Restaurante Gratis
-                </span>
-              </button>
-              <a
-                href="#caracteristicas"
-                className="btn-outline flex cursor-pointer items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold text-emerald-400 sm:px-7 sm:py-4 sm:text-base"
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <circle
-                    cx="9"
-                    cy="9"
-                    r="8"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  />
-                  <path d="M7 6l5 3-5 3V6z" fill="currentColor" />
-                </svg>
-                <span>Ver Demo en Vivo</span>
-              </a>
-            </div>
+            <p className="mb-8 max-w-lg text-base leading-relaxed text-slate-400 sm:text-lg">
+              Los comensales piden por QR; tú ves la cocina al momento. Tu canal
+              de venta,{" "}
+              <span className="font-semibold text-white">sin pagar el 30%</span>{" "}
+              a las apps.
+            </p>
 
-            {/* Social proof */}
-            <div
-              className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4 border-t pt-6 sm:mt-10 sm:pt-8"
-              style={{ borderColor: "rgba(51,65,85,0.5)" }}
+            <button
+              type="button"
+              onClick={onRegister}
+              className="btn-emerald flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl px-6 py-3.5 text-sm font-bold text-white sm:w-auto sm:px-7 sm:py-4 sm:text-base"
             >
-              {[
-                { value: "200+", label: "Restaurantes" },
-                { value: "0%", label: "Comisiones" },
-                { value: "99.9%", label: "Uptime" },
-              ].map((s) => (
-                <div key={s.label} className="min-w-0">
-                  <div
-                    className="text-xl font-black sm:text-2xl"
-                    style={{
-                      fontFamily:
-                        "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
-                      color: "#10B981",
-                    }}
-                  >
-                    {s.value}
-                  </div>
-                  <div className="mt-0.5 text-xs font-medium text-slate-500">
-                    {s.label}
-                  </div>
-                </div>
-              ))}
-            </div>
+              Crear mi restaurante
+            </button>
           </div>
 
-          {/* Mockup — teléfono en móvil; dúo completo solo en lg+ */}
           <div className="relative z-0 mt-6 w-full max-w-full sm:mt-8 lg:mt-0 lg:flex lg:justify-end">
             <HeroMockup />
           </div>
@@ -676,79 +754,92 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
 
 function FeaturesSection() {
   return (
-    <section id="caracteristicas" className="py-24 relative">
+    <section id="caracteristicas" className="b2b-section relative py-24">
       <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 60% 40% at 80% 50%, rgba(245,158,11,0.04) 0%, transparent 60%)' }}
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 40% at 80% 50%, rgba(245,158,11,0.04) 0%, transparent 60%)",
+        }}
       />
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center mb-16" id="beneficios">
-          <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full border border-amber-500/30 bg-amber-500/5">
-            <span className="text-xs font-semibold text-amber-400 tracking-wide uppercase">
-              Características
-            </span>
-          </div>
+      <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
+        <div className="mb-14 max-w-2xl">
           <h2
-            className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight"
-            style={{ fontFamily: 'var(--font-jakarta), Plus Jakarta Sans, sans-serif' }}
+            className="mb-4 text-4xl leading-tight font-black text-white lg:text-5xl"
+            style={{
+              fontFamily:
+                "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
+            }}
           >
-            Todo lo que tu restaurante
+            Opera el servicio
             <br />
-            <span className="shimmer-text">necesita en un solo lugar</span>
+            <span className="accent-text-warn">en una sola línea</span>
           </h2>
-          <p className="text-slate-400 text-lg max-w-xl mx-auto">
-            Tecnología de punta diseñada para la operación diaria de restaurantes mexicanos.
+          <p className="max-w-xl text-lg text-slate-400">
+            Tres piezas que usas en el turno: mesa, cocina y tu canal de venta.
           </p>
         </div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATURES.map((f, i) => (
-            <div
-              key={f.title}
-              className="card-glow group relative rounded-2xl p-6 transition-all duration-300 cursor-default"
+        <ol className="mb-20 max-w-3xl space-y-10 sm:space-y-12">
+          {OPERATING_JOBS.map((job, i) => (
+            <li key={job.title} className="flex gap-5 sm:gap-6">
+              <span
+                className="w-8 shrink-0 pt-1 text-sm font-bold tabular-nums text-emerald-400"
+                aria-hidden
+              >
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div className="min-w-0">
+                <h3
+                  className="mb-2 text-lg font-bold text-white sm:text-xl"
+                  style={{
+                    fontFamily:
+                      "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
+                  }}
+                >
+                  {job.title}
+                </h3>
+                <p className="max-w-prose text-base leading-relaxed text-slate-400">
+                  {job.desc}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <div
+          className="flex flex-col gap-6 border-t pt-12 sm:flex-row sm:items-end sm:justify-between sm:gap-10"
+          style={{ borderColor: "rgba(51,65,85,0.6)" }}
+        >
+          <div className="max-w-xl">
+            <p className="mb-2 text-xs font-semibold tracking-wide text-emerald-400 uppercase">
+              Plan Pro
+            </p>
+            <h3
+              className="mb-3 text-2xl font-black text-white sm:text-3xl"
               style={{
-                background: 'rgba(30,41,59,0.6)',
-                border: '1px solid rgba(51,65,85,0.6)',
-                backdropFilter: 'blur(8px)',
+                fontFamily:
+                  "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
               }}
             >
-              {/* Top accent line */}
-              <div
-                className="absolute top-0 left-6 right-6 h-px rounded-full transition-all duration-300 group-hover:left-4 group-hover:right-4"
-                style={{ background: `linear-gradient(90deg, transparent, ${f.accent}, transparent)` }}
-              />
-
-              {/* Icon */}
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 transition-transform duration-300 group-hover:scale-110"
-                style={{ background: `${f.accent}18`, border: `1px solid ${f.accent}30` }}
-              >
-                {f.icon}
-              </div>
-
-              {/* Tag */}
-              <span
-                className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mb-3"
-                style={{ background: `${f.accent}15`, color: f.accent }}
-              >
-                {f.tag}
-              </span>
-
-              <h3
-                className="text-base font-bold text-white mb-2"
-                style={{ fontFamily: 'var(--font-jakarta), Plus Jakarta Sans, sans-serif' }}
-              >
-                {f.title}
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
+              Sitio web exclusivo de tu restaurante
+            </h3>
+            <p className="text-base leading-relaxed text-slate-400">
+              No es una plantilla compartida: el equipo PlatoListo diseña y
+              entrega el sitio de tu local. El menú QR y la cocina en vivo ya
+              operan desde el día uno; el sitio llega cuando lo entregamos.
+            </p>
+          </div>
+          <a
+            href="#precios"
+            className="btn-outline inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-6 py-3.5 text-sm font-semibold sm:text-base"
+          >
+            Ver Plan Pro
+          </a>
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 function PricingSection({
@@ -757,18 +848,13 @@ function PricingSection({
   onRegister: (plan: "BASIC" | "PRO") => void;
 }) {
   return (
-    <section id="precios" className="py-24 relative">
+    <section id="precios" className="b2b-section relative py-24">
       <div
         className="absolute inset-0 pointer-events-none"
         style={{ background: 'radial-gradient(ellipse 70% 50% at 30% 60%, rgba(16,185,129,0.05) 0%, transparent 60%)' }}
       />
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/45 bg-emerald-500/15 px-4 py-1.5">
-            <span className="text-xs font-semibold tracking-wide text-emerald-300 uppercase">
-              Precios
-            </span>
-          </div>
+        <div className="mb-16 max-w-2xl text-center mx-auto">
           <h2
             className="mb-4 text-4xl font-black text-white lg:text-5xl"
             style={{
@@ -778,9 +864,9 @@ function PricingSection({
           >
             Dos planes claros
             <br />
-            <span className="gradient-text">para tu operación</span>
+            <span className="accent-text">para tu operación</span>
           </h2>
-          <p className="text-lg text-slate-300">
+          <p className="text-lg text-slate-400">
             Empieza gratis. Pasa a Pro cuando quieras tu sitio a medida
             (incluido en el setup) y menú sin límite.
           </p>
@@ -790,25 +876,26 @@ function PricingSection({
           {PRICING.map((plan) => (
             <div
               key={plan.name}
-              className="relative rounded-2xl p-8 flex flex-col transition-all duration-300"
+              className="relative flex flex-col rounded-2xl p-8 transition-shadow duration-300"
               style={{
                 background: plan.highlight
-                  ? 'linear-gradient(145deg, rgba(16,185,129,0.12), rgba(5,150,105,0.08))'
-                  : 'rgba(30,41,59,0.6)',
+                  ? "linear-gradient(145deg, rgba(16,185,129,0.12), rgba(5,150,105,0.08))"
+                  : "rgba(30,41,59,0.6)",
                 border: plan.highlight
-                  ? '1.5px solid rgba(16,185,129,0.5)'
-                  : '1px solid rgba(51,65,85,0.6)',
-                boxShadow: plan.highlight ? '0 0 40px rgba(16,185,129,0.12)' : 'none',
-                transform: plan.highlight ? 'scale(1.02)' : 'none',
+                  ? "1.5px solid rgba(52,211,153,0.55)"
+                  : "1px solid rgba(51,65,85,0.6)",
+                boxShadow: plan.highlight
+                  ? "0 14px 40px rgba(0, 0, 0, 0.35)"
+                  : "none",
               }}
             >
               {plan.badge && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                   <span
-                    className="px-4 py-1.5 rounded-full text-xs font-bold text-white whitespace-nowrap"
-                    style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
+                    className="whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-bold text-white"
+                    style={{ background: "var(--b2b-action)" }}
                   >
-                    ⭐ {plan.badge}
+                    {plan.badge}
                   </span>
                 </div>
               )}
@@ -844,9 +931,7 @@ function PricingSection({
                 <p className="text-sm text-slate-400">{plan.period}</p>
                 {plan.setupFee ? (
                   <p className="mt-3 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1.5 text-left text-xs font-semibold leading-snug text-emerald-400">
-                    <span>
-                      +$1,000 MXN de creación de Sitio Web (Pago único)
-                    </span>
+                    <span>{plan.setupFee}</span>
                   </p>
                 ) : null}
               </div>
@@ -912,18 +997,9 @@ function PricingSection({
                 onClick={() =>
                   onRegister(plan.highlight ? "PRO" : "BASIC")
                 }
-                className={`w-full cursor-pointer rounded-xl py-3.5 text-sm font-bold transition-all duration-200 ${
-                  plan.highlight ? "btn-emerald text-white" : ""
+                className={`min-h-11 w-full cursor-pointer rounded-xl py-3.5 text-sm font-bold transition-all duration-200 ${
+                  plan.highlight ? "btn-emerald text-white" : "btn-plan-basic"
                 }`}
-                style={
-                  !plan.highlight
-                    ? {
-                        border: `1.5px solid ${plan.color}`,
-                        color: plan.color,
-                        background: `${plan.color}18`,
-                      }
-                    : undefined
-                }
               >
                 {plan.cta}
               </button>
@@ -935,11 +1011,11 @@ function PricingSection({
           <p className="text-sm font-semibold text-amber-200">
             ¿Varias sucursales, dominio propio o integraciones a medida?
           </p>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-amber-100/75">
             Enterprise sigue en el roadmap.{" "}
             <a
               href="mailto:hola@platolisto.com?subject=PlatoListo%20Enterprise"
-              className="font-semibold text-amber-300 underline-offset-2 hover:underline"
+              className="font-semibold text-amber-200 underline-offset-2 hover:underline"
             >
               Habla con ventas
             </a>{" "}
@@ -947,17 +1023,10 @@ function PricingSection({
           </p>
         </div>
 
-        {/* Trust strip */}
-        <div className="mt-12 flex flex-wrap justify-center gap-6 text-sm text-slate-400">
-          {[
-            "✓ Sin tarjeta de crédito para empezar",
-            "✓ Configuración en 2 minutos",
-            "✓ Soporte en español",
-            "✓ Escala de Básico a Pro cuando quieras",
-          ].map((t) => (
-            <span key={t}>{t}</span>
-          ))}
-        </div>
+        <p className="mt-12 text-center text-sm leading-relaxed text-slate-400">
+          Sin tarjeta para empezar · Tres pasos para crear tu local · Soporte en
+          español
+        </p>
       </div>
     </section>
   )
@@ -974,62 +1043,36 @@ function RegisterSection({
     <section
       id="registro"
       ref={sectionRef}
-      className="py-24 relative"
-      style={{ scrollMarginTop: 80 }}
+      className="b2b-section relative scroll-mt-20 py-24"
     >
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="pointer-events-none absolute inset-0"
         style={{
           background:
             "radial-gradient(ellipse 60% 80% at 50% 50%, rgba(16,185,129,0.06) 0%, transparent 70%)",
         }}
       />
-      <div className="mx-auto max-w-2xl px-6 lg:px-8">
+      <div className="relative mx-auto max-w-2xl px-5 sm:px-6 lg:px-8">
         <div
-          className="relative overflow-hidden rounded-3xl p-8 lg:p-12"
-          style={{
-            background: "rgba(30,41,59,0.8)",
-            border: "1px solid rgba(51,65,85,0.7)",
-            backdropFilter: "blur(16px)",
-          }}
+          className="rounded-3xl border border-[var(--b2b-border)] p-8 lg:p-12"
+          style={{ background: "color-mix(in srgb, var(--b2b-surface) 95%, transparent)" }}
         >
-          <div
-            className="absolute top-0 left-0 right-0 h-px"
-            style={{
-              background:
-                "linear-gradient(90deg, transparent, rgba(16,185,129,0.6), transparent)",
-            }}
-          />
           <div className="mb-8 text-center">
-            <div
-              className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl"
-              style={{
-                background: "rgba(16,185,129,0.12)",
-                border: "1px solid rgba(16,185,129,0.3)",
-              }}
-            >
-              🚀
-            </div>
             <h2
               className="mb-3 text-3xl font-black text-white lg:text-4xl"
-              style={{ fontFamily: "var(--font-jakarta), Plus Jakarta Sans, sans-serif" }}
+              style={{
+                fontFamily:
+                  "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
+              }}
             >
-              Registra tu local en
-              <br />
-              <span className="gradient-text">menos de 2 minutos</span>
+              Crea tu restaurante
             </h2>
-            <p className="text-sm text-slate-400">
-              Elige Básico o Pro. Early access: el cobro Pro es por transferencia
-              o efectivo; te damos un cupón para activar.
+            <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-400">
+              Tres pasos: elige plan, nombra tu local y crea tu cuenta. El menú
+              QR y la cocina quedan listos al terminar.
             </p>
           </div>
           <RegisterForm variant="b2b" defaultPlan={defaultPlan} />
-          <p className="mt-5 text-center text-[11px] leading-relaxed text-slate-500">
-            * Plan Pro: $999 MXN/mes + $1,000 MXN de setup (pago único) por el
-            diseño e instalación de tu landing a medida. Tras pagar, canjeas un
-            cupón; el menú opera de inmediato y el sitio se publica cuando
-            entregamos tu diseño. Cobro online llega después.
-          </p>
         </div>
       </div>
     </section>
@@ -1039,69 +1082,52 @@ function RegisterSection({
 function Footer() {
   return (
     <footer
-      className="py-12 border-t"
-      style={{ borderColor: 'rgba(51,65,85,0.5)' }}
+      className="border-t border-[var(--b2b-border)] py-12"
     >
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Logo */}
+      <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+        <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
-            >
-              🍽️
-            </div>
+            <BrandMark size="sm" />
             <span
-              className="text-lg font-black"
-              style={{ fontFamily: 'var(--font-jakarta), Plus Jakarta Sans, sans-serif', color: '#F8FAFC' }}
+              className="text-lg font-black text-[var(--b2b-fg)]"
+              style={{
+                fontFamily:
+                  "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
+              }}
             >
-              Plato<span style={{ color: '#10B981' }}>Listo</span>
+              Plato<span className="accent-text">Listo</span>
             </span>
           </div>
 
-          {/* Links */}
           <div className="flex flex-wrap items-center justify-center gap-6">
-            {['Privacidad', 'Términos', 'Soporte', 'Blog'].map((link) => (
-              <a
-                key={link}
-                href="#"
-                className="text-sm text-slate-500 hover:text-emerald-400 transition-colors duration-200"
-              >
-                {link}
-              </a>
-            ))}
-          </div>
-
-          {/* Social + Copyright */}
-          <div className="flex items-center gap-4">
-            {[
-              { icon: '𝕏', label: 'Twitter' },
-              { icon: 'in', label: 'LinkedIn' },
-              { icon: 'f', label: 'Facebook' },
-            ].map((s) => (
-              <a
-                key={s.label}
-                href="#"
-                aria-label={s.label}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-slate-500 hover:text-emerald-400 hover:border-emerald-500/40 transition-all duration-200"
-                style={{ border: '1px solid rgba(51,65,85,0.6)' }}
-              >
-                {s.icon}
-              </a>
-            ))}
+            <Link
+              href="/terminos"
+              className="text-sm text-slate-400 transition-colors duration-200 hover:text-emerald-300"
+            >
+              Términos y Condiciones
+            </Link>
+            <Link
+              href="/aviso-de-privacidad"
+              className="text-sm text-slate-400 transition-colors duration-200 hover:text-emerald-300"
+            >
+              Aviso de Privacidad
+            </Link>
+            <a
+              href="mailto:hola@platolisto.com?subject=Soporte%20PlatoListo"
+              className="text-sm text-slate-400 transition-colors duration-200 hover:text-emerald-300"
+            >
+              Soporte
+            </a>
           </div>
         </div>
 
-        <div
-          className="mt-8 pt-6 text-center text-xs text-slate-600 border-t"
-          style={{ borderColor: 'rgba(51,65,85,0.3)' }}
-        >
-          © 2026 PlatoListo. Todos los derechos reservados. Hecho con ❤️ para restauranteros mexicanos.
+        <div className="mt-8 border-t border-[var(--b2b-border)] pt-6 text-center text-xs text-slate-400">
+          © 2026 PlatoListo. Todos los derechos reservados. Hecho para
+          restauranteros mexicanos.
         </div>
       </div>
     </footer>
-  )
+  );
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
@@ -1109,34 +1135,31 @@ export function B2bLanding() {
   const registerRef = useRef<HTMLElement>(null)
   const [selectedPlan, setSelectedPlan] = useState<"BASIC" | "PRO">("BASIC")
 
-  useEffect(() => {
-    document.documentElement.classList.add("scroll-smooth");
-    document.documentElement.classList.add("overflow-x-hidden");
-    document.body.classList.add("overflow-x-hidden");
-    return () => {
-      document.documentElement.classList.remove("scroll-smooth");
-      document.documentElement.classList.remove("overflow-x-hidden");
-      document.body.classList.remove("overflow-x-hidden");
-    };
-  }, []);
-
   const scrollToRegister = (plan: "BASIC" | "PRO" = "BASIC") => {
     setSelectedPlan(plan)
     const target =
       registerRef.current ?? document.getElementById("registro")
-    target?.scrollIntoView({ behavior: "smooth", block: "start" })
+    const preferReduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches
+    target?.scrollIntoView({
+      behavior: preferReduce ? "auto" : "smooth",
+      block: "start",
+    })
   }
 
   return (
-    <div
-      className="b2b-landing min-h-screen w-full max-w-full overflow-x-hidden font-[family-name:var(--font-jakarta)]"
-      style={{ background: "#0F172A", color: "#F8FAFC" }}
-    >
+    <div className="b2b-landing min-h-screen w-full max-w-full overflow-x-hidden font-[family-name:var(--font-jakarta)]">
+      <a href="#contenido-principal" className="b2b-skip-link">
+        Saltar al contenido
+      </a>
       <Navbar onRegister={() => scrollToRegister("BASIC")} />
-      <HeroSection onRegister={() => scrollToRegister("BASIC")} />
-      <FeaturesSection />
-      <PricingSection onRegister={scrollToRegister} />
-      <RegisterSection sectionRef={registerRef} defaultPlan={selectedPlan} />
+      <main id="contenido-principal" tabIndex={-1}>
+        <HeroSection onRegister={() => scrollToRegister("BASIC")} />
+        <FeaturesSection />
+        <PricingSection onRegister={scrollToRegister} />
+        <RegisterSection sectionRef={registerRef} defaultPlan={selectedPlan} />
+      </main>
       <Footer />
     </div>
   )

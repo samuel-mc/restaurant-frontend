@@ -161,8 +161,8 @@ function menuSubtitle(profile: RestaurantProfile | null): string {
   const bits: string[] = [];
   if (profile?.hasPickup) bits.push("para llevar");
   if (profile?.hasDelivery) bits.push("delivery");
-  if (bits.length === 0) return "Arma tu pedido desde tu mesa.";
-  return `Pide en mesa, ${bits.join(" o ")}.`;
+  if (bits.length === 0) return "Arma tu pedido desde tu mesa (escanea el QR).";
+  return `Sin mesa: ${bits.join(" o ")}. En el local, escanea el QR de tu mesa.`;
 }
 
 function MenuUnavailableState({

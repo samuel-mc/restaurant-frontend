@@ -50,7 +50,13 @@ function orderTitle(order: Order): string {
   if (order.orderType === "IN_TABLE") {
     return order.tableNumber ? `${code} · Mesa ${order.tableNumber}` : `${code} · En mesa`;
   }
-  if (order.orderType === "PICKUP") return `${code} · Para llevar`;
+  if (order.orderType === "PICKUP") {
+    const who = order.customerName?.trim() || "Cliente";
+    const phone = order.customerPhone?.trim();
+    return phone
+      ? `${code} · 🛍️ PICKUP · ${who} · ${phone}`
+      : `${code} · 🛍️ PICKUP · ${who}`;
+  }
   if (order.orderType === "DELIVERY") return `${code} · Delivery`;
   return code;
 }

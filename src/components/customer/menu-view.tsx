@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Order, Product } from "@/types/api";
 import {
   CategoryBar,
@@ -19,7 +20,6 @@ import {
   clearStoredTable,
   formatTableLabel,
   normalizeTableParam,
-  readStoredTable,
   writeStoredTable,
 } from "@/lib/table-session";
 import { formatCurrency } from "@/lib/format";
@@ -46,6 +46,7 @@ export function MenuView({
   orderingEnabled = true,
   tableFromQuery = null,
 }: MenuViewProps) {
+  const router = useRouter();
   const sections = useMemo<MenuSection[]>(() => {
     const byCategory = new Map<string, MenuSection>();
     for (const product of products) {
@@ -83,22 +84,28 @@ export function MenuView({
   const setCartTable = useCartStore((s) => s.setTableNumber);
   const cartTable = useCartStore((s) => s.tableNumber);
 
-  // Anclaje de mesa: ?m= → localStorage + store
+  // Anclaje de mesa: solo con ?m= en la URL.
+  // Sin ?m= → exploración / pickup (no heredar mesa de localStorage).
   useEffect(() => {
     const fromQuery = normalizeTableParam(tableFromQuery);
-    const fromStorage = readStoredTable(tenantSlug);
-    const table = fromQuery ?? fromStorage;
-    if (!table) return;
-
     if (fromQuery) {
-      writeStoredTable(tenantSlug, table);
+      writeStoredTable(tenantSlug, fromQuery);
       setTableLockedFromQr(true);
-    } else if (fromStorage) {
-      setTableLockedFromQr(true);
+      setCartTable(fromQuery);
+      return;
     }
 
-    setCartTable(table);
-  }, [tableFromQuery, tenantSlug, setCartTable]);
+    clearStoredTable(tenantSlug);
+    setTableLockedFromQr(false);
+    setCartTable(null);
+    releaseActiveOrder();
+    setSessionOrder(null);
+  }, [
+    tableFromQuery,
+    tenantSlug,
+    setCartTable,
+    releaseActiveOrder,
+  ]);
 
   // Consulta sesión activa de la mesa
   useEffect(() => {
@@ -189,6 +196,8 @@ export function MenuView({
     clearActiveOrderSession();
     setSessionOrder(null);
     setCartTable(null);
+    // Quitar ?m= para pasar a exploración / pickup.
+    router.replace("/menu");
   }
 
   return (

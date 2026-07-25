@@ -2,6 +2,9 @@
 
 /**
  * Botón flotante del carrito + drawer: pedido nuevo o adición a mesa.
+ *
+ * - Con ?m= (QR): modo IN_TABLE, mesa bloqueada.
+ * - Sin ?m=: exploración → PICKUP (nombre + teléfono; sin campo mesa).
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -38,15 +41,28 @@ type OrderTypeOption = {
   label: string;
 };
 
-function resolveOrderTypes(modules: OrderModules | undefined): OrderTypeOption[] {
-  const options: OrderTypeOption[] = [
-    { value: "IN_TABLE", label: "En mesa" },
-  ];
-  if (modules?.hasPickup) {
+/**
+ * Sin mesa QR: solo canales de recogida/envío (no “En mesa” manual).
+ * Con QR / adición: solo IN_TABLE.
+ */
+function resolveOrderTypes(
+  modules: OrderModules | undefined,
+  tableLockedFromQr: boolean,
+  isAddition: boolean,
+): OrderTypeOption[] {
+  if (isAddition || tableLockedFromQr) {
+    return [{ value: "IN_TABLE", label: "En mesa" }];
+  }
+
+  const options: OrderTypeOption[] = [];
+  if (modules?.hasPickup ?? true) {
     options.push({ value: "PICKUP", label: "Para llevar" });
   }
   if (modules?.hasDelivery) {
     options.push({ value: "DELIVERY", label: "Delivery" });
+  }
+  if (options.length === 0) {
+    options.push({ value: "IN_TABLE", label: "En mesa" });
   }
   return options;
 }
@@ -58,15 +74,12 @@ export function CartBar({
   onChangeTable,
 }: CartBarProps) {
   const router = useRouter();
-  const orderTypes = useMemo(() => resolveOrderTypes(modules), [modules]);
   const [isOpen, setIsOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [tableNumber, setTableNumber] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [orderType, setOrderType] = useState<OrderType>(
-    () => orderTypes[0]?.value ?? "IN_TABLE",
-  );
+  const [orderType, setOrderType] = useState<OrderType>("PICKUP");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -84,12 +97,18 @@ export function CartBar({
   );
 
   const isAddition = Boolean(activeOrderId);
+  const orderTypes = useMemo(
+    () => resolveOrderTypes(modules, tableLockedFromQr, isAddition),
+    [modules, tableLockedFromQr, isAddition],
+  );
   const orderedLines = useMemo(() => Object.values(lines), [lines]);
   const itemLabel = count === 1 ? "1 ítem" : `${count} ítems`;
+  const isPickupFlow =
+    !isAddition && !tableLockedFromQr && orderType === "PICKUP";
 
   useEffect(() => {
     if (!orderTypes.some((opt) => opt.value === orderType)) {
-      setOrderType(orderTypes[0]?.value ?? "IN_TABLE");
+      setOrderType(orderTypes[0]?.value ?? "PICKUP");
     }
   }, [orderTypes, orderType]);
 
@@ -98,8 +117,18 @@ export function CartBar({
       setOrderType("IN_TABLE");
       if (sessionTable) setTableNumber(sessionTable);
       if (sessionName) setCustomerName(sessionName);
+      return;
     }
-  }, [isAddition, tableLockedFromQr, sessionTable, sessionName]);
+    // Exploración sin mesa: preferir PICKUP si está disponible.
+    const pickup = orderTypes.find((opt) => opt.value === "PICKUP");
+    if (pickup) setOrderType("PICKUP");
+  }, [
+    isAddition,
+    tableLockedFromQr,
+    sessionTable,
+    sessionName,
+    orderTypes,
+  ]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -116,6 +145,8 @@ export function CartBar({
 
     const effectiveType = isAddition ? "IN_TABLE" : orderType;
     const effectiveTable = tableNumber.trim();
+    const name = customerName.trim() || sessionName || "";
+    const phone = customerPhone.trim();
 
     if (effectiveType === "IN_TABLE" && !effectiveTable && !isAddition) {
       setErrorMessage("Indica el número de mesa para tu pedido.");
@@ -124,6 +155,16 @@ export function CartBar({
     if (isAddition && !activeOrderId) {
       setErrorMessage("No hay una orden activa para agregar platillos.");
       return;
+    }
+    if (effectiveType === "PICKUP") {
+      if (!name) {
+        setErrorMessage("Indica tu nombre para el pedido para llevar.");
+        return;
+      }
+      if (!phone) {
+        setErrorMessage("Indica tu teléfono para avisar cuando esté listo.");
+        return;
+      }
     }
     if (effectiveType === "DELIVERY" && !deliveryAddress.trim()) {
       setErrorMessage("Indica la dirección de entrega.");
@@ -143,8 +184,8 @@ export function CartBar({
           : null,
       deliveryAddress:
         effectiveType === "DELIVERY" ? deliveryAddress.trim() || null : null,
-      customerName: customerName.trim() || sessionName || null,
-      customerPhone: customerPhone.trim() || null,
+      customerName: name || null,
+      customerPhone: phone || null,
       total: subtotal,
       orderType: effectiveType,
       activeOrderUuid: isAddition ? activeOrderId : null,
@@ -174,10 +215,14 @@ export function CartBar({
   const confirmLabel = isSubmitting
     ? isAddition
       ? "Enviando adición…"
-      : "Procesando pedido…"
+      : isPickupFlow
+        ? "Enviando pedido para llevar…"
+        : "Procesando pedido…"
     : isAddition
       ? "Enviar Adición a la Cocina"
-      : "Confirmar pedido";
+      : isPickupFlow
+        ? "Pedir para Llevar por WhatsApp"
+        : "Confirmar pedido";
 
   return (
     <>
@@ -195,7 +240,11 @@ export function CartBar({
               {count}
             </span>
             <span className="truncate">
-              {isAddition ? `Adición · ${itemLabel}` : `Ver Pedido · ${itemLabel}`}
+              {isAddition
+                ? `Adición · ${itemLabel}`
+                : isPickupFlow
+                  ? `Para llevar · ${itemLabel}`
+                  : `Ver Pedido · ${itemLabel}`}
             </span>
           </span>
           <span className="shrink-0 tabular-nums">
@@ -228,11 +277,19 @@ export function CartBar({
             <div className="flex items-center justify-between px-5 pb-2 pt-3">
               <div>
                 <h2 className="text-lg font-bold">
-                  {isAddition ? "Adición a tu mesa" : "Tu pedido"}
+                  {isAddition
+                    ? "Adición a tu mesa"
+                    : isPickupFlow
+                      ? "Pedido para llevar"
+                      : "Tu pedido"}
                 </h2>
                 {isAddition && sessionTable ? (
                   <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
                     Se suma a la cuenta · Mesa {sessionTable}
+                  </p>
+                ) : isPickupFlow ? (
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                    Recoges en el local · te avisamos al teléfono
                   </p>
                 ) : null}
               </div>
@@ -303,17 +360,18 @@ export function CartBar({
                 </fieldset>
               ) : null}
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-black/50 dark:text-white/50">
-                    Tu nombre
+                    Nombre{isPickupFlow ? " *" : ""}
                   </span>
                   <input
                     type="text"
                     name="customerName"
                     autoComplete="name"
                     maxLength={100}
-                    placeholder="Opcional"
+                    required={isPickupFlow}
+                    placeholder={isPickupFlow ? "Tu nombre" : "Opcional"}
                     value={customerName}
                     disabled={isSubmitting}
                     onChange={(event) => setCustomerName(event.target.value)}
@@ -322,15 +380,20 @@ export function CartBar({
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-black/50 dark:text-white/50">
-                    Teléfono
+                    Teléfono{isPickupFlow ? " *" : ""}
                   </span>
                   <input
                     type="tel"
                     name="customerPhone"
                     autoComplete="tel"
                     maxLength={20}
+                    required={isPickupFlow}
                     placeholder={
-                      orderType === "DELIVERY" ? "Recomendado" : "Opcional"
+                      isPickupFlow
+                        ? "Para avisarte"
+                        : orderType === "DELIVERY"
+                          ? "Recomendado"
+                          : "Opcional"
                     }
                     value={customerPhone}
                     disabled={isSubmitting}

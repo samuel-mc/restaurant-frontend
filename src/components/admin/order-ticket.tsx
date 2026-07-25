@@ -40,7 +40,7 @@ function orderTypeLabel(order: Order): string {
     case "IN_TABLE":
       return order.tableNumber ? `Mesa ${order.tableNumber}` : "En mesa";
     case "PICKUP":
-      return "Para llevar";
+      return "🛍️ PICKUP - Para Recoger";
     case "DELIVERY":
       return "Delivery";
     default:
@@ -116,11 +116,13 @@ export function OrderTicket({
   return (
     <article
       className={`flex flex-col rounded-3xl bg-white p-5 shadow-md ring-1 transition-all duration-500 dark:bg-neutral-900 ${
-        isNew || isAddition
-          ? "ring-4 ring-amber-400 shadow-lg shadow-amber-500/25"
-          : urgent
-            ? "ring-2 ring-red-500"
-            : "ring-black/10 dark:ring-white/10"
+        order.orderType === "PICKUP"
+          ? "ring-2 ring-violet-500 shadow-lg shadow-violet-500/20"
+          : isNew || isAddition
+            ? "ring-4 ring-amber-400 shadow-lg shadow-amber-500/25"
+            : urgent
+              ? "ring-2 ring-red-500"
+              : "ring-black/10 dark:ring-white/10"
       }`}
     >
       <header className="mb-4 flex items-start justify-between gap-3">
@@ -131,9 +133,29 @@ export function OrderTicket({
           <h3 className="truncate text-2xl font-black tracking-tight">
             {orderTypeLabel(order)}
           </h3>
-          <p className="mt-0.5 text-base font-semibold text-black/60 dark:text-white/60">
-            {order.customerName}
-          </p>
+          {order.orderType === "PICKUP" ? (
+            <div className="mt-2 rounded-2xl bg-violet-500/15 px-3 py-2 ring-1 ring-violet-500/30">
+              <p className="text-[10px] font-black uppercase tracking-wider text-violet-800 dark:text-violet-200">
+                Cliente · para recoger
+              </p>
+              <p className="truncate text-base font-bold text-violet-950 dark:text-violet-50">
+                {order.customerName?.trim() || "Sin nombre"}
+              </p>
+              {order.customerPhone?.trim() ? (
+                <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-violet-900/80 dark:text-violet-100/80">
+                  {order.customerPhone.trim()}
+                </p>
+              ) : (
+                <p className="mt-0.5 text-xs font-medium text-violet-800/70 dark:text-violet-200/70">
+                  Sin teléfono
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-0.5 text-base font-semibold text-black/60 dark:text-white/60">
+              {order.customerName}
+            </p>
+          )}
           {isAddition ? (
             <span className="mt-2 inline-flex rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-950 animate-pulse">
               ¡Nuevo / Adición!

@@ -12,6 +12,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { getPublicRootDomain, buildTenantSiteUrl } from "@/lib/qr-menu-url";
 
 const RegisterForm = dynamic(
   () =>
@@ -21,7 +22,11 @@ const RegisterForm = dynamic(
   {
     loading: () => (
       <div
-        className="min-h-[28rem] rounded-xl bg-slate-800/50"
+        className="min-h-[28rem] rounded-xl border border-[var(--b2b-border)]"
+        style={{
+          background:
+            "color-mix(in srgb, var(--b2b-surface) 70%, transparent)",
+        }}
         aria-busy="true"
         aria-label="Cargando formulario de registro"
       />
@@ -43,15 +48,15 @@ interface OrderItem {
 const OPERATING_JOBS = [
   {
     title: "Menú QR en mesa",
-    desc: "El comensal abre el menú en el celular, pide sin descargar app y ve el pedido avanzar.",
+    desc: "Piden en el celular, sin app, y ven el pedido avanzar.",
   },
   {
     title: "Cocina en vivo",
-    desc: "Las comandas llegan al instante al monitor de cocina, con estado y alerta de sonido.",
+    desc: "Comandas al monitor al instante, con estado y alerta de sonido.",
   },
   {
     title: "Canal propio, sin comisión",
-    desc: "Pickup y delivery por tu subdominio. Dejas de pagar el 30% a las plataformas.",
+    desc: "Pickup y delivery por tu subdominio — sin el 30% de las apps.",
   },
 ];
 
@@ -84,11 +89,9 @@ const PRICING: PricingPlan[] = [
     color: "#94A3B8",
     features: [
       "Menú QR hasta 30 platillos",
-      "Gestión de comandas básica",
-      "Panel de administración",
       "Monitor de cocina en vivo",
+      "Panel de administración",
       "Subdominio platolisto.com",
-      "Soporte por email",
     ],
     cta: "Crear con Básico",
     highlight: false,
@@ -105,10 +108,7 @@ const PRICING: PricingPlan[] = [
         label: "Sitio web a medida (diseño propio por local)",
         highlight: true,
       },
-      "Setup de instalación + carga inicial de marca/menú",
       "Menú QR ilimitado",
-      "Imágenes HD en el menú",
-      "Ventas y top 5 platillos",
       "Pedidos Pickup y Delivery",
       "Soporte prioritario",
     ],
@@ -137,22 +137,16 @@ const INITIAL_ORDERS: OrderItem[] = [
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function BrandMark({ size = "md" }: { size?: "sm" | "md" }) {
-  const box = size === "sm" ? "size-8 rounded-lg" : "size-9 rounded-xl";
-  const icon = size === "sm" ? 14 : 16;
+  const box = size === "sm" ? "size-8" : "size-9";
   return (
-    <span
-      className={`flex shrink-0 items-center justify-center ${box}`}
-      style={{
-        background:
-          "linear-gradient(135deg, var(--b2b-action), var(--b2b-action-hover))",
-      }}
+    <img
+      src="/brand/platolisto-logo.png"
+      alt=""
+      width={size === "sm" ? 32 : 36}
+      height={size === "sm" ? 32 : 36}
+      className={`${box} shrink-0 object-contain`}
       aria-hidden
-    >
-      <svg width={icon} height={icon} viewBox="0 0 16 16" fill="none">
-        <circle cx="8" cy="8" r="5.25" stroke="#fff" strokeWidth="1.5" />
-        <circle cx="8" cy="8" r="2" fill="#fff" />
-      </svg>
-    </span>
+    />
   );
 }
 
@@ -301,6 +295,7 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
               type="button"
               onClick={onRegister}
               className="btn-emerald hidden min-h-11 cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white md:flex"
+              aria-label="Crear mi restaurante con Plan Básico, gratis"
             >
               <span>Crear mi restaurante</span>
               <svg
@@ -378,6 +373,7 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
                 setMobileOpen(false);
               }}
               className="btn-emerald mt-3 min-h-11 w-full cursor-pointer rounded-xl py-2.5 text-sm font-semibold text-white"
+              aria-label="Crear mi restaurante con Plan Básico, gratis"
             >
               Crear mi restaurante
             </button>
@@ -448,21 +444,38 @@ function HeroMockup() {
     }
   }, [])
 
-  const statusLabel = { new: 'Nuevo', preparing: 'Preparando', ready: 'Listo' }
-  const statusClass = { new: 'badge-new', preparing: 'badge-preparing', ready: 'badge-ready' }
-  const statusDot = { new: '#34D399', preparing: '#FBBF24', ready: '#93C5FD' }
+  const statusLabel = { new: "Nuevo", preparing: "Preparando", ready: "Listo" };
+  const statusClass = {
+    new: "badge-new",
+    preparing: "badge-preparing",
+    ready: "badge-ready",
+  };
+  const statusDot = {
+    new: "var(--b2b-accent)",
+    preparing: "var(--b2b-warn)",
+    ready: "var(--b2b-status-ready)",
+  };
+  const mobileOrders = orders.slice(0, 2);
+
+  function ticketBorder(status: OrderItem["status"]) {
+    if (status === "new")
+      return "color-mix(in srgb, var(--b2b-accent-deep) 30%, transparent)";
+    if (status === "preparing")
+      return "color-mix(in srgb, var(--b2b-warn) 30%, transparent)";
+    return "color-mix(in srgb, var(--b2b-status-ready) 30%, transparent)";
+  }
 
   return (
     <div
       ref={rootRef}
-      className="relative mx-auto flex w-full max-w-full items-end justify-center gap-4 px-1 pb-4 pt-2 lg:justify-end lg:gap-5 lg:px-0 lg:pb-2 lg:pt-8"
+      className="relative mx-auto flex w-full max-w-full flex-col items-center gap-5 px-1 pb-4 pt-2 sm:gap-6 lg:flex-row lg:items-end lg:justify-end lg:gap-5 lg:px-0 lg:pb-2 lg:pt-8"
       aria-hidden
     >
       {/* Phone — QR Menu (siempre visible) */}
-      <div className="animate-float relative z-[2] w-[10.5rem] shrink-0 sm:w-[12rem] lg:w-[11.25rem]">
+      <div className="animate-float relative z-[2] mb-2 w-[10.5rem] shrink-0 sm:w-[12rem] lg:mb-0 lg:w-[11.25rem]">
         <div
-          className="overflow-hidden rounded-3xl border border-slate-700/80 shadow-2xl"
-          style={{ background: "#1E293B", padding: "12px 10px" }}
+          className="overflow-hidden rounded-3xl border border-[var(--b2b-border)] shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+          style={{ background: "var(--b2b-surface)", padding: "12px 10px" }}
         >
           <div className="mb-3 flex justify-center">
             <div className="h-1.5 w-16 rounded-full bg-slate-600" />
@@ -473,7 +486,19 @@ function HeroMockup() {
               background: "linear-gradient(135deg, #064e3b, #065f46)",
             }}
           >
-            <div className="mb-0.5 text-lg">🌮</div>
+            <div className="mx-auto mb-1.5 size-8 overflow-hidden rounded-full border border-emerald-400/30">
+              {/* eslint-disable-next-line @next/next/no-img-element -- decorative mock */}
+              <img
+                src="https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=96&h=96&fit=crop&auto=format"
+                alt=""
+                width={32}
+                height={32}
+                className="size-full object-cover"
+                loading="eager"
+                decoding="async"
+                fetchPriority="low"
+              />
+            </div>
             <div className="text-xs font-bold text-emerald-300">
               La Taquería del Sol
             </div>
@@ -496,9 +521,21 @@ function HeroMockup() {
             ))}
           </div>
           {[
-            { name: "Tacos al Pastor", price: "$45", img: "🌮" },
-            { name: "Agua Jamaica", price: "$25", img: "🥤" },
-            { name: "Enchiladas", price: "$65", img: "🧆" },
+            {
+              name: "Tacos al Pastor",
+              price: "$45",
+              img: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=80&h=80&fit=crop&auto=format",
+            },
+            {
+              name: "Agua Jamaica",
+              price: "$25",
+              img: "https://images.unsplash.com/photo-1622597467836-f3285f2131b8?w=80&h=80&fit=crop&auto=format",
+            },
+            {
+              name: "Enchiladas",
+              price: "$65",
+              img: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=80&h=80&fit=crop&auto=format",
+            },
           ].map((item) => (
             <div
               key={item.name}
@@ -508,7 +545,16 @@ function HeroMockup() {
                 border: "1px solid rgba(51,65,85,0.5)",
               }}
             >
-              <span className="text-base">{item.img}</span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- decorative mock */}
+              <img
+                src={item.img}
+                alt=""
+                width={28}
+                height={28}
+                className="size-7 shrink-0 rounded-md object-cover"
+                loading="eager"
+                decoding="async"
+              />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[10px] font-semibold text-slate-200">
                   {item.name}
@@ -531,12 +577,12 @@ function HeroMockup() {
               background: "#047857",
             }}
           >
-            🛒 Ver mi Pedido (3)
+            Ver mi pedido (3)
           </div>
         </div>
         <div
-          className="absolute right-0 -bottom-3 rounded-xl border border-slate-600/50 p-2 text-center shadow-lg"
-          style={{ background: "#1E293B" }}
+          className="absolute right-0 -bottom-3 rounded-xl border border-[var(--b2b-border)] p-2 text-center shadow-lg"
+          style={{ background: "var(--b2b-surface)" }}
         >
           <div className="mb-1 grid size-8 grid-cols-3 gap-0.5">
             {Array.from({ length: 9 }, (_, i) => (
@@ -545,69 +591,73 @@ function HeroMockup() {
                 className="rounded-sm"
                 style={{
                   background: [0, 1, 3, 5, 7, 8].includes(i)
-                    ? "#10B981"
+                    ? "var(--b2b-accent-deep)"
                     : "transparent",
                 }}
               />
             ))}
           </div>
-          <div className="text-[8px] font-medium text-slate-400">Escanear</div>
+          <div className="text-[8px] font-medium text-[var(--b2b-muted)]">
+            Escanear
+          </div>
         </div>
       </div>
 
-      {/* Tablet — solo en desktop (columna propia); en móvil/tablet se oculta para no cortar */}
-      <div className="animate-float-delayed relative z-[1] hidden w-[15.5rem] shrink-0 lg:block">
+      {/* Cocina compacta — móvil / tablet: Service Line Live sin el monitor completo */}
+      <div className="z-[1] w-full max-w-sm pt-1 lg:hidden">
         <div
-          className="overflow-hidden rounded-2xl border border-slate-600/80 shadow-2xl"
-          style={{ background: "#0F172A", padding: "10px" }}
+          className="rounded-2xl border border-[var(--b2b-border)] p-3 shadow-[0_12px_32px_rgba(0,0,0,0.45)] sm:p-3.5"
+          style={{
+            background:
+              "color-mix(in srgb, var(--b2b-surface) 95%, transparent)",
+          }}
         >
-          <div className="mb-2 flex items-center justify-between px-1">
-            <div>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <div
-                className="text-xs font-bold text-white"
+                className="text-sm font-bold text-[var(--b2b-fg)]"
                 style={{
                   fontFamily:
                     "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
                 }}
               >
-                Monitor de Cocina
+                Cocina al momento
               </div>
-              <div className="mt-0.5 flex items-center gap-1.5">
-                <span className="animate-blink inline-block size-1.5 rounded-full bg-emerald-400" />
-                <span className="text-[9px] font-medium text-emerald-400">
-                  EN VIVO
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="animate-blink inline-block size-1.5 shrink-0 rounded-full bg-[var(--b2b-accent)]" />
+                <span className="truncate text-xs font-medium text-[var(--b2b-accent)]">
+                  <span className="sm:hidden">EN VIVO</span>
+                  <span className="hidden sm:inline">
+                    EN VIVO · comandas al instante
+                  </span>
                 </span>
               </div>
             </div>
             <div
-              className="rounded-lg px-2 py-1 text-xs font-bold"
+              className="shrink-0 rounded-lg px-2 py-1 text-xs font-bold"
               style={{
-                background: "rgba(16,185,129,0.15)",
-                color: "#34D399",
+                background:
+                  "color-mix(in srgb, var(--b2b-accent-deep) 22%, transparent)",
+                color: "var(--b2b-accent)",
               }}
             >
               {orders.length} activas
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            {orders.map((order) => (
+          <div className="space-y-2">
+            {mobileOrders.map((order) => (
               <div
-                key={order.id}
-                className="rounded-xl p-2.5 transition-all duration-500"
+                key={`m-${order.id}`}
+                className="rounded-xl px-3 py-2.5 transition-[border-color,background-color] duration-500"
                 style={{
-                  background: "rgba(30,41,59,0.9)",
-                  border: `1px solid ${
-                    order.status === "new"
-                      ? "rgba(16,185,129,0.3)"
-                      : order.status === "preparing"
-                        ? "rgba(245,158,11,0.3)"
-                        : "rgba(96,165,250,0.3)"
-                  }`,
+                  background:
+                    "color-mix(in srgb, var(--b2b-surface) 92%, black)",
+                  border: `1px solid ${ticketBorder(order.status)}`,
                 }}
               >
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-white">
+                <div className="mb-0.5 flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-[var(--b2b-fg)]">
                     {order.table}
                   </span>
                   <span className={`order-badge ${statusClass[order.status]}`}>
@@ -618,8 +668,96 @@ function HeroMockup() {
                     {statusLabel[order.status]}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400">{order.item}</div>
-                <div className="mt-0.5 text-[9px] text-slate-400">
+                <div className="truncate text-xs text-[var(--b2b-muted)]">
+                  {order.item}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div
+            className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5"
+            style={{ background: "var(--b2b-action)" }}
+          >
+            <span
+              className="size-2 shrink-0 rounded-full bg-white"
+              aria-hidden
+            />
+            <p className="text-xs leading-snug text-emerald-50">
+              <span className="font-bold text-white">Nueva comanda</span>
+              {" · "}
+              Mesa 12 · Birria x2
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tablet — solo desktop */}
+      <div className="animate-float-delayed relative z-[1] hidden w-[15.5rem] shrink-0 lg:block">
+        <div
+          className="overflow-hidden rounded-2xl border border-[var(--b2b-border)] shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+          style={{
+            background: "var(--b2b-canvas)",
+            padding: "10px",
+          }}
+        >
+          <div className="mb-2 flex items-center justify-between px-1">
+            <div>
+              <div
+                className="text-xs font-bold text-[var(--b2b-fg)]"
+                style={{
+                  fontFamily:
+                    "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
+                }}
+              >
+                Monitor de Cocina
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <span className="animate-blink inline-block size-1.5 rounded-full bg-[var(--b2b-accent)]" />
+                <span className="text-[9px] font-medium text-[var(--b2b-accent)]">
+                  EN VIVO
+                </span>
+              </div>
+            </div>
+            <div
+              className="rounded-lg px-2 py-1 text-xs font-bold"
+              style={{
+                background:
+                  "color-mix(in srgb, var(--b2b-accent-deep) 22%, transparent)",
+                color: "var(--b2b-accent)",
+              }}
+            >
+              {orders.length} activas
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            {orders.map((order) => (
+              <div
+                key={order.id}
+                className="rounded-xl p-2.5 transition-[border-color,background-color] duration-500"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--b2b-surface) 92%, black)",
+                  border: `1px solid ${ticketBorder(order.status)}`,
+                }}
+              >
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-[var(--b2b-fg)]">
+                    {order.table}
+                  </span>
+                  <span className={`order-badge ${statusClass[order.status]}`}>
+                    <span
+                      className="size-1.5 rounded-full"
+                      style={{ background: statusDot[order.status] }}
+                    />
+                    {statusLabel[order.status]}
+                  </span>
+                </div>
+                <div className="text-[10px] text-[var(--b2b-muted)]">
+                  {order.item}
+                </div>
+                <div className="mt-0.5 text-[9px] text-[var(--b2b-muted)]">
                   {order.time} hrs
                 </div>
               </div>
@@ -627,44 +765,18 @@ function HeroMockup() {
           </div>
 
           <div
-            className="mt-2 flex items-center justify-between border-t pt-2"
-            style={{ borderColor: "rgba(51,65,85,0.5)" }}
+            className="mt-2 flex items-center gap-2 rounded-xl px-2.5 py-2"
+            style={{ background: "var(--b2b-action)" }}
           >
-            <div className="text-center">
-              <div className="text-xs font-bold text-emerald-400">$4,230</div>
-              <div className="text-[8px] text-slate-400">Ventas hoy</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-bold text-amber-400">$147</div>
-              <div className="text-[8px] text-slate-400">Ticket prom.</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-bold text-blue-300">28</div>
-              <div className="text-[8px] text-slate-400">Pedidos</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Notificación — solo desktop, dentro del flujo visual sin salirse */}
-      <div
-        className="absolute top-0 right-2 z-[3] hidden rounded-xl px-3 py-2 shadow-lg lg:block"
-        style={{
-          background: "rgba(4, 120, 87, 0.98)",
-          minWidth: 148,
-          boxShadow: "0 10px 28px rgba(0, 0, 0, 0.35)",
-        }}
-      >
-        <div className="flex items-center gap-2">
-          <span
-            className="size-2 shrink-0 rounded-full bg-white"
-            aria-hidden
-          />
-          <div>
-            <div className="text-[10px] font-bold text-white">
-              Nueva comanda
-            </div>
-            <div className="text-[9px] text-emerald-100">Mesa 12 · Birria x2</div>
+            <span
+              className="size-1.5 shrink-0 rounded-full bg-white"
+              aria-hidden
+            />
+            <p className="text-[10px] leading-snug text-emerald-50">
+              <span className="font-bold text-white">Nueva comanda</span>
+              {" · "}
+              Mesa 12 · Birria x2
+            </p>
           </div>
         </div>
       </div>
@@ -675,7 +787,6 @@ function HeroMockup() {
 function HeroSection({ onRegister }: { onRegister: () => void }) {
   return (
     <section
-      id="demo"
       aria-label="PlatoListo"
       className="relative flex items-start overflow-x-hidden lg:min-h-[100svh] lg:items-center"
       style={{ paddingTop: 80 }}
@@ -734,13 +845,25 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
               a las apps.
             </p>
 
-            <button
-              type="button"
-              onClick={onRegister}
-              className="btn-emerald flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl px-6 py-3.5 text-sm font-bold text-white sm:w-auto sm:px-7 sm:py-4 sm:text-base"
-            >
-              Crear mi restaurante
-            </button>
+            <div className="flex flex-col items-stretch gap-3 sm:items-start">
+              <button
+                type="button"
+                onClick={onRegister}
+                className="btn-emerald flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl px-6 py-3.5 text-sm font-bold text-white sm:w-auto sm:px-7 sm:py-4 sm:text-base"
+                aria-label="Crear mi restaurante con Plan Básico, gratis"
+              >
+                Crear mi restaurante
+              </button>
+              <p className="max-w-md text-sm leading-relaxed text-[var(--b2b-muted)]">
+                Empieza gratis con Plan Básico.{" "}
+                <a
+                  href="#sitio-pro"
+                  className="font-semibold text-[var(--b2b-accent)] underline-offset-2 hover:underline"
+                >
+                  ¿Sitio a medida? Ver Plan Pro
+                </a>
+              </p>
+            </div>
           </div>
 
           <div className="relative z-0 mt-6 w-full max-w-full sm:mt-8 lg:mt-0 lg:flex lg:justify-end">
@@ -752,9 +875,128 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
   );
 }
 
+function useProDemoUrl() {
+  const host = getPublicRootDomain();
+  const [demoUrl, setDemoUrl] = useState(
+    () => `https://latrattoria.${host}`,
+  );
+
+  useEffect(() => {
+    setDemoUrl(buildTenantSiteUrl("latrattoria"));
+  }, []);
+
+  return demoUrl;
+}
+
+function ProDemoLink({
+  className,
+  href,
+}: {
+  className?: string;
+  href: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      aria-label="Ver ejemplo vivo de La Trattoria (se abre en una pestaña nueva)"
+    >
+      Ver ejemplo vivo
+    </a>
+  );
+}
+
+function ProSitePreview({
+  demoUrl,
+  host,
+}: {
+  demoUrl: string;
+  host: string;
+}) {
+  return (
+    <figure className="min-w-0 w-full">
+      <div
+        className="overflow-hidden rounded-2xl border border-[var(--b2b-border)] shadow-[0_14px_40px_rgba(0,0,0,0.35)]"
+        style={{ background: "var(--b2b-surface)" }}
+      >
+        <div
+          className="flex items-center gap-2 border-b border-[var(--b2b-border)] px-3 py-2.5"
+          style={{
+            background: "color-mix(in srgb, var(--b2b-canvas) 88%, black)",
+          }}
+        >
+          <div className="flex gap-1.5" aria-hidden>
+            <span className="size-2.5 rounded-full bg-slate-600" />
+            <span className="size-2.5 rounded-full bg-slate-600" />
+            <span className="size-2.5 rounded-full bg-slate-600" />
+          </div>
+          <a
+            href={demoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="min-w-0 flex-1 truncate rounded-md bg-slate-950/80 px-3 py-1.5 text-center text-xs text-[var(--b2b-muted)] transition-colors hover:text-[var(--b2b-accent)]"
+            aria-label="Abrir latrattoria en una pestaña nueva"
+          >
+            latrattoria.{host}
+          </a>
+        </div>
+
+        <div className="relative aspect-[16/10] overflow-hidden bg-[#0e1f16]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- decorative demo crop; same asset as Pro landing */}
+          <img
+            src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&h=750&fit=crop&auto=format"
+            alt=""
+            width={1200}
+            height={750}
+            sizes="(max-width: 1024px) 100vw, 36rem"
+            className="absolute inset-0 h-full w-full object-cover opacity-50"
+            loading="lazy"
+            decoding="async"
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(14,31,22,0.55), rgba(14,31,22,0.25) 45%, rgba(14,31,22,0.85))",
+            }}
+          />
+          <div className="relative z-10 flex h-full flex-col items-center justify-center px-5 py-6 text-center sm:px-6">
+            <p className="mb-2 font-[family-name:var(--font-nunito)] text-[10px] tracking-[0.35em] text-[#d4a853] uppercase sm:text-xs">
+              Ristorante Italiano
+            </p>
+            <p className="mb-3 font-[family-name:var(--font-playfair)] text-2xl font-black tracking-tight text-balance text-white sm:text-3xl md:text-4xl">
+              La Trattoria
+            </p>
+            <p className="mb-5 max-w-[18rem] font-[family-name:var(--font-nunito)] text-xs leading-relaxed text-white/75 sm:text-sm">
+              Ingredientes frescos, recetas de la casa y un servicio cercano.
+            </p>
+            <span
+              className="rounded-sm px-5 py-2.5 font-[family-name:var(--font-nunito)] text-[10px] font-semibold tracking-widest text-white uppercase"
+              style={{ background: "#C9612A" }}
+            >
+              Ver menú
+            </span>
+          </div>
+        </div>
+      </div>
+      <figcaption className="mt-3 max-w-prose text-sm leading-snug text-[var(--b2b-muted)]">
+        Ejemplo Pro entregado:{" "}
+        <span className="font-semibold text-slate-300">La Trattoria</span>. Tu
+        menú QR y la cocina operan desde el día uno; el sitio se publica cuando
+        lo entregamos.
+      </figcaption>
+    </figure>
+  );
+}
+
 function FeaturesSection() {
   return (
-    <section id="caracteristicas" className="b2b-section relative py-24">
+    <section
+      id="caracteristicas"
+      className="b2b-section relative scroll-mt-20 py-24"
+    >
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -762,8 +1004,8 @@ function FeaturesSection() {
             "radial-gradient(ellipse 60% 40% at 80% 50%, rgba(245,158,11,0.04) 0%, transparent 60%)",
         }}
       />
-      <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mb-14 max-w-2xl">
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+        <div className="mb-12 max-w-2xl">
           <h2
             className="mb-4 text-4xl leading-tight font-black text-white lg:text-5xl"
             style={{
@@ -775,23 +1017,23 @@ function FeaturesSection() {
             <br />
             <span className="accent-text-warn">en una sola línea</span>
           </h2>
-          <p className="max-w-xl text-lg text-slate-400">
-            Tres piezas que usas en el turno: mesa, cocina y tu canal de venta.
+          <p className="max-w-xl text-lg text-[var(--b2b-muted)]">
+            Mesa, cocina y tu canal — en el mismo turno.
           </p>
         </div>
 
-        <ol className="mb-20 max-w-3xl space-y-10 sm:space-y-12">
+        <ol className="max-w-3xl space-y-8 sm:space-y-10">
           {OPERATING_JOBS.map((job, i) => (
             <li key={job.title} className="flex gap-5 sm:gap-6">
               <span
-                className="w-8 shrink-0 pt-1 text-sm font-bold tabular-nums text-emerald-400"
+                className="w-8 shrink-0 pt-1 text-sm font-bold tabular-nums text-[var(--b2b-accent)]"
                 aria-hidden
               >
                 {String(i + 1).padStart(2, "0")}
               </span>
               <div className="min-w-0">
                 <h3
-                  className="mb-2 text-lg font-bold text-white sm:text-xl"
+                  className="mb-1.5 text-lg font-bold text-white sm:text-xl"
                   style={{
                     fontFamily:
                       "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
@@ -799,43 +1041,81 @@ function FeaturesSection() {
                 >
                   {job.title}
                 </h3>
-                <p className="max-w-prose text-base leading-relaxed text-slate-400">
+                <p className="max-w-prose text-base leading-relaxed text-[var(--b2b-muted)]">
                   {job.desc}
                 </p>
               </div>
             </li>
           ))}
         </ol>
+      </div>
+    </section>
+  );
+}
 
-        <div
-          className="flex flex-col gap-6 border-t pt-12 sm:flex-row sm:items-end sm:justify-between sm:gap-10"
-          style={{ borderColor: "rgba(51,65,85,0.6)" }}
-        >
-          <div className="max-w-xl">
-            <p className="mb-2 text-xs font-semibold tracking-wide text-emerald-400 uppercase">
+function ProSection({
+  onRegisterPro,
+}: {
+  onRegisterPro: () => void;
+}) {
+  const host = getPublicRootDomain();
+  const demoUrl = useProDemoUrl();
+
+  return (
+    <section id="sitio-pro" className="b2b-section relative scroll-mt-20 py-24">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 50% at 20% 40%, rgba(16,185,129,0.06) 0%, transparent 65%)",
+        }}
+      />
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12 xl:gap-16">
+          <div className="min-w-0 lg:pr-2">
+            <p className="mb-3 text-xs font-semibold tracking-wide text-[var(--b2b-accent)] uppercase">
               Plan Pro
             </p>
-            <h3
-              className="mb-3 text-2xl font-black text-white sm:text-3xl"
+            <h2
+              className="mb-4 text-4xl leading-tight font-black tracking-tight text-pretty text-white lg:text-5xl"
               style={{
                 fontFamily:
                   "var(--font-jakarta), Plus Jakarta Sans, sans-serif",
               }}
             >
-              Sitio web exclusivo de tu restaurante
-            </h3>
-            <p className="text-base leading-relaxed text-slate-400">
-              No es una plantilla compartida: el equipo PlatoListo diseña y
-              entrega el sitio de tu local. El menú QR y la cocina en vivo ya
-              operan desde el día uno; el sitio llega cuando lo entregamos.
+              Sitio web exclusivo
+              <br />
+              de tu restaurante
+            </h2>
+            <p className="mb-8 max-w-md text-base leading-relaxed text-[var(--b2b-muted)] sm:text-lg">
+              No es una plantilla compartida: diseñamos y entregamos el sitio de
+              tu local. El menú y la cocina ya corren; el sitio llega cuando está
+              listo.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <button
+                type="button"
+                onClick={onRegisterPro}
+                className="btn-emerald inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl px-6 py-3.5 text-sm font-bold text-white sm:w-auto sm:text-base"
+              >
+                Crear con Pro
+              </button>
+              <ProDemoLink
+                href={demoUrl}
+                className="btn-outline inline-flex min-h-11 w-full items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold sm:w-auto"
+              />
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-[var(--b2b-muted)]">
+              Incluye setup de sitio.{" "}
+              <a
+                href="#precios"
+                className="font-semibold text-[var(--b2b-accent)] underline-offset-2 hover:underline"
+              >
+                Ver precio
+              </a>
             </p>
           </div>
-          <a
-            href="#precios"
-            className="btn-outline inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-6 py-3.5 text-sm font-semibold sm:text-base"
-          >
-            Ver Plan Pro
-          </a>
+          <ProSitePreview demoUrl={demoUrl} host={host} />
         </div>
       </div>
     </section>
@@ -848,13 +1128,13 @@ function PricingSection({
   onRegister: (plan: "BASIC" | "PRO") => void;
 }) {
   return (
-    <section id="precios" className="b2b-section relative py-24">
+    <section id="precios" className="b2b-section relative scroll-mt-20 py-24">
       <div
         className="absolute inset-0 pointer-events-none"
         style={{ background: 'radial-gradient(ellipse 70% 50% at 30% 60%, rgba(16,185,129,0.05) 0%, transparent 60%)' }}
       />
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="mb-16 max-w-2xl text-center mx-auto">
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+        <div className="mb-16 mx-auto max-w-2xl text-center">
           <h2
             className="mb-4 text-4xl font-black text-white lg:text-5xl"
             style={{
@@ -866,9 +1146,9 @@ function PricingSection({
             <br />
             <span className="accent-text">para tu operación</span>
           </h2>
-          <p className="text-lg text-slate-400">
-            Empieza gratis. Pasa a Pro cuando quieras tu sitio a medida
-            (incluido en el setup) y menú sin límite.
+          <p className="text-lg text-[var(--b2b-muted)]">
+            Empieza gratis con Básico. Pasa a Pro cuando quieras sitio a medida y
+            menú sin límite.
           </p>
         </div>
 
@@ -924,9 +1204,7 @@ function PricingSection({
                   >
                     {plan.price}
                   </span>
-                  {plan.price !== "Custom" && (
-                    <span className="mb-1.5 text-sm text-slate-400">MXN</span>
-                  )}
+                  <span className="mb-1.5 text-sm text-slate-400">MXN</span>
                 </div>
                 <p className="text-sm text-slate-400">{plan.period}</p>
                 {plan.setupFee ? (
@@ -1157,6 +1435,7 @@ export function B2bLanding() {
       <main id="contenido-principal" tabIndex={-1}>
         <HeroSection onRegister={() => scrollToRegister("BASIC")} />
         <FeaturesSection />
+        <ProSection onRegisterPro={() => scrollToRegister("PRO")} />
         <PricingSection onRegister={scrollToRegister} />
         <RegisterSection sectionRef={registerRef} defaultPlan={selectedPlan} />
       </main>

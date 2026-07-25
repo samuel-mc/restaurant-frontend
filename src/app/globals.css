@@ -148,6 +148,7 @@ body {
   --b2b-action-hover: #065f46;
   --b2b-warn: #fbbf24;
   --b2b-focus: #6ee7b7;
+  --b2b-status-ready: #93c5fd;
 
   font-family: var(--font-jakarta-sans);
   -webkit-font-smoothing: antialiased;
@@ -267,6 +268,12 @@ body:has(.b2b-landing) {
   box-shadow: 0 8px 24px color-mix(in srgb, var(--b2b-action) 45%, transparent);
   transform: translateY(-1px);
 }
+.b2b-landing .btn-emerald:disabled {
+  cursor: wait;
+  opacity: 0.8;
+  transform: none;
+  box-shadow: none;
+}
 .b2b-landing .btn-emerald:focus-visible,
 .b2b-landing .btn-outline:focus-visible,
 .b2b-landing .btn-plan-basic:focus-visible,
@@ -289,6 +296,11 @@ body:has(.b2b-landing) {
   background: color-mix(in srgb, var(--b2b-accent-deep) 10%, transparent);
   transform: translateY(-1px);
 }
+.b2b-landing .btn-outline:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
 
 .b2b-landing .btn-plan-basic {
   border: 1.5px solid color-mix(in srgb, var(--b2b-muted) 70%, transparent);
@@ -303,6 +315,10 @@ body:has(.b2b-landing) {
   background: color-mix(in srgb, var(--b2b-muted) 22%, transparent);
   border-color: var(--b2b-muted);
   color: var(--b2b-fg);
+}
+.b2b-landing .btn-plan-basic:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .b2b-landing .nav-link {
@@ -353,8 +369,8 @@ body:has(.b2b-landing) {
   color: var(--b2b-warn);
 }
 .b2b-landing .badge-ready {
-  background: rgba(59, 130, 246, 0.2);
-  color: #93c5fd;
+  background: color-mix(in srgb, var(--b2b-status-ready) 22%, transparent);
+  color: var(--b2b-status-ready);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -405,5 +421,52 @@ body:has(.b2b-landing) {
     aspect-ratio: auto !important;
     gap: 10px !important;
     padding: 14px 14px 18px !important;
+  }
+}
+
+/* ─── Tenant restaurant landing (La Trattoria / Pro sites) ─── */
+.restaurant-landing .restaurant-skip-link {
+  position: absolute;
+  left: max(1rem, env(safe-area-inset-left));
+  top: max(1rem, env(safe-area-inset-top));
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  border-radius: 2px;
+  background: var(--accent, #c9612a);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 0.15s ease;
+}
+.restaurant-landing .restaurant-skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--ring, #c9612a);
+  outline-offset: 3px;
+}
+.restaurant-landing a:focus-visible,
+.restaurant-landing button:focus-visible,
+.restaurant-landing input:focus-visible,
+.restaurant-landing select:focus-visible,
+.restaurant-landing textarea:focus-visible {
+  outline: 2px solid var(--ring, #c9612a);
+  outline-offset: 3px;
+}
+.restaurant-landing #contenido-principal:focus {
+  outline: none;
+}
+/* Secondary blocks only — keep #mas-del-local free for sticky CTA rail. */
+.restaurant-landing #mas-del-local [data-secondary-block] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 800px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .restaurant-landing {
+    scroll-behavior: auto;
+  }
+  .restaurant-landing .motion-safe-only {
+    transition: none !important;
+    animation: none !important;
   }
 }

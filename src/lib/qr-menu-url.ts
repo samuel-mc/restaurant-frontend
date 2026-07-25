@@ -11,6 +11,26 @@ export function getPublicRootDomain(): string {
 }
 
 /**
+ * Origen público del sitio del tenant (institucional / home).
+ * En local: `http://{slug}.localhost:{port}`; en prod: `https://{slug}.{root}`.
+ */
+export function buildTenantSiteUrl(tenantSlug: string): string {
+  const slug = tenantSlug.trim().toLowerCase();
+  if (typeof window !== "undefined") {
+    const { protocol, hostname, port } = window.location;
+    const isLocal =
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "127.0.0.1";
+    if (isLocal) {
+      const portSuffix = port ? `:${port}` : "";
+      return `${protocol}//${slug}.localhost${portSuffix}`;
+    }
+  }
+  return `https://${slug}.${getPublicRootDomain()}`;
+}
+
+/**
  * Extrae solo dígitos para `?m=` (ej. "Mesa 4" / 4 → "4").
  * Máx. 10 caracteres (límite de `normalizeTableParam` en el menú).
  */

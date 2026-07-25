@@ -11,6 +11,7 @@ import {
   registerRestaurant,
 } from "@/services/tenantService";
 import type { RegisterTenantDTO } from "@/types/auth";
+import { getPublicRootDomain } from "@/lib/qr-menu-url";
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -23,8 +24,7 @@ const RESERVED_SLUGS = new Set([
   "assets",
 ]);
 
-const ROOT_DOMAIN =
-  process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase() || "tusass.com";
+const ROOT_DOMAIN = getPublicRootDomain();
 
 type RegisterStep = "plan" | "local" | "cuenta";
 
@@ -293,7 +293,7 @@ export function RegisterForm({
     : "text-sm font-medium";
 
   const inputClass = isB2b
-    ? "w-full rounded-xl border border-slate-700/80 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"
+    ? "w-full rounded-xl border border-slate-700/80 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus-visible:border-[var(--b2b-accent-deep)] focus-visible:ring-2 focus-visible:ring-[var(--b2b-focus)]/35 disabled:opacity-60"
     : "rounded-xl border border-black/10 bg-black/2 px-3.5 py-2.5 text-sm outline-none ring-neutral-900/20 focus:ring-2 disabled:opacity-60 dark:border-white/10 dark:bg-white/5";
 
   const errorClass = isB2b
@@ -301,7 +301,11 @@ export function RegisterForm({
     : "text-xs text-red-600 dark:text-red-400";
 
   const planPicker = (
-    <fieldset className={isB2b ? "block" : "sm:col-span-2"}>
+    <fieldset
+      className={isB2b ? "block" : "sm:col-span-2"}
+      role="radiogroup"
+      aria-label="Plan"
+    >
       <legend className={labelClass}>Plan</legend>
       <div className="mt-1.5 grid grid-cols-2 gap-2">
         {(
@@ -323,6 +327,8 @@ export function RegisterForm({
             <button
               key={option.id}
               type="button"
+              role="radio"
+              aria-checked={selected}
               disabled={isSubmitting}
               onClick={() =>
                 setForm((prev) => ({
@@ -335,7 +341,7 @@ export function RegisterForm({
                 isB2b
                   ? `min-h-11 rounded-xl border px-3 py-3 text-left transition ${
                       selected
-                        ? "border-emerald-400/60 bg-emerald-500/15 ring-2 ring-emerald-500/25"
+                        ? "border-[var(--b2b-accent)]/60 bg-[var(--b2b-accent-deep)]/15 ring-2 ring-[var(--b2b-focus)]/30"
                         : "border-slate-700/80 bg-slate-950/60 hover:border-slate-500"
                     }`
                   : `rounded-xl border px-3 py-3 text-left transition ${
@@ -464,7 +470,7 @@ export function RegisterForm({
         <div
           className={
             isB2b
-              ? "flex items-center overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/80 focus-within:border-emerald-500/60 focus-within:ring-2 focus-within:ring-emerald-500/20"
+            ? "flex items-center overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/80 focus-within:border-[var(--b2b-accent-deep)] focus-within:ring-2 focus-within:ring-[var(--b2b-focus)]/35"
               : "flex items-center gap-0 overflow-hidden rounded-xl border border-black/10 focus-within:ring-2 focus-within:ring-neutral-900/20 dark:border-white/10"
           }
         >
@@ -480,7 +486,7 @@ export function RegisterForm({
             }
             className={
               isB2b
-                ? "min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 disabled:opacity-60"
+                ? "min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 disabled:opacity-60"
                 : "min-w-0 flex-1 bg-black/2 px-3.5 py-2.5 text-sm outline-none disabled:opacity-60 dark:bg-white/5"
             }
             placeholder="mi-restaurante"

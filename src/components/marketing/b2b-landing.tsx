@@ -150,13 +150,26 @@ function BrandMark({ size = "md" }: { size?: "sm" | "md" }) {
   );
 }
 
-function Navbar({ onRegister }: { onRegister: () => void }) {
+function Navbar({
+  onRegister,
+  selectedPlan,
+}: {
+  onRegister: () => void;
+  selectedPlan: "BASIC" | "PRO";
+}) {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const menuId = "b2b-mobile-nav"
   const menuRef = useRef<HTMLDivElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const wasOpenRef = useRef(false)
+
+  const registerAria =
+    selectedPlan === "PRO"
+      ? "Continuar registro con Plan Pro"
+      : "Crear mi restaurante con Plan Básico, gratis";
+  const registerLabel =
+    selectedPlan === "PRO" ? "Continuar con Pro" : "Crear mi restaurante";
 
   useEffect(() => {
     let ticking = false
@@ -295,9 +308,9 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
               type="button"
               onClick={onRegister}
               className="btn-emerald hidden min-h-11 cursor-pointer items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white md:flex"
-              aria-label="Crear mi restaurante con Plan Básico, gratis"
+              aria-label={registerAria}
             >
-              <span>Crear mi restaurante</span>
+              <span>{registerLabel}</span>
               <svg
                 width="14"
                 height="14"
@@ -373,9 +386,9 @@ function Navbar({ onRegister }: { onRegister: () => void }) {
                 setMobileOpen(false);
               }}
               className="btn-emerald mt-3 min-h-11 w-full cursor-pointer rounded-xl py-2.5 text-sm font-semibold text-white"
-              aria-label="Crear mi restaurante con Plan Básico, gratis"
+              aria-label={registerAria}
             >
-              Crear mi restaurante
+              {registerLabel}
             </button>
           </div>
         ) : null}
@@ -1412,9 +1425,11 @@ function Footer() {
 export function B2bLanding() {
   const registerRef = useRef<HTMLElement>(null)
   const [selectedPlan, setSelectedPlan] = useState<"BASIC" | "PRO">("BASIC")
+  const [showMobileCta, setShowMobileCta] = useState(false)
 
-  const scrollToRegister = (plan: "BASIC" | "PRO" = "BASIC") => {
-    setSelectedPlan(plan)
+  const scrollToRegister = (plan?: "BASIC" | "PRO") => {
+    const next = plan ?? selectedPlan
+    setSelectedPlan(next)
     const target =
       registerRef.current ?? document.getElementById("registro")
     const preferReduce = window.matchMedia(
@@ -1426,12 +1441,39 @@ export function B2bLanding() {
     })
   }
 
+  useEffect(() => {
+    const onScroll = () => {
+      const register = document.getElementById("registro")
+      const registerTop = register?.getBoundingClientRect().top ?? Infinity
+      const pastHero = window.scrollY > 420
+      const registerInView = registerTop < window.innerHeight * 0.85
+      setShowMobileCta(pastHero && !registerInView)
+    }
+    onScroll()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    window.addEventListener("resize", onScroll)
+    return () => {
+      window.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onScroll)
+    }
+  }, [])
+
+  const stickyLabel =
+    selectedPlan === "PRO" ? "Continuar con Pro" : "Crear mi restaurante"
+  const stickyAria =
+    selectedPlan === "PRO"
+      ? "Continuar registro con Plan Pro"
+      : "Crear mi restaurante con Plan Básico, gratis"
+
   return (
     <div className="b2b-landing min-h-screen w-full max-w-full overflow-x-hidden font-[family-name:var(--font-jakarta)]">
       <a href="#contenido-principal" className="b2b-skip-link">
         Saltar al contenido
       </a>
-      <Navbar onRegister={() => scrollToRegister("BASIC")} />
+      <Navbar
+        onRegister={() => scrollToRegister()}
+        selectedPlan={selectedPlan}
+      />
       <main id="contenido-principal" tabIndex={-1}>
         <HeroSection onRegister={() => scrollToRegister("BASIC")} />
         <FeaturesSection />
@@ -1440,6 +1482,26 @@ export function B2bLanding() {
         <RegisterSection sectionRef={registerRef} defaultPlan={selectedPlan} />
       </main>
       <Footer />
+
+      {showMobileCta ? (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--b2b-border)] px-4 py-3 md:hidden"
+          style={{
+            background: "color-mix(in srgb, var(--b2b-canvas) 94%, transparent)",
+            backdropFilter: "blur(12px)",
+            paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => scrollToRegister()}
+            className="btn-emerald min-h-11 w-full cursor-pointer rounded-xl text-sm font-bold text-white"
+            aria-label={stickyAria}
+          >
+            {stickyLabel}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

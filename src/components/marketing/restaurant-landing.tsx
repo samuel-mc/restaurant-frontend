@@ -13,7 +13,7 @@ import {
   Search, ChevronDown, ChevronUp, Star, MapPin, Phone,
   Clock, Menu, X,
   MessageCircle,
-  ShoppingBag, Users, Award, Gift,
+  ShoppingBag, Package, Users, Award, Gift,
   Music, Coffee, Cake, BookOpen, Send, CheckCircle, ExternalLink,
 } from "lucide-react";
 import {
@@ -73,8 +73,8 @@ const FAQ_ITEMS = [
   { q: "¿Emiten facturas fiscales?", a: "Sí, emitimos facturas CFDI. Solicítala al momento del pago o a través de nuestro portal en línea con el folio de tu ticket dentro de los 30 días naturales." },
   { q: "¿Hay estacionamiento disponible?", a: "Contamos con valet parking cortesía para consumos mayores a $500. También hay estacionamiento público a media cuadra en Calle Florencia #45." },
   { q: "¿Se permiten mascotas?", a: "Sí aceptamos mascotas en nuestra terraza exterior. Contamos con bebederos y snacks para perros. Te pedimos que vengan con correa y vacunas al día." },
-  { q: "¿Tienen opciones vegetarianas y veganas?", a: "Más del 40% de nuestro menú es vegetariano o adaptable. Tenemos opciones veganas marcadas en el menú. Solo avisa al mesero y adaptamos cualquier platillo." },
-  { q: "¿Hacen eventos privados?", a: "Sí, tenemos un salón privado para hasta 40 personas con menú especial. Contáctanos por WhatsApp o email para cotizaciones y disponibilidad." },
+  { q: "¿Tienen opciones vegetarianas y veganas?", a: "Más del 40% de nuestra carta es vegetariano o adaptable. Tenemos opciones veganas marcadas en la carta. Solo avisa al mesero y adaptamos cualquier platillo." },
+  { q: "¿Hacen eventos privados?", a: "Sí, tenemos un salón privado para hasta 40 personas con carta especial. Contáctanos por WhatsApp o email para cotizaciones y disponibilidad." },
   { q: "¿Cuál es la política de cancelación?", a: "Las reservaciones pueden cancelarse hasta 2 horas antes sin cargo. Para grupos de 8+ personas pedimos 24 horas de anticipación." },
 ];
 
@@ -335,10 +335,7 @@ function pickFeaturedPromoIndex(now = new Date()): number {
 }
 
 function useFeaturedPromoIndex() {
-  const [index, setIndex] = useState(0);
-  useEffect(() => {
-    setIndex(pickFeaturedPromoIndex());
-  }, []);
+  const [index] = useState(pickFeaturedPromoIndex);
   return index;
 }
 // ─── Small components ────────────────────────────────────────────────────────
@@ -408,10 +405,10 @@ function Navbar() {
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const wasOpenRef = useRef(false);
 
-  // Decide-tonight: ≤4 destinations + one CTA (Reservar / Ordenar).
+  // Decide-tonight: ≤4 destinations + one CTA (Reservar / Ver carta).
   const links = useMemo(() => {
     const items: { label: string; id: string }[] = [
-      { label: "Menú", id: "menu" },
+      { label: "Carta", id: "carta" },
       ...(brand.orderingEnabled !== false
         ? [{ label: "Cómo pedir", id: "como-pedir" }]
         : []),
@@ -561,12 +558,13 @@ function Navbar() {
             Reservar mesa
           </button>
         ) : (
-          <Link
-            href="/menu"
+          <button
+            type="button"
+            onClick={() => scrollTo("carta")}
             className={`hidden lg:inline-flex items-center gap-2 px-5 py-2.5 ${BTN_ACCENT}`}
           >
-            {brand.orderingEnabled !== false ? "Ordenar" : "Ver menú"}
-          </Link>
+            Ver carta
+          </button>
         )}
         <button
           ref={menuBtnRef}
@@ -611,13 +609,13 @@ function Navbar() {
                 Reservar mesa
               </button>
             ) : (
-              <Link
-                href="/menu"
+              <button
+                type="button"
+                onClick={() => scrollTo("carta")}
                 className={`mt-3 flex w-full items-center justify-center py-3.5 ${BTN_ACCENT}`}
-                onClick={() => setOpen(false)}
               >
-                {brand.orderingEnabled !== false ? "Ordenar" : "Ver menú"}
-              </Link>
+                Ver carta
+              </button>
             )}
           </div>
         </div>
@@ -637,18 +635,12 @@ function Hero() {
     brand.description?.trim() ||
     "Ingredientes frescos, recetas de la casa y un servicio que te hará sentir como en casa.";
 
-  const secondary =
-    brand.orderingEnabled !== false
-      ? { label: "Ordenar", href: "/menu" as const }
-      : brand.hasReservations
-        ? { label: "Reservar mesa", id: "reservaciones" as const }
-        : { label: "Cómo llegar", id: "ubicacion" as const };
+  const secondary = brand.hasReservations
+    ? { label: "Reservar mesa", id: "reservaciones" as const }
+    : { label: "Cómo llegar", id: "ubicacion" as const };
 
-  const ctas: Array<
-    | { label: string; primary: boolean; href: string }
-    | { label: string; primary: boolean; id: string }
-  > = [
-    { label: "Ver menú", id: "menu", primary: true },
+  const ctas: Array<{ label: string; primary: boolean; id: string }> = [
+    { label: "Ver carta", id: "carta", primary: true },
     { ...secondary, primary: false },
   ];
 
@@ -686,13 +678,6 @@ function Hero() {
                 ? BTN_ACCENT
                 : "font-nunito-sans text-xs tracking-widest uppercase rounded-sm border border-white/25 text-white/90 hover:border-white/50 hover:bg-white/5 transition-colors duration-200 motion-reduce:transition-none min-h-11"
             }`;
-            if ("href" in btn) {
-              return (
-                <Link key={btn.label} href={btn.href} className={className}>
-                  {btn.label}
-                </Link>
-              );
-            }
             return (
               <button
                 key={btn.label}
@@ -708,9 +693,9 @@ function Hero() {
       </div>
       <button
         type="button"
-        onClick={() => scrollToId("menu")}
+        onClick={() => scrollToId("carta")}
         className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 text-white/30 hover:text-white/55 transition-colors size-11 inline-flex items-center justify-center"
-        aria-label="Ir al menú"
+        aria-label="Ir a la carta"
       >
         <ChevronDown size={24} />
       </button>
@@ -718,13 +703,12 @@ function Hero() {
   );
 }
 
-// ─── Menu ────────────────────────────────────────────────────────────────────
+// ─── Carta ───────────────────────────────────────────────────────────────────
 
 const MENU_INITIAL_VISIBLE = 10;
 const MENU_LOAD_MORE_STEP = 20;
 
 function DigitalMenu() {
-  const brand = useBrand();
   const products = useCatalog();
   const [categoryId, setCategoryId] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
@@ -770,7 +754,7 @@ function DigitalMenu() {
   };
 
   return (
-    <section id="menu" className={`${SECTION_Y} bg-background`}>
+    <section id="carta" className={`${SECTION_Y} bg-background`}>
       <div className={SHELL}>
         <SectionHeader
           eyebrow="Carta"
@@ -912,15 +896,6 @@ function DigitalMenu() {
                         {item.description}
                       </p>
                     ) : null}
-                    <Link
-                      href="/menu"
-                      className="mt-4 inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
-                    >
-                      <ShoppingBag size={14} aria-hidden />{" "}
-                      {brand.orderingEnabled !== false
-                        ? "Ordenar"
-                        : "Ver menú"}
-                    </Link>
                   </div>
                 </div>
               ))}
@@ -937,24 +912,8 @@ function DigitalMenu() {
                 >
                   Ver {nextBatch} más
                 </button>
-                <Link
-                  href="/menu"
-                  className="font-nunito-sans text-xs tracking-widest uppercase text-accent hover:underline"
-                >
-                  Ver menú completo
-                </Link>
               </div>
-            ) : (
-              <div className="mt-10 text-center">
-                <Link
-                  href="/menu"
-                  className={`inline-flex items-center gap-2 px-8 py-3.5 ${BTN_PRIMARY}`}
-                >
-                  <ShoppingBag size={14} aria-hidden />{" "}
-                  {brand.orderingEnabled !== false ? "Ordenar" : "Ver menú"}
-                </Link>
-              </div>
-            )}
+            ) : null}
           </>
         )}
       </div>
@@ -1002,10 +961,10 @@ function Destacados() {
         <div className="mt-10 text-center">
           <button
             type="button"
-            onClick={() => scrollToId("menu")}
+            onClick={() => scrollToId("carta")}
             className={`inline-flex items-center gap-2 px-8 py-3.5 ${BTN_PRIMARY}`}
           >
-            Volver al menú
+            Ver carta
           </button>
         </div>
       </div>
@@ -1180,15 +1139,29 @@ function ComoPedir() {
           },
         ]
       : []),
+    ...(brand.hasPickup
+      ? [
+          {
+            name: "Pick up",
+            desc: "Pide para llevar y recoge en el local",
+            color: "bg-white/5 border border-white/15",
+            hov: "hover:bg-white/10",
+            icon: <Package size={24} />,
+            scrollId: "ubicacion" as const,
+            external: false,
+            primary: false,
+          },
+        ]
+      : []),
     {
-      name: canOrder ? "Ordenar" : "Ver menú",
+      name: "Ver carta",
       desc: canOrder
-        ? "Abre la carta digital y arma tu pedido"
+        ? "Consulta la carta y arma tu pedido"
         : "Consulta la carta completa",
       color: "bg-white/5 border border-white/15",
       hov: "hover:bg-white/10",
       icon: <ShoppingBag size={24} />,
-      link: "/menu",
+      scrollId: "carta" as const,
       external: false,
       primary: false,
     },
@@ -1200,51 +1173,75 @@ function ComoPedir() {
       : "Arma tu pedido en la carta. Queda listo cuando el restaurante lo confirma — no es un envío automático."
     : "Por ahora la carta es solo consulta. Si necesitas algo, escríbenos en Ubicación.";
 
+  const subtitle = !canOrder
+    ? "Explora la carta. Por ahora es solo consulta."
+    : brand.hasPickup && brand.hasDelivery
+      ? "Elige el canal: WhatsApp, Pick up o la carta (para llevar o a domicilio según disponibilidad)."
+      : brand.hasPickup
+        ? "Elige el canal: WhatsApp, Pick up o consulta la carta para armar tu pedido."
+        : brand.hasDelivery
+          ? "Elige el canal: WhatsApp o la carta digital (mesa o a domicilio según disponibilidad)."
+          : "Elige el canal: WhatsApp o la carta digital desde la mesa.";
+
   return (
     <section id="como-pedir" className={`${SECTION_Y} bg-primary`}>
       <div className={SHELL_NARROW}>
         <SectionHeader
           eyebrow={eyebrow}
           title="Cómo pedir"
-          subtitle={
-            canOrder
-              ? brand.hasDelivery || brand.hasPickup
-                ? "Elige el canal: WhatsApp o la carta digital (mesa, para llevar o a domicilio según disponibilidad)."
-                : "Elige el canal: WhatsApp o la carta digital desde la mesa."
-              : "Explora la carta. Por ahora es solo consulta."
-          }
+          subtitle={subtitle}
           light
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">
-          {platforms.map((p) => (
-            <a
-              key={p.name}
-              href={p.link}
-              {...(p.external
-                ? { target: "_blank", rel: "noopener noreferrer" }
-                : {})}
-              className={`${p.color} ${p.hov} text-white p-5 rounded-sm flex items-center gap-4 transition-[filter,background-color] duration-200 motion-reduce:transition-none group min-h-11`}
-            >
-              <div className="shrink-0 w-11 h-11 bg-white/10 rounded-sm flex items-center justify-center">
-                {p.icon}
-              </div>
-              <div className="min-w-0">
-                <div className="font-playfair-display text-lg font-semibold">
-                  {p.name}
+          {platforms.map((p) => {
+            const className = `${p.color} ${p.hov} text-white p-5 rounded-sm flex items-center gap-4 transition-[filter,background-color] duration-200 motion-reduce:transition-none group min-h-11 w-full text-left`;
+            const body = (
+              <>
+                <div className="shrink-0 w-11 h-11 bg-white/10 rounded-sm flex items-center justify-center">
+                  {p.icon}
                 </div>
-                <div className="font-nunito-sans text-xs text-white/65 mt-0.5">
-                  {p.desc}
+                <div className="min-w-0">
+                  <div className="font-playfair-display text-lg font-semibold">
+                    {p.name}
+                  </div>
+                  <div className="font-nunito-sans text-xs text-white/65 mt-0.5">
+                    {p.desc}
+                  </div>
                 </div>
-              </div>
-              <ExternalLink
-                size={14}
-                className={`ml-auto shrink-0 text-white/35 ${
-                  p.external ? "" : "invisible"
-                }`}
-                aria-hidden
-              />
-            </a>
-          ))}
+                <ExternalLink
+                  size={14}
+                  className={`ml-auto shrink-0 text-white/35 ${
+                    p.external ? "" : "invisible"
+                  }`}
+                  aria-hidden
+                />
+              </>
+            );
+            if ("scrollId" in p && p.scrollId) {
+              return (
+                <button
+                  key={p.name}
+                  type="button"
+                  onClick={() => scrollToId(p.scrollId)}
+                  className={className}
+                >
+                  {body}
+                </button>
+              );
+            }
+            return (
+              <a
+                key={p.name}
+                href={"link" in p ? p.link : undefined}
+                {...(p.external
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
+                className={className}
+              >
+                {body}
+              </a>
+            );
+          })}
         </div>
         <p className="mt-6 max-w-xl mx-auto text-center font-nunito-sans text-sm text-white/70 leading-relaxed">
           {reassurance}
@@ -2045,7 +2042,6 @@ function VisitCtaCluster({
   className?: string;
 }) {
   const brand = useBrand();
-  const canOrder = brand.orderingEnabled !== false;
   const onDark = tone === "dark";
   const fill = onDark
     ? `px-6 py-3 w-full sm:w-auto inline-flex items-center justify-center ${BTN_ACCENT}`
@@ -2053,7 +2049,7 @@ function VisitCtaCluster({
   const outline = onDark
     ? "font-nunito-sans text-xs tracking-widest uppercase rounded-sm border border-white/30 text-white/90 hover:border-white/50 hover:bg-white/8 transition-colors motion-reduce:transition-none min-h-11 px-6 py-3 w-full sm:w-auto inline-flex items-center justify-center"
     : "font-nunito-sans text-xs tracking-widest uppercase rounded-sm border border-border text-foreground hover:bg-muted/60 transition-colors motion-reduce:transition-none min-h-11 px-6 py-3 w-full sm:w-auto inline-flex items-center justify-center";
-  const secondary = brand.hasReservations || !canOrder ? outline : fill;
+  const secondary = brand.hasReservations ? outline : fill;
 
   return (
     <div
@@ -2068,22 +2064,13 @@ function VisitCtaCluster({
           Reservar mesa
         </button>
       ) : null}
-      {canOrder ? (
-        <Link
-          href="/menu"
-          className={brand.hasReservations ? secondary : fill}
-        >
-          Ordenar
-        </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={() => scrollToId("menu")}
-          className={brand.hasReservations ? secondary : fill}
-        >
-          Ver menú
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => scrollToId("carta")}
+        className={brand.hasReservations ? secondary : fill}
+      >
+        Ver carta
+      </button>
       {!compact ? (
         <button
           type="button"
@@ -2253,7 +2240,7 @@ function ExtrasSection() {
               {
                 icon: <Star size={24} />,
                 title: "Beneficios VIP",
-                desc: "Acceso anticipado a eventos y menús especiales.",
+                desc: "Acceso anticipado a eventos y cartas especiales.",
               },
             ].map((item) => (
               <div key={item.title} className="px-2">
@@ -2431,7 +2418,7 @@ function Footer() {
             {brand.tagline ?? "Restaurante"}
           </p>
           <p className="font-nunito-sans text-xs leading-relaxed max-w-xs">
-            El sitio oficial de {brand.name}. Menú, reservaciones y experiencia
+            El sitio oficial de {brand.name}. Carta, reservaciones y experiencia
             gastronómica.
           </p>
         </div>
@@ -2441,7 +2428,7 @@ function Footer() {
           </p>
           {(
             [
-              ["Menú", "menu"],
+              ["Carta", "carta"],
               ...(brand.orderingEnabled !== false
                 ? ([["Cómo pedir", "como-pedir"]] as const)
                 : []),

@@ -8,7 +8,7 @@ import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 import { ApiError } from "@/services/apiClient";
 
 export const metadata: Metadata = {
-  title: "Códigos QR",
+  title: "Códigos QR · Panel",
   description: "Genera e imprime códigos QR del menú y mesas.",
 };
 
@@ -20,8 +20,10 @@ export default async function AdminQrPage() {
   if (!tenantSlug) {
     return (
       <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
-        <h1 className="text-2xl font-bold">Tenant no identificado</h1>
-        <p className="text-sm text-foreground/60">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Tenant no identificado
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Abre el panel desde el subdominio de tu restaurante.
         </p>
       </div>

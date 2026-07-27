@@ -39,6 +39,23 @@ interface QrGeneratorProps {
   primaryColor?: string;
 }
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+
+const MODE_OPTIONS = [
+  { id: "general" as const, label: "Menú general", hint: "Sin mesa fija" },
+  {
+    id: "table" as const,
+    label: "Mesa específica",
+    hint: "Ancla ?m= en la URL",
+  },
+  {
+    id: "bulk" as const,
+    label: "Generación masiva",
+    hint: "Rango de mesas",
+  },
+];
+
 function slugifyId(value: string): string {
   return value
     .trim()
@@ -158,48 +175,32 @@ export function QrGenerator({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="print:hidden">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
-          {restaurantName}
-        </p>
-        <h1 className="mt-1 flex items-center gap-2 text-2xl font-black tracking-tight sm:text-3xl">
-          <QrCode className="size-7 shrink-0" aria-hidden />
-          Códigos QR
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-black/55 dark:text-white/55">
-          Genera tarjetas para el menú general o mesas específicas. La URL
-          apunta a{" "}
-          <span className="font-semibold text-foreground">
-            {tenantSlug}.{rootDomain}/menu
-          </span>
-          .
-        </p>
+    <div className="font-jakarta-sans">
+      <header className="border-b border-border px-4 py-5 print:hidden md:px-6">
+        <div className="mx-auto w-full max-w-6xl">
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+            <QrCode className="size-6 shrink-0" aria-hidden />
+            Códigos QR
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Tarjetas para menú general o mesas. La URL apunta a{" "}
+            <span className="font-semibold text-foreground">
+              {tenantSlug}.{rootDomain}/menu
+            </span>
+            .
+          </p>
+        </div>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] print:hidden">
-        <section className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-neutral-900">
-          <h2 className="text-sm font-extrabold tracking-tight">Tipo de QR</h2>
+      <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-5 print:hidden md:gap-8 md:px-6 md:py-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="text-sm font-bold tracking-tight">Tipo de QR</h2>
           <div
             role="tablist"
             aria-label="Tipo de código QR"
             className="mt-3 flex flex-col gap-2"
           >
-            {(
-              [
-                { id: "general", label: "Menú General", hint: "Sin mesa fija" },
-                {
-                  id: "table",
-                  label: "Mesa Específica",
-                  hint: "Ancla ?m= en la URL",
-                },
-                {
-                  id: "bulk",
-                  label: "Generación Masiva",
-                  hint: "Rango de mesas",
-                },
-              ] as const
-            ).map((item) => {
+            {MODE_OPTIONS.map((item) => {
               const active = mode === item.id;
               return (
                 <button
@@ -208,18 +209,20 @@ export function QrGenerator({
                   role="tab"
                   aria-selected={active}
                   onClick={() => setMode(item.id)}
-                  className={`rounded-2xl px-4 py-3 text-left transition-colors ${
+                  className={`min-h-11 rounded-xl px-4 py-3 text-left transition-colors ${focusRing} ${
                     active
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950"
-                      : "bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary/70 text-foreground hover:bg-secondary"
                   }`}
                 >
-                  <span className="block text-sm font-bold">{item.label}</span>
+                  <span className="block text-sm font-semibold">
+                    {item.label}
+                  </span>
                   <span
-                    className={`mt-0.5 block text-[11px] font-medium ${
+                    className={`mt-0.5 block text-xs font-medium ${
                       active
-                        ? "text-white/70 dark:text-neutral-600"
-                        : "text-black/45 dark:text-white/45"
+                        ? "text-primary-foreground/70"
+                        : "text-muted-foreground"
                     }`}
                   >
                     {item.hint}
@@ -231,11 +234,11 @@ export function QrGenerator({
 
           {mode === "table" ? (
             <div className="mt-5">
-              <span className="text-xs font-bold uppercase tracking-wide text-black/45 dark:text-white/45">
+              <span className="text-xs font-semibold text-muted-foreground">
                 Número de mesa
               </span>
-              <div className="mt-2 flex overflow-hidden rounded-2xl border border-black/10 bg-white dark:border-white/15 dark:bg-neutral-950">
-                <span className="flex items-center bg-black/[0.04] px-4 text-sm font-extrabold text-black/70 dark:bg-white/[0.06] dark:text-white/70">
+              <div className="mt-2 flex overflow-hidden rounded-xl border border-border bg-background">
+                <span className="flex items-center bg-secondary px-4 text-sm font-semibold text-muted-foreground">
                   Mesa
                 </span>
                 <input
@@ -249,10 +252,10 @@ export function QrGenerator({
                   }
                   placeholder="4"
                   aria-label="Número de mesa"
-                  className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm font-semibold outline-none ring-neutral-900 focus:ring-2"
+                  className={`min-w-0 flex-1 bg-transparent px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20 ${focusRing}`}
                 />
               </div>
-              <span className="mt-2 block truncate text-[11px] text-black/45 dark:text-white/45">
+              <span className="mt-2 block truncate text-xs text-muted-foreground">
                 URL: {preview?.menuUrl ?? "—"}
               </span>
             </div>
@@ -262,7 +265,7 @@ export function QrGenerator({
             <form onSubmit={onBulkSubmit} className="mt-5 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-xs font-bold uppercase tracking-wide text-black/45 dark:text-white/45">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     Desde mesa
                   </span>
                   <input
@@ -273,11 +276,11 @@ export function QrGenerator({
                     onChange={(e) =>
                       setBulkFrom(Math.max(1, Number(e.target.value) || 1))
                     }
-                    className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold outline-none ring-neutral-900 focus:ring-2 dark:border-white/15 dark:bg-neutral-950"
+                    className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
                   />
                 </label>
                 <label className="block">
-                  <span className="text-xs font-bold uppercase tracking-wide text-black/45 dark:text-white/45">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     Hasta mesa
                   </span>
                   <input
@@ -288,15 +291,15 @@ export function QrGenerator({
                     onChange={(e) =>
                       setBulkTo(Math.max(1, Number(e.target.value) || 1))
                     }
-                    className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold outline-none ring-neutral-900 focus:ring-2 dark:border-white/15 dark:bg-neutral-950"
+                    className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
                   />
                 </label>
               </div>
-              <p className="text-[11px] text-black/45 dark:text-white/45">
+              <p className="text-xs text-muted-foreground">
                 Se generarán {targets.length || 0} tarjetas (máx. 48 por lote).
               </p>
               {bulkTooLarge ? (
-                <p className="text-xs font-medium text-red-600 dark:text-red-300">
+                <p className="text-xs font-medium text-destructive" role="alert">
                   Reduce el rango a 48 mesas o menos.
                 </p>
               ) : null}
@@ -304,7 +307,7 @@ export function QrGenerator({
           ) : null}
 
           {mode === "general" && preview ? (
-            <p className="mt-5 break-all text-[11px] text-black/45 dark:text-white/45">
+            <p className="mt-5 break-all text-xs text-muted-foreground">
               URL: {preview.menuUrl}
             </p>
           ) : null}
@@ -314,7 +317,7 @@ export function QrGenerator({
               type="button"
               disabled={!preview || busy}
               onClick={() => void handleDownloadPng()}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-neutral-900 px-4 text-sm font-bold text-white disabled:opacity-50 dark:bg-white dark:text-neutral-950"
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 ${focusRing}`}
             >
               <Download className="size-4" aria-hidden />
               {busy ? "Generando…" : "Descargar PNG"}
@@ -323,15 +326,18 @@ export function QrGenerator({
               type="button"
               disabled={targets.length === 0 || bulkTooLarge}
               onClick={handlePrint}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50"
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 ${focusRing}`}
             >
               <Printer className="size-4" aria-hidden />
-              Imprimir Tarjetas / Exportar PDF
+              Imprimir / exportar PDF
             </button>
           </div>
 
           {error ? (
-            <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-300">
+            <p
+              role="alert"
+              className="mt-3 text-sm font-medium text-destructive"
+            >
               {error}
             </p>
           ) : null}
@@ -340,15 +346,13 @@ export function QrGenerator({
         <section>
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-sm font-extrabold tracking-tight">
-                Vista previa
-              </h2>
-              <p className="text-xs text-black/45 dark:text-white/45">
-                Simulación de acrílico de mesa · alta resolución
+              <h2 className="text-sm font-bold tracking-tight">Vista previa</h2>
+              <p className="text-xs text-muted-foreground">
+                Tarjeta de mesa · alta resolución
               </p>
             </div>
             {mode === "bulk" ? (
-              <p className="text-xs font-bold text-black/50 dark:text-white/50">
+              <p className="text-xs font-semibold text-muted-foreground">
                 {targets.length} tarjetas
               </p>
             ) : null}
@@ -356,7 +360,7 @@ export function QrGenerator({
 
           {preview ? (
             <div className="mx-auto w-full max-w-sm">
-              <div className="rounded-[2rem] bg-gradient-to-b from-neutral-200/80 to-neutral-100 p-6 dark:from-neutral-800 dark:to-neutral-900">
+              <div className="rounded-2xl bg-secondary p-6">
                 <QrCard
                   ref={previewRef}
                   cardId={`qr-preview-${preview.id}`}
@@ -369,7 +373,7 @@ export function QrGenerator({
               </div>
             </div>
           ) : (
-            <div className="rounded-3xl border border-dashed border-black/10 px-6 py-16 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+            <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
               Ajusta el identificador o el rango para ver la vista previa.
             </div>
           )}
@@ -379,7 +383,7 @@ export function QrGenerator({
               {targets.slice(0, 8).map((t) => (
                 <div
                   key={t.id}
-                  className="rounded-2xl border border-black/5 bg-white p-2 dark:border-white/10 dark:bg-neutral-950"
+                  className="rounded-xl border border-border bg-card p-2"
                 >
                   <QrCard
                     cardId={`qr-thumb-${t.id}`}
@@ -396,7 +400,7 @@ export function QrGenerator({
             </div>
           ) : null}
           {mode === "bulk" && targets.length > 8 ? (
-            <p className="mt-3 text-center text-xs text-black/45 dark:text-white/45">
+            <p className="mt-3 text-center text-xs text-muted-foreground">
               +{targets.length - 8} más en la hoja de impresión
             </p>
           ) : null}
@@ -409,7 +413,7 @@ export function QrGenerator({
         className="qr-print-sheet hidden print:block"
         aria-hidden
       >
-        <div className="mb-4 text-center text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+        <div className="mb-4 text-center text-xs font-semibold tracking-wide text-neutral-500">
           {restaurantName} · Códigos QR · {targets.length} tarjeta
           {targets.length === 1 ? "" : "s"} · Guías de corte
         </div>
@@ -426,7 +430,7 @@ export function QrGenerator({
                 qrSize={168}
                 className="shadow-none"
               />
-              <p className="mt-2 text-center text-[9px] text-neutral-400">
+              <p className="mt-2 text-center text-xs text-neutral-400">
                 {t.menuUrl}
               </p>
             </div>

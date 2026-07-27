@@ -76,6 +76,17 @@ function nextAction(status: OrderStatus): {
   }
 }
 
+function closeActionLabel(order: Order): string {
+  switch (order.orderType) {
+    case "PICKUP":
+      return "Cobrar / Entregar";
+    case "DELIVERY":
+      return "Cobrar / Despachar";
+    default:
+      return "Cobrar / Cerrar cuenta";
+  }
+}
+
 function groupByBatch(items: OrderItem[]): Array<{
   batch: number;
   items: OrderItem[];
@@ -297,16 +308,20 @@ export function OrderTicket({
         </button>
       ) : null}
 
-      {order.orderType === "IN_TABLE" ? (
+      {order.status === "DELIVERED" || order.orderType === "IN_TABLE" ? (
         <button
           type="button"
           disabled={isUpdating}
           onClick={() => onCloseAccount(order)}
-          className={`mt-2 min-h-11 w-full rounded-xl border border-border bg-transparent px-4 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-wait disabled:opacity-70 ${focusRing}`}
+          className={
+            order.status === "DELIVERED"
+              ? `min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-bold text-white transition-transform hover:bg-emerald-500 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 ${action ? "mt-2" : ""} ${focusRing}`
+              : `mt-2 min-h-11 w-full rounded-xl border border-border bg-transparent px-4 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-wait disabled:opacity-70 ${focusRing}`
+          }
         >
           {isUpdating && updatingItemId == null
             ? "Cerrando…"
-            : "Cobrar / Cerrar cuenta"}
+            : closeActionLabel(order)}
         </button>
       ) : null}
     </article>

@@ -42,7 +42,7 @@ export const QrCard = forwardRef<HTMLDivElement, QrCardProps>(
         ref={ref}
         id={cardId}
         data-qr-card={cardId}
-        className={`qr-acrylic-card relative flex w-full flex-col items-center gap-4 overflow-visible rounded-[1.75rem] border border-black/10 bg-white px-5 pb-6 pt-5 text-neutral-950 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.45)] ${className}`}
+        className={`qr-acrylic-card relative flex w-full flex-col items-center gap-4 overflow-visible rounded-2xl border border-black/10 bg-white px-5 pb-6 pt-5 text-neutral-950 shadow-[0_18px_40px_rgba(0,0,0,0.12)] ${className}`}
         style={{ ["--qr-brand" as string]: primaryColor }}
       >
         {/* Guías de corte (solo impresión) */}
@@ -74,20 +74,20 @@ export const QrCard = forwardRef<HTMLDivElement, QrCardProps>(
             />
           ) : (
             <div
-              className="flex size-11 items-center justify-center rounded-2xl text-lg font-black text-white"
+              className="flex size-11 items-center justify-center rounded-xl text-lg font-bold text-white"
               style={{ backgroundColor: primaryColor }}
               aria-hidden
             >
               {restaurantName.charAt(0).toUpperCase()}
             </div>
           )}
-          <p className="max-w-full truncate text-center text-sm font-extrabold tracking-tight">
+          <p className="max-w-full truncate text-center text-sm font-bold tracking-tight">
             {restaurantName}
           </p>
         </header>
 
         <div className="flex shrink-0 items-center justify-center">
-          <div className="rounded-2xl bg-white p-2 ring-1 ring-black/5">
+          <div className="rounded-xl bg-white p-2 ring-1 ring-black/5">
             <QRCodeSVG
               value={menuUrl}
               size={qrSize}
@@ -102,12 +102,12 @@ export const QrCard = forwardRef<HTMLDivElement, QrCardProps>(
 
         <footer className="flex w-full shrink-0 flex-col items-center gap-1.5 text-center">
           <p
-            className="text-xl font-black tracking-tight"
+            className="text-xl font-bold tracking-tight"
             style={{ color: primaryColor }}
           >
             {headline}
           </p>
-          <p className="max-w-[15rem] text-[11px] font-medium leading-snug text-neutral-500">
+          <p className="max-w-[15rem] text-xs font-medium leading-snug text-neutral-500">
             Escanea con la cámara de tu celular para ver el menú y ordenar
           </p>
         </footer>

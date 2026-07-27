@@ -21,9 +21,9 @@ const PAGE_SIZE = 20;
 
 const FILTERS: Array<{ id: AdminOrderListFilter; label: string }> = [
   { id: "ALL", label: "Todas" },
-  { id: "OPEN", label: "Abiertas / En Mesa" },
-  { id: "CLOSED", label: "Cerradas / Pagadas" },
-  { id: "PICKUP", label: "Para Llevar" },
+  { id: "OPEN", label: "Abiertas" },
+  { id: "CLOSED", label: "Cerradas" },
+  { id: "PICKUP", label: "Para llevar" },
 ];
 
 const OPEN_STATUSES = new Set([
@@ -32,6 +32,9 @@ const OPEN_STATUSES = new Set([
   "IN_KITCHEN",
   "DELIVERED",
 ]);
+
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 interface OrdersBoardProps {
   tenantSlug: string;
@@ -48,14 +51,16 @@ function orderDisplayCode(order: Order): string {
 function orderTitle(order: Order): string {
   const code = `#${orderDisplayCode(order)}`;
   if (order.orderType === "IN_TABLE") {
-    return order.tableNumber ? `${code} · Mesa ${order.tableNumber}` : `${code} · En mesa`;
+    return order.tableNumber
+      ? `${code} · Mesa ${order.tableNumber}`
+      : `${code} · En mesa`;
   }
   if (order.orderType === "PICKUP") {
     const who = order.customerName?.trim() || "Cliente";
     const phone = order.customerPhone?.trim();
     return phone
-      ? `${code} · 🛍️ PICKUP · ${who} · ${phone}`
-      : `${code} · 🛍️ PICKUP · ${who}`;
+      ? `${code} · Pickup · ${who} · ${phone}`
+      : `${code} · Pickup · ${who}`;
   }
   if (order.orderType === "DELIVERY") return `${code} · Delivery`;
   return code;
@@ -84,31 +89,43 @@ function formatDateTime(iso: string | null | undefined): string {
 }
 
 function badgeMeta(order: Order): { label: string; className: string } {
-  if (order.status === "CLOSED") {
-    return {
-      label: "CLOSED",
-      className:
-        "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-100",
-    };
+  switch (order.status) {
+    case "CLOSED":
+      return {
+        label: "Cerrada",
+        className: "bg-secondary text-muted-foreground",
+      };
+    case "CANCELLED":
+      return {
+        label: "Cancelada",
+        className: "bg-destructive/10 text-destructive",
+      };
+    case "PENDING":
+      return {
+        label: "Recibido",
+        className: "bg-amber-500/15 text-amber-900 dark:text-amber-200",
+      };
+    case "ACCEPTED":
+      return {
+        label: "Aceptado",
+        className: "bg-secondary text-foreground",
+      };
+    case "IN_KITCHEN":
+      return {
+        label: "En cocina",
+        className: "bg-amber-500/20 text-amber-950 dark:text-amber-100",
+      };
+    case "DELIVERED":
+      return {
+        label: "Por cobrar",
+        className: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-200",
+      };
+    default:
+      return {
+        label: "Abierta",
+        className: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-200",
+      };
   }
-  if (order.status === "IN_KITCHEN") {
-    return {
-      label: "IN_KITCHEN",
-      className:
-        "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200",
-    };
-  }
-  if (order.status === "CANCELLED") {
-    return {
-      label: "CANCELLED",
-      className: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
-    };
-  }
-  return {
-    label: "OPEN",
-    className:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200",
-  };
 }
 
 function groupByBatch(items: OrderItem[]): Array<{ batch: number; items: OrderItem[] }> {
@@ -160,7 +177,6 @@ function canClose(order: Order): boolean {
 
 export function OrdersBoard({
   tenantSlug,
-  restaurantName,
   initialPage,
   initialFilter,
 }: OrdersBoardProps) {
@@ -291,239 +307,254 @@ export function OrdersBoard({
   }, [connection]);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
-            {restaurantName}
-          </p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-            Pedidos / Cuentas
-          </h1>
-          <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-            Control de mesas, tickets y cobro. {connectionLabel}.
-          </p>
+    <div className="font-jakarta-sans">
+      <header className="border-b border-border px-4 py-5 md:px-6">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight">Pedidos</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Mesas, tickets y cobro · {connectionLabel}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refresh(filter, pageIndex)}
+            disabled={loading}
+            className={`inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 ${focusRing}`}
+          >
+            {loading ? "Actualizando…" : "Actualizar"}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => void refresh(filter, pageIndex)}
-          disabled={loading}
-          className="inline-flex h-10 items-center justify-center rounded-xl bg-neutral-900 px-4 text-sm font-bold text-white disabled:opacity-50 dark:bg-white dark:text-neutral-950"
-        >
-          {loading ? "Actualizando…" : "Actualizar"}
-        </button>
       </header>
 
-      <div
-        role="tablist"
-        aria-label="Filtros de pedidos"
-        className="flex flex-wrap gap-2"
-      >
-        {FILTERS.map((item) => {
-          const active = filter === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => {
-                setFilter(item.id);
-                setPageIndex(0);
-              }}
-              className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
-                active
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950"
-                  : "bg-white text-neutral-700 ring-1 ring-black/10 hover:bg-black/[0.03] dark:bg-neutral-900 dark:text-neutral-200 dark:ring-white/10"
-              }`}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {banner ? (
-        <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-100">
-          {banner}
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 md:gap-6 md:px-6 md:py-6">
+        <div
+          role="tablist"
+          aria-label="Filtros de pedidos"
+          className="flex flex-wrap gap-2"
+        >
+          {FILTERS.map((item) => {
+            const active = filter === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => {
+                  setFilter(item.id);
+                  setPageIndex(0);
+                }}
+                className={`min-h-10 rounded-xl px-3.5 text-sm font-semibold transition-colors ${focusRing} ${
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border bg-card text-foreground hover:bg-secondary"
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </div>
-      ) : null}
 
-      {error ? (
-        <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-800 dark:bg-red-500/15 dark:text-red-200">
-          {error}
-        </div>
-      ) : null}
+        {banner ? (
+          <div
+            role="status"
+            className="rounded-xl border border-emerald-500/25 bg-emerald-500/15 px-4 py-3 text-sm font-medium text-emerald-900 dark:text-emerald-100"
+          >
+            {banner}
+          </div>
+        ) : null}
 
-      {page.empty ? (
-        <div className="rounded-3xl border border-dashed border-black/10 bg-white px-6 py-16 text-center dark:border-white/10 dark:bg-neutral-900">
-          <Receipt className="mx-auto size-10 text-black/25 dark:text-white/25" />
-          <p className="mt-3 text-base font-bold">Sin pedidos en este filtro</p>
-          <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-            Cuando lleguen comandas aparecerán aquí automáticamente.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="hidden overflow-hidden rounded-3xl border border-black/5 bg-white shadow-sm md:block dark:border-white/10 dark:bg-neutral-900">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-black/5 bg-neutral-50 text-xs font-bold uppercase tracking-wide text-black/45 dark:border-white/10 dark:bg-neutral-950 dark:text-white/45">
-                <tr>
-                  <th className="px-4 py-3">Orden</th>
-                  <th className="px-4 py-3">Horarios</th>
-                  <th className="px-4 py-3">Ítems</th>
-                  <th className="px-4 py-3">Total</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {page.content.map((order) => {
-                  const badge = badgeMeta(order);
-                  return (
-                    <tr
-                      key={order.uuid}
-                      className="border-b border-black/5 last:border-0 dark:border-white/10"
-                    >
-                      <td className="px-4 py-4 align-top">
-                        <p className="font-extrabold tracking-tight">
-                          {orderTitle(order)}
-                        </p>
-                        <p className="mt-0.5 text-xs text-black/45 dark:text-white/45">
-                          {order.customerName}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4 align-top text-xs text-black/60 dark:text-white/60">
-                        <p>Inicio {formatClock(order.createdAt)}</p>
-                        <p className="mt-1">
-                          Act. {formatClock(order.updatedAt ?? order.createdAt)}
-                        </p>
-                      </td>
-                      <td className="max-w-xs px-4 py-4 align-top text-xs leading-relaxed text-black/65 dark:text-white/65">
-                        {summarizeItems(order)}
-                      </td>
-                      <td className="px-4 py-4 align-top font-bold">
-                        {order.formattedTotal}
-                      </td>
-                      <td className="px-4 py-4 align-top">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${badge.className}`}
-                        >
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 align-top">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setDetailOrder(order)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-black/[0.04] px-3 py-2 text-xs font-bold dark:bg-white/[0.08]"
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-xl bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
+
+        {page.empty ? (
+          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+            <Receipt
+              className="mx-auto size-10 text-muted-foreground"
+              aria-hidden
+            />
+            <p className="mt-3 text-base font-bold tracking-tight">
+              Sin pedidos en este filtro
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cuando lleguen comandas aparecerán aquí automáticamente.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="border-b border-border bg-secondary/50 text-xs font-semibold text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Orden</th>
+                    <th className="px-4 py-3 font-semibold">Horarios</th>
+                    <th className="px-4 py-3 font-semibold">Ítems</th>
+                    <th className="px-4 py-3 font-semibold">Total</th>
+                    <th className="px-4 py-3 font-semibold">Estado</th>
+                    <th className="px-4 py-3 text-right font-semibold">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {page.content.map((order) => {
+                    const badge = badgeMeta(order);
+                    return (
+                      <tr
+                        key={order.uuid}
+                        className="border-b border-border last:border-0"
+                      >
+                        <td className="px-4 py-4 align-top">
+                          <p className="font-bold tracking-tight">
+                            {orderTitle(order)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {order.customerName}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4 align-top text-xs text-muted-foreground">
+                          <p>Inicio {formatClock(order.createdAt)}</p>
+                          <p className="mt-1">
+                            Act.{" "}
+                            {formatClock(order.updatedAt ?? order.createdAt)}
+                          </p>
+                        </td>
+                        <td className="max-w-xs px-4 py-4 align-top text-xs leading-relaxed text-muted-foreground">
+                          {summarizeItems(order)}
+                        </td>
+                        <td className="px-4 py-4 align-top font-semibold tabular-nums">
+                          {order.formattedTotal}
+                        </td>
+                        <td className="px-4 py-4 align-top">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}
                           >
-                            <Eye className="size-3.5" aria-hidden />
-                            Ver detalle
-                          </button>
-                          {canClose(order) ? (
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 align-top">
+                          <div className="flex flex-wrap justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => setCloseTarget(order)}
-                              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-emerald-600/25"
+                              onClick={() => setDetailOrder(order)}
+                              className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-secondary px-3 text-xs font-semibold hover:bg-secondary/80 ${focusRing}`}
                             >
-                              Cobrar y Cerrar
+                              <Eye className="size-3.5" aria-hidden />
+                              Ver detalle
                             </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            {canClose(order) ? (
+                              <button
+                                type="button"
+                                onClick={() => setCloseTarget(order)}
+                                className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-500 ${focusRing}`}
+                              >
+                                Cobrar y cerrar
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-          <ul className="grid gap-3 md:hidden">
-            {page.content.map((order) => {
-              const badge = badgeMeta(order);
-              return (
-                <li
-                  key={order.uuid}
-                  className="rounded-3xl border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-neutral-900"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-extrabold tracking-tight">
-                        {orderTitle(order)}
-                      </p>
-                      <p className="mt-0.5 text-xs text-black/45 dark:text-white/45">
-                        {order.customerName}
-                      </p>
-                    </div>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.className}`}
-                    >
-                      {badge.label}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-xs text-black/55 dark:text-white/55">
-                    Inicio {formatClock(order.createdAt)} · Act.{" "}
-                    {formatClock(order.updatedAt ?? order.createdAt)}
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-black/70 dark:text-white/70">
-                    {summarizeItems(order)}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <p className="text-lg font-black">{order.formattedTotal}</p>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setDetailOrder(order)}
-                        className="rounded-xl bg-black/[0.04] px-3 py-2 text-xs font-bold dark:bg-white/[0.08]"
+            <ul className="grid gap-3 md:hidden">
+              {page.content.map((order) => {
+                const badge = badgeMeta(order);
+                return (
+                  <li
+                    key={order.uuid}
+                    className="rounded-2xl border border-border bg-card p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-bold tracking-tight">
+                          {orderTitle(order)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {order.customerName}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}
                       >
-                        Ver detalle
-                      </button>
-                      {canClose(order) ? (
+                        {badge.label}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Inicio {formatClock(order.createdAt)} · Act.{" "}
+                      {formatClock(order.updatedAt ?? order.createdAt)}
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+                      {summarizeItems(order)}
+                    </p>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <p className="text-lg font-bold tabular-nums">
+                        {order.formattedTotal}
+                      </p>
+                      <div className="flex flex-wrap justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => setCloseTarget(order)}
-                          className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
+                          onClick={() => setDetailOrder(order)}
+                          className={`min-h-9 rounded-xl bg-secondary px-3 text-xs font-semibold ${focusRing}`}
                         >
-                          Cobrar y Cerrar
+                          Ver detalle
                         </button>
-                      ) : null}
+                        {canClose(order) ? (
+                          <button
+                            type="button"
+                            onClick={() => setCloseTarget(order)}
+                            className={`min-h-9 rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white ${focusRing}`}
+                          >
+                            Cobrar y cerrar
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
 
-      {!page.empty && page.totalPages > 1 ? (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-black/50 dark:text-white/50">
-            Página {page.number + 1} de {page.totalPages} · {page.totalElements}{" "}
-            pedidos
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page.first || loading}
-              onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-              className="rounded-xl bg-white px-3 py-2 text-xs font-bold ring-1 ring-black/10 disabled:opacity-40 dark:bg-neutral-900 dark:ring-white/10"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              disabled={page.last || loading}
-              onClick={() => setPageIndex((p) => p + 1)}
-              className="rounded-xl bg-white px-3 py-2 text-xs font-bold ring-1 ring-black/10 disabled:opacity-40 dark:bg-neutral-900 dark:ring-white/10"
-            >
-              Siguiente
-            </button>
+        {!page.empty && page.totalPages > 1 ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Página {page.number + 1} de {page.totalPages} ·{" "}
+              {page.totalElements} pedidos
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page.first || loading}
+                onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                className={`min-h-9 rounded-xl border border-border bg-card px-3 text-xs font-semibold disabled:opacity-40 ${focusRing}`}
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={page.last || loading}
+                onClick={() => setPageIndex((p) => p + 1)}
+                className={`min-h-9 rounded-xl border border-border bg-card px-3 text-xs font-semibold disabled:opacity-40 ${focusRing}`}
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {detailOrder ? (
         <OrderDetailModal
@@ -544,7 +575,7 @@ export function OrdersBoard({
             ? `Se marcará ${orderTitle(closeTarget)} como pagada (${closeTarget.formattedTotal}) y se liberará la mesa.`
             : ""
         }
-        confirmLabel={closing ? "Cerrando…" : "Cobrar y Cerrar"}
+        confirmLabel={closing ? "Cerrando…" : "Cobrar y cerrar"}
         cancelLabel="Cancelar"
         busy={closing}
         tone="neutral"
@@ -583,17 +614,17 @@ function OrderDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl dark:bg-neutral-900"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-card shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-black/5 px-5 py-4 dark:border-white/10">
+        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="truncate text-lg font-extrabold">
+            <h2 id={titleId} className="truncate text-lg font-bold tracking-tight">
               Ticket {orderTitle(order)}
             </h2>
-            <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+            <p className="mt-1 text-xs text-muted-foreground">
               {formatDateTime(order.createdAt)} ·{" "}
               <span
-                className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.className}`}
+                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge.className}`}
               >
                 {badge.label}
               </span>
@@ -602,7 +633,7 @@ function OrderDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10"
+            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary ${focusRing}`}
             aria-label="Cerrar detalle"
           >
             <X className="size-4" aria-hidden />
@@ -610,16 +641,19 @@ function OrderDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <p className="text-sm text-black/60 dark:text-white/60">
-            Cliente: <span className="font-semibold text-foreground">{order.customerName}</span>
+          <p className="text-sm text-muted-foreground">
+            Cliente:{" "}
+            <span className="font-semibold text-foreground">
+              {order.customerName}
+            </span>
           </p>
           {rounds.length === 0 ? (
-            <p className="mt-6 text-sm text-black/50">Sin consumos.</p>
+            <p className="mt-6 text-sm text-muted-foreground">Sin consumos.</p>
           ) : (
             <div className="mt-4 space-y-5">
               {rounds.map(({ batch, items }) => (
                 <section key={batch}>
-                  <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
+                  <h3 className="text-xs font-semibold text-muted-foreground">
                     Ronda {batch}
                   </h3>
                   <ul className="mt-2 space-y-2">
@@ -633,12 +667,12 @@ function OrderDetailModal({
                             {item.quantity}× {item.productName}
                           </p>
                           {item.notes ? (
-                            <p className="text-xs text-black/45 dark:text-white/45">
+                            <p className="text-xs text-muted-foreground">
                               {item.notes}
                             </p>
                           ) : null}
                         </div>
-                        <p className="shrink-0 font-bold">
+                        <p className="shrink-0 font-semibold tabular-nums">
                           {item.formattedSubtotal}
                         </p>
                       </li>
@@ -650,12 +684,10 @@ function OrderDetailModal({
           )}
         </div>
 
-        <div className="border-t border-black/5 px-5 py-4 dark:border-white/10">
+        <div className="border-t border-border px-5 py-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-black/50 dark:text-white/50">
-              Total
-            </p>
-            <p className="text-xl font-black">
+            <p className="text-sm font-medium text-muted-foreground">Total</p>
+            <p className="text-xl font-bold tabular-nums">
               {formatCurrency(order.totalAmount)}
             </p>
           </div>
@@ -663,7 +695,7 @@ function OrderDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-2xl bg-black/[0.04] px-4 py-3 text-sm font-bold dark:bg-white/[0.08]"
+              className={`flex min-h-11 flex-1 items-center justify-center rounded-xl bg-secondary px-4 text-sm font-semibold ${focusRing}`}
             >
               Cerrar
             </button>
@@ -671,9 +703,9 @@ function OrderDetailModal({
               <button
                 type="button"
                 onClick={onCloseAccount}
-                className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white"
+                className={`flex min-h-11 flex-1 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-500 ${focusRing}`}
               >
-                Cobrar y Cerrar
+                Cobrar y cerrar
               </button>
             ) : null}
           </div>

@@ -243,8 +243,14 @@ export function KitchenDashboard({
     try {
       const updated = await closeOrder(order.uuid, tenantSlug);
       handleOrderEvent(updated);
+      const who =
+        order.orderType === "IN_TABLE"
+          ? `Mesa ${order.tableNumber ?? "—"}`
+          : order.orderType === "PICKUP"
+            ? order.customerName?.trim() || "Pickup"
+            : "Delivery";
       setBanner(
-        `Cuenta cerrada · Mesa ${order.tableNumber ?? "—"} · #${order.uuid.slice(0, 8).toUpperCase()}`,
+        `Cuenta cerrada · ${who} · #${order.uuid.slice(0, 8).toUpperCase()}`,
       );
       window.setTimeout(() => setBanner(null), 3_500);
     } catch (error) {

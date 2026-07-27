@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Barra flotante del carrito + sheet: lista → datos → confirmar.
+ * Barra flotante del carrito + sheet de un solo panel.
  *
  * - Con ?m= (QR): modo IN_TABLE, mesa bloqueada.
- * - Sin ?m=: exploración → PICKUP (nombre + teléfono; sin campo mesa).
+ * - Sin ?m=: exploración → PICKUP / Delivery.
  */
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
 import { formatTableLabel } from "@/lib/table-session";
@@ -36,10 +36,13 @@ interface CartBarProps {
   isEditingTable?: boolean;
   draftTable?: string;
   tableEditError?: string | null;
+  /** Mesa elegida pendiente de confirmar (cuenta abierta). */
+  pendingTableChange?: string | null;
   onDraftTableChange?: (value: string) => void;
   onChangeTable?: () => void;
   onConfirmTableEdit?: () => void;
   onCancelTableEdit?: () => void;
+  onCancelPendingTableChange?: () => void;
 }
 
 type OrderTypeOption = {
@@ -71,7 +74,7 @@ function resolveOrderTypes(
     options.push({ value: "PICKUP", label: "Para llevar" });
   }
   if (modules?.hasDelivery) {
-    options.push({ value: "DELIVERY", label: "Delivery" });
+    options.push({ value: "DELIVERY", label: "A domicilio" });
   }
   if (options.length === 0) {
     options.push({ value: "IN_TABLE", label: "En mesa" });
@@ -86,13 +89,16 @@ export function CartBar({
   isEditingTable = false,
   draftTable = "",
   tableEditError = null,
+  pendingTableChange = null,
   onDraftTableChange,
   onChangeTable,
   onConfirmTableEdit,
   onCancelTableEdit,
+  onCancelPendingTableChange,
 }: CartBarProps) {
   const router = useRouter();
   const titleId = useId();
+  const tableInputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -122,9 +128,13 @@ export function CartBar({
     [modules, tableLockedFromQr, isAddition],
   );
   const orderedLines = useMemo(() => Object.values(lines), [lines]);
-  const itemLabel = count === 1 ? "1 ítem" : `${count} ítems`;
+  const itemLabel = count === 1 ? "1 platillo" : `${count} platillos`;
   const isPickupFlow =
     !isAddition && !tableLockedFromQr && orderType === "PICKUP";
+  const isInTableFlow =
+    isAddition || tableLockedFromQr || orderType === "IN_TABLE";
+  /** En mesa: nombre/teléfono opcionales se colapsan para no competir con confirmar. */
+  const showGuestFieldsUpFront = !isInTableFlow;
 
   useEffect(() => {
     if (!orderTypes.some((opt) => opt.value === orderType)) {
@@ -161,6 +171,10 @@ export function CartBar({
         setConfirmClear(false);
         return;
       }
+      if (pendingTableChange) {
+        onCancelPendingTableChange?.();
+        return;
+      }
       closeSheet();
     };
     window.addEventListener("keydown", onKey);
@@ -169,7 +183,14 @@ export function CartBar({
       document.body.style.overflow = previous;
       window.removeEventListener("keydown", onKey);
     };
-  }, [isOpen, isSubmitting, confirmClear, isEditingTable]);
+  }, [
+    isOpen,
+    isSubmitting,
+    confirmClear,
+    isEditingTable,
+    pendingTableChange,
+    onCancelPendingTableChange,
+  ]);
 
   // Si el padre pide editar mesa, abrir el sheet para que solo exista un editor.
   useEffect(() => {
@@ -180,8 +201,26 @@ export function CartBar({
     }
   }, [isEditingTable]);
 
+  useEffect(() => {
+    if (!isOpen || !isEditingTable || pendingTableChange) return;
+    const id = window.requestAnimationFrame(() => {
+      tableInputRef.current?.focus();
+      tableInputRef.current?.select();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [isOpen, isEditingTable, pendingTableChange]);
+
+  useEffect(() => {
+    if (!isOpen || isEditingTable || pendingTableChange) return;
+    const id = window.requestAnimationFrame(() => {
+      document.getElementById(titleId)?.focus();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [isOpen, isEditingTable, pendingTableChange, titleId]);
+
   function closeSheet() {
     if (isSubmitting) return;
+    if (pendingTableChange) onCancelPendingTableChange?.();
     if (isEditingTable) onCancelTableEdit?.();
     setConfirmClear(false);
     setIsOpen(false);
@@ -217,25 +256,25 @@ export function CartBar({
     const phone = customerPhone.trim();
 
     if (effectiveType === "IN_TABLE" && !effectiveTable && !isAddition) {
-      setErrorMessage("Indica el número de mesa para tu pedido.");
+      setErrorMessage("Escribe el número de mesa.");
       return;
     }
     if (isAddition && !activeOrderId) {
-      setErrorMessage("No hay una orden activa para agregar platillos.");
+      setErrorMessage("No hay una cuenta abierta para sumar platillos.");
       return;
     }
     if (effectiveType === "PICKUP") {
       if (!name) {
-        setErrorMessage("Indica tu nombre para el pedido para llevar.");
+        setErrorMessage("Escribe tu nombre para el pedido para llevar.");
         return;
       }
       if (!phone) {
-        setErrorMessage("Indica tu teléfono para avisar cuando esté listo.");
+        setErrorMessage("Escribe tu teléfono para avisarte cuando esté listo.");
         return;
       }
     }
     if (effectiveType === "DELIVERY" && !deliveryAddress.trim()) {
-      setErrorMessage("Indica la dirección de entrega.");
+      setErrorMessage("Escribe la dirección de entrega.");
       return;
     }
 
@@ -288,13 +327,16 @@ export function CartBar({
         ? "Pedido a domicilio"
         : "Tu pedido";
 
-  const sheetHint = isAddition && sessionTable
-    ? `Se agrega a ${formatTableLabel(sessionTable)}`
-    : isPickupFlow
-      ? "Recoges en el local · te avisamos al teléfono"
-      : tableLockedFromQr
-        ? `${formatTableLabel(tableNumber || sessionTable || "")} · pedís a esta mesa`
-        : null;
+  const sheetHint =
+    isAddition && sessionTable
+      ? `Se suma a ${formatTableLabel(sessionTable)}`
+      : isPickupFlow
+        ? "Recoges en el local · te avisamos al teléfono"
+        : tableLockedFromQr
+          ? `${formatTableLabel(tableNumber || sessionTable || "")} · pedís aquí`
+          : orderType === "DELIVERY"
+            ? "Llega a la dirección que indiques"
+            : null;
 
   const confirmLabel = isSubmitting
     ? isAddition
@@ -305,14 +347,16 @@ export function CartBar({
       : isPickupFlow
         ? "Confirmar para llevar"
         : orderType === "DELIVERY"
-          ? "Confirmar delivery"
+          ? "Confirmar a domicilio"
           : "Confirmar pedido";
 
   const barLabel = isAddition
     ? `Sumar · ${itemLabel}`
     : isPickupFlow
       ? `Para llevar · ${itemLabel}`
-      : `Ver pedido · ${itemLabel}`;
+      : orderType === "DELIVERY"
+        ? `A domicilio · ${itemLabel}`
+        : `Tu pedido · ${itemLabel}`;
 
   return (
     <>
@@ -320,7 +364,8 @@ export function CartBar({
         <button
           type="button"
           onClick={openSheet}
-          className={`${focusRing} pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_10px_28px_rgba(0,0,0,0.22)] transition-transform active:scale-[0.98]`}
+          aria-label={`${barLabel}. Total ${formatCurrency(subtotal)}`}
+          className={`${focusRing} pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98]`}
         >
           <span className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-7 min-w-7 items-center justify-center rounded-lg bg-[var(--menu-accent-fg)]/20 px-2 text-sm tabular-nums">
@@ -343,7 +388,7 @@ export function CartBar({
         >
           <button
             type="button"
-            aria-label="Cerrar resumen"
+            aria-label="Cerrar pedido"
             disabled={isSubmitting}
             onClick={closeSheet}
             className="absolute inset-0 bg-black/45 disabled:cursor-wait"
@@ -355,62 +400,58 @@ export function CartBar({
               className="mx-auto mt-3 h-1 w-10 rounded-full bg-border"
             />
 
-            <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-3">
-              <div className="min-w-0">
-                <h2 id={titleId} className="text-lg font-bold tracking-tight">
+            <div className="flex items-start justify-between gap-3 px-5 pb-2 pt-3">
+              <div className="min-w-0 flex-1">
+                <h2
+                  id={titleId}
+                  tabIndex={-1}
+                  className="text-lg font-bold tracking-tight outline-none"
+                >
                   {sheetTitle}
                 </h2>
-                {sheetHint ? (
-                  <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                    {sheetHint}
-                  </p>
+                {sheetHint || (tableLockedFromQr && onChangeTable) ? (
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    {sheetHint ? (
+                      <p className="text-xs text-muted-foreground">{sheetHint}</p>
+                    ) : null}
+                    {tableLockedFromQr && !isAddition && onChangeTable ? (
+                      <button
+                        type="button"
+                        disabled={isSubmitting || isEditingTable}
+                        onClick={onChangeTable}
+                        className={`${focusRing} text-xs font-medium text-muted-foreground underline underline-offset-2`}
+                      >
+                        Cambiar mesa
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
-              {confirmClear ? (
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <p className="text-xs font-medium text-destructive">
-                    ¿Vaciar el pedido?
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={handleClearCart}
-                      className={`${focusRing} rounded-lg bg-destructive px-2.5 py-1 text-xs font-bold text-white`}
-                    >
-                      Sí, vaciar
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={() => setConfirmClear(false)}
-                      className={`${focusRing} rounded-lg bg-secondary px-2.5 py-1 text-xs font-bold text-muted-foreground`}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleClearCart}
-                  className={`${focusRing} shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-destructive transition-transform active:scale-95 disabled:opacity-40`}
-                >
-                  Vaciar
-                </button>
-              )}
+              <button
+                type="button"
+                aria-label="Cerrar pedido"
+                disabled={isSubmitting}
+                onClick={closeSheet}
+                className={`${focusRing} -mr-1 inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground`}
+              >
+                <span aria-hidden className="text-xl leading-none">
+                  ×
+                </span>
+              </button>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <ul className="space-y-0 border-y border-border px-5">
+              <ul className="border-y border-border/80 px-5">
                 {orderedLines.map(({ product, quantity }) => (
                   <li
                     key={product.uuid}
-                    className="flex items-center gap-3 border-b border-border py-3.5 last:border-b-0"
+                    className="flex items-center gap-3 border-b border-border/80 py-3 last:border-b-0"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold tracking-tight">
+                      <p
+                        className="truncate text-sm font-semibold tracking-tight"
+                        title={product.name}
+                      >
                         {product.name}
                       </p>
                       <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
@@ -430,175 +471,251 @@ export function CartBar({
                 ))}
               </ul>
 
-              <div className="space-y-4 px-5 py-4">
-                <p className="text-sm font-semibold tracking-tight text-muted-foreground">
-                  Datos del pedido
-                </p>
-
+              <div className="space-y-3 px-5 py-3">
                 {!isAddition && !tableLockedFromQr && orderTypes.length > 1 ? (
-                  <fieldset>
-                    <legend className="mb-2 text-xs font-medium text-muted-foreground">
-                      Tipo de pedido
-                    </legend>
-                    <div
-                      role="group"
-                      className="grid grid-cols-2 gap-1 rounded-xl bg-secondary p-1"
-                    >
-                      {orderTypes.map((opt) => {
-                        const active = orderType === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            disabled={isSubmitting}
-                            aria-pressed={active}
-                            onClick={() => setOrderType(opt.value)}
-                            className={`${focusRing} min-h-10 rounded-lg px-3 text-xs font-bold transition-colors ${
-                              active
-                                ? "bg-card text-foreground shadow-[0_1px_0_rgba(0,0,0,0.06)]"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </fieldset>
+                  <div
+                    role="group"
+                    aria-label="Tipo de pedido"
+                    className="grid grid-cols-2 gap-1 rounded-xl bg-secondary p-1"
+                  >
+                    {orderTypes.map((opt) => {
+                      const active = orderType === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          disabled={isSubmitting}
+                          aria-pressed={active}
+                          onClick={() => setOrderType(opt.value)}
+                          className={`${focusRing} min-h-10 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                            active
+                              ? "bg-card text-foreground shadow-[0_1px_0_rgba(0,0,0,0.06)]"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : null}
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Nombre{isPickupFlow ? " *" : ""}
-                    </span>
-                    <input
-                      type="text"
-                      name="customerName"
-                      autoComplete="name"
-                      maxLength={100}
-                      required={isPickupFlow}
-                      placeholder={isPickupFlow ? "Tu nombre" : "Opcional"}
-                      value={customerName}
-                      disabled={isSubmitting}
-                      onChange={(event) => setCustomerName(event.target.value)}
-                      className={fieldClass}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Teléfono{isPickupFlow ? " *" : ""}
-                    </span>
-                    <input
-                      type="tel"
-                      name="customerPhone"
-                      autoComplete="tel"
-                      maxLength={20}
-                      required={isPickupFlow}
-                      placeholder={
-                        isPickupFlow
-                          ? "Para avisarte"
-                          : orderType === "DELIVERY"
-                            ? "Recomendado"
-                            : "Opcional"
-                      }
-                      value={customerPhone}
-                      disabled={isSubmitting}
-                      onChange={(event) => setCustomerPhone(event.target.value)}
-                      className={fieldClass}
-                    />
-                  </label>
-                </div>
+                    {isEditingTable ? (
+                      <div className="space-y-2">
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Mesa
+                          </span>
+                          <input
+                            ref={tableInputRef}
+                            type="text"
+                            name="tableNumber"
+                            inputMode="numeric"
+                            maxLength={10}
+                            placeholder="Ej. 12"
+                            value={draftTable}
+                            disabled={isSubmitting || Boolean(pendingTableChange)}
+                            onChange={(event) => {
+                              onDraftTableChange?.(event.target.value);
+                            }}
+                            onKeyDown={(event) => {
+                              if (pendingTableChange) return;
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                onConfirmTableEdit?.();
+                              }
+                              if (event.key === "Escape") {
+                                event.preventDefault();
+                                onCancelTableEdit?.();
+                              }
+                            }}
+                            className={fieldClass}
+                            aria-invalid={Boolean(tableEditError)}
+                          />
+                        </label>
+                        {tableEditError ? (
+                          <p
+                            role="alert"
+                            className="text-xs font-medium text-destructive"
+                          >
+                            {tableEditError}
+                          </p>
+                        ) : null}
+                        {pendingTableChange ? (
+                          <div
+                            role="alertdialog"
+                            aria-labelledby="table-change-title"
+                            className="space-y-2 rounded-xl border border-border bg-secondary/50 px-3 py-3"
+                          >
+                            <p
+                              id="table-change-title"
+                              className="text-sm font-semibold text-foreground"
+                            >
+                              ¿Cambiar a {formatTableLabel(pendingTableChange)}?
+                            </p>
+                            <p className="text-xs leading-snug text-muted-foreground">
+                              Se desliga la cuenta abierta de esta mesa. Tu
+                              carrito se conserva.
+                            </p>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={onConfirmTableEdit}
+                                className={`${focusRing} rounded-xl bg-[var(--menu-accent)] px-3.5 py-2 text-xs font-bold text-[var(--menu-accent-fg)]`}
+                              >
+                                Sí, cambiar mesa
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={onCancelPendingTableChange}
+                                className={`${focusRing} rounded-xl bg-secondary px-3.5 py-2 text-xs font-bold text-muted-foreground`}
+                              >
+                                Seguir en esta mesa
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={isSubmitting}
+                              onClick={onConfirmTableEdit}
+                              className={`${focusRing} rounded-xl bg-[var(--menu-accent)] px-3.5 py-2 text-xs font-bold text-[var(--menu-accent-fg)]`}
+                            >
+                              Usar esta mesa
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSubmitting}
+                              onClick={onCancelTableEdit}
+                              className={`${focusRing} rounded-xl bg-secondary px-3.5 py-2 text-xs font-bold text-muted-foreground`}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : !isAddition &&
+                      !tableLockedFromQr &&
+                      orderType === "IN_TABLE" ? (
+                      <div className="space-y-2">
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Mesa
+                          </span>
+                          <input
+                            type="text"
+                            name="tableNumber"
+                            inputMode="numeric"
+                            maxLength={10}
+                            placeholder="Ej. 12"
+                            value={tableNumber}
+                            disabled={isSubmitting}
+                            onChange={(event) =>
+                              setTableNumber(event.target.value)
+                            }
+                            className={fieldClass}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
 
-                {isAddition ||
-                tableLockedFromQr ||
-                isEditingTable ||
-                orderType === "IN_TABLE" ? (
-                  <div className="space-y-2">
+                {showGuestFieldsUpFront ? (
+                  <div className="space-y-2.5">
                     <label className="flex flex-col gap-1.5">
                       <span className="text-xs font-medium text-muted-foreground">
-                        Mesa
+                        Nombre{isPickupFlow ? " *" : ""}
                       </span>
                       <input
                         type="text"
-                        name="tableNumber"
-                        inputMode="numeric"
-                        maxLength={10}
-                        placeholder="Ej. 12"
-                        value={isEditingTable ? draftTable : tableNumber}
-                        readOnly={
-                          (tableLockedFromQr && !isEditingTable) || isAddition
+                        name="customerName"
+                        autoComplete="name"
+                        maxLength={100}
+                        required={isPickupFlow}
+                        placeholder={isPickupFlow ? "Tu nombre" : "Opcional"}
+                        value={customerName}
+                        disabled={isSubmitting}
+                        onChange={(event) =>
+                          setCustomerName(event.target.value)
                         }
-                        disabled={
-                          isSubmitting ||
-                          ((tableLockedFromQr && !isEditingTable) ||
-                            isAddition)
-                        }
-                        onChange={(event) => {
-                          if (isEditingTable) {
-                            onDraftTableChange?.(event.target.value);
-                            return;
-                          }
-                          setTableNumber(event.target.value);
-                        }}
-                        onKeyDown={(event) => {
-                          if (!isEditingTable) return;
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            onConfirmTableEdit?.();
-                          }
-                          if (event.key === "Escape") {
-                            event.preventDefault();
-                            onCancelTableEdit?.();
-                          }
-                        }}
                         className={fieldClass}
-                        aria-invalid={Boolean(tableEditError)}
                       />
                     </label>
-                    {tableEditError ? (
-                      <p role="alert" className="text-xs font-medium text-destructive">
-                        {tableEditError}
-                      </p>
-                    ) : null}
-                    {isEditingTable ? (
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={isSubmitting}
-                          onClick={onConfirmTableEdit}
-                          className={`${focusRing} rounded-xl bg-[var(--menu-accent)] px-3.5 py-2 text-xs font-bold text-[var(--menu-accent-fg)]`}
-                        >
-                          Usar esta mesa
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSubmitting}
-                          onClick={onCancelTableEdit}
-                          className={`${focusRing} rounded-xl bg-secondary px-3.5 py-2 text-xs font-bold text-muted-foreground`}
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    ) : tableLockedFromQr ? (
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="inline-flex items-center rounded-lg bg-live-muted px-2.5 py-1 text-xs font-bold text-live-ink">
-                          {formatTableLabel(tableNumber || "")} · pedís aquí
-                        </span>
-                        {onChangeTable ? (
-                          <button
-                            type="button"
-                            disabled={isSubmitting}
-                            onClick={onChangeTable}
-                            className={`${focusRing} text-xs font-medium text-muted-foreground underline underline-offset-2`}
-                          >
-                            ¿No es tu mesa? Cambiar
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Teléfono{isPickupFlow ? " *" : ""}
+                      </span>
+                      <input
+                        type="tel"
+                        name="customerPhone"
+                        autoComplete="tel"
+                        maxLength={20}
+                        required={isPickupFlow}
+                        placeholder={
+                          isPickupFlow
+                            ? "Para avisarte"
+                            : orderType === "DELIVERY"
+                              ? "Recomendado"
+                              : "Opcional"
+                        }
+                        value={customerPhone}
+                        disabled={isSubmitting}
+                        onChange={(event) =>
+                          setCustomerPhone(event.target.value)
+                        }
+                        className={fieldClass}
+                      />
+                    </label>
                   </div>
-                ) : null}
+                ) : (
+                  <details className="group">
+                    <summary
+                      className={`${focusRing} cursor-pointer list-none py-1 text-xs font-medium text-muted-foreground underline-offset-2 marker:content-none hover:underline [&::-webkit-details-marker]:hidden`}
+                    >
+                      Nombre o teléfono (opcional)
+                    </summary>
+                    <div className="mt-2 space-y-2.5">
+                      <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Nombre
+                        </span>
+                        <input
+                          type="text"
+                          name="customerName"
+                          autoComplete="name"
+                          maxLength={100}
+                          placeholder="Opcional"
+                          value={customerName}
+                          disabled={isSubmitting}
+                          onChange={(event) =>
+                            setCustomerName(event.target.value)
+                          }
+                          className={fieldClass}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Teléfono
+                        </span>
+                        <input
+                          type="tel"
+                          name="customerPhone"
+                          autoComplete="tel"
+                          maxLength={20}
+                          placeholder="Opcional"
+                          value={customerPhone}
+                          disabled={isSubmitting}
+                          onChange={(event) =>
+                            setCustomerPhone(event.target.value)
+                          }
+                          className={fieldClass}
+                        />
+                      </label>
+                    </div>
+                  </details>
+                )}
 
                 {!isAddition && orderType === "DELIVERY" ? (
                   <label className="flex flex-col gap-1.5">
@@ -620,13 +737,50 @@ export function CartBar({
                     />
                   </label>
                 ) : null}
+
+                <div className="pt-1">
+                  {confirmClear ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2">
+                      <p className="flex-1 text-xs font-medium text-destructive">
+                        ¿Vaciar tu pedido?
+                      </p>
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={handleClearCart}
+                        className={`${focusRing} rounded-lg bg-destructive px-2.5 py-1.5 text-xs font-bold text-white`}
+                      >
+                        Vaciar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => setConfirmClear(false)}
+                        className={`${focusRing} rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground`}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleClearCart}
+                      className={`${focusRing} text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive`}
+                    >
+                      Vaciar pedido
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="space-y-3 border-t border-border px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4">
-              <div className="flex items-center justify-between text-base font-bold tracking-tight">
-                <span>Subtotal</span>
-                <span className="tabular-nums">{formatCurrency(subtotal)}</span>
+            <div className="shrink-0 space-y-2.5 border-t border-border bg-card px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+              <div className="flex items-center justify-between text-sm font-semibold tracking-tight">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="tabular-nums text-foreground">
+                  {formatCurrency(subtotal)}
+                </span>
               </div>
 
               {errorMessage ? (
@@ -640,13 +794,18 @@ export function CartBar({
 
               <button
                 type="button"
-                disabled={isSubmitting || isEditingTable}
+                disabled={isSubmitting || isEditingTable || Boolean(pendingTableChange)}
+                aria-busy={isSubmitting}
                 onClick={() => {
                   void handleConfirmOrder();
                 }}
                 className={`${focusRing} w-full rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70`}
               >
-                {isEditingTable ? "Confirma la mesa primero" : confirmLabel}
+                {pendingTableChange
+                  ? "Confirma el cambio de mesa"
+                  : isEditingTable
+                    ? "Confirma la mesa para continuar"
+                    : confirmLabel}
               </button>
             </div>
           </div>

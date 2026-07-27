@@ -14,7 +14,10 @@ import {
 } from "@/components/customer/category-bar";
 import { ProductCard } from "@/components/customer/product-card";
 import { CartBar, type OrderModules } from "@/components/customer/cart-bar";
-import { useCartStore } from "@/store/cartStore";
+import {
+  useCartCount,
+  useCartStore,
+} from "@/store/cartStore";
 import { getActiveOrderSession } from "@/services/orderService";
 import {
   clearStoredTable,
@@ -78,15 +81,23 @@ export function MenuView({
   const [isEditingTable, setIsEditingTable] = useState(false);
   const [draftTable, setDraftTable] = useState("");
   const [tableEditError, setTableEditError] = useState<string | null>(null);
+  /** Mesa pendiente de confirmación cuando hay cuenta abierta. */
+  const [pendingTableChange, setPendingTableChange] = useState<string | null>(
+    null,
+  );
   const [sessionOrder, setSessionOrder] = useState<Order | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [sessionRetryKey, setSessionRetryKey] = useState(0);
 
   const setActiveOrderSession = useCartStore((s) => s.setActiveOrderSession);
   const clearActiveOrderSession = useCartStore((s) => s.clearActiveOrderSession);
   const releaseActiveOrder = useCartStore((s) => s.releaseActiveOrder);
   const setCartTable = useCartStore((s) => s.setTableNumber);
   const cartTable = useCartStore((s) => s.tableNumber);
+  const activeOrderId = useCartStore((s) => s.activeOrderId);
+  const cartCount = useCartCount();
+  const hasOpenAccount = Boolean(sessionOrder) || Boolean(activeOrderId);
 
   // Anclaje de mesa: solo con ?m= en la URL.
   // Sin ?m= → exploración / pickup (no heredar mesa de localStorage).
@@ -98,6 +109,7 @@ export function MenuView({
       setCartTable(fromQuery);
       setIsEditingTable(false);
       setTableEditError(null);
+      setPendingTableChange(null);
       return;
     }
 
@@ -106,6 +118,7 @@ export function MenuView({
     setCartTable(null);
     setIsEditingTable(false);
     setTableEditError(null);
+    setPendingTableChange(null);
     releaseActiveOrder();
     setSessionOrder(null);
   }, [
@@ -126,14 +139,16 @@ export function MenuView({
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     setSessionLoading(true);
     setSessionError(null);
 
     void (async () => {
       try {
-        const session = await getActiveOrderSession(table, tenantSlug);
-        if (cancelled) return;
+        const session = await getActiveOrderSession(table, tenantSlug, {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
         if (session.hasActiveOrder && session.order) {
           setSessionOrder(session.order);
           setActiveOrderSession({
@@ -146,23 +161,23 @@ export function MenuView({
           releaseActiveOrder();
           setCartTable(table);
         }
-      } catch {
-        if (!cancelled) {
-          setSessionOrder(null);
-          setSessionError(
-            "No pudimos consultar la cuenta de la mesa. Puedes seguir armando el pedido.",
-          );
-        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setSessionOrder(null);
+        setSessionError(
+          "No pudimos ver la cuenta de la mesa. Puedes seguir pidiendo.",
+        );
       } finally {
-        if (!cancelled) setSessionLoading(false);
+        if (!controller.signal.aborted) setSessionLoading(false);
       }
     })();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reconsultar al cambiar mesa
-  }, [cartTable, tenantSlug, orderingEnabled, isEditingTable]);
+  }, [cartTable, tenantSlug, orderingEnabled, isEditingTable, sessionRetryKey]);
 
   useEffect(() => {
     if (sections.length === 0) return;
@@ -207,23 +222,56 @@ export function MenuView({
     }, 600);
   }
 
-  /** Abrir edición de mesa (sigue en modo mesa; no pasa a pickup). */
+  /** Corregir número de mesa (solo con ítems en carrito → sheet). */
   function handleChangeTable() {
     setDraftTable(cartTable ?? normalizeTableParam(tableFromQuery) ?? "");
     setTableEditError(null);
+    setPendingTableChange(null);
     setIsEditingTable(true);
+  }
+
+  /** Salir del QR con carrito vacío (no edita número; vuelve a explorar / pickup). */
+  function handleLeaveWrongTable() {
+    clearStoredTable(tenantSlug);
+    clearActiveOrderSession();
+    setSessionOrder(null);
+    setSessionError(null);
+    setCartTable(null);
+    setTableLockedFromQr(false);
+    setIsEditingTable(false);
+    setPendingTableChange(null);
+    router.replace("/menu");
   }
 
   function handleCancelTableEdit() {
     setIsEditingTable(false);
     setTableEditError(null);
     setDraftTable("");
+    setPendingTableChange(null);
+  }
+
+  function applyTableChange(next: string) {
+    clearActiveOrderSession();
+    setSessionOrder(null);
+    setSessionError(null);
+    writeStoredTable(tenantSlug, next);
+    setCartTable(next);
+    setTableLockedFromQr(true);
+    setIsEditingTable(false);
+    setPendingTableChange(null);
+    setTableEditError(null);
+    router.replace(`/menu?m=${encodeURIComponent(next)}`);
   }
 
   function handleConfirmTableEdit() {
+    if (pendingTableChange) {
+      applyTableChange(pendingTableChange);
+      return;
+    }
+
     const next = normalizeTableParam(draftTable);
     if (!next) {
-      setTableEditError("Indica el número de mesa.");
+      setTableEditError("Escribe el número de mesa.");
       return;
     }
 
@@ -231,46 +279,40 @@ export function MenuView({
     if (current && current === next) {
       setIsEditingTable(false);
       setTableEditError(null);
+      setPendingTableChange(null);
       return;
     }
 
-    clearActiveOrderSession();
-    setSessionOrder(null);
-    writeStoredTable(tenantSlug, next);
-    setCartTable(next);
-    setTableLockedFromQr(true);
-    setIsEditingTable(false);
-    setTableEditError(null);
-    router.replace(`/menu?m=${encodeURIComponent(next)}`);
+    // Con cuenta abierta: pedir confirmación antes de desligar.
+    if (hasOpenAccount) {
+      setPendingTableChange(next);
+      setTableEditError(null);
+      return;
+    }
+
+    applyTableChange(next);
+  }
+
+  function handleCancelPendingTableChange() {
+    setPendingTableChange(null);
   }
 
   return (
     <>
       {orderingEnabled ? (
-        <OrderModeStatus
+        <MenuContextStrip
           tableLockedFromQr={tableLockedFromQr}
           tableNumber={cartTable}
-          hasOpenAccount={Boolean(sessionOrder)}
+          cartCount={cartCount}
           sessionLoading={sessionLoading}
-          modules={modules}
+          sessionOrder={sessionOrder}
+          sessionError={sessionError}
+          onLeaveWrongTable={handleLeaveWrongTable}
+          onRetrySession={() => {
+            setSessionError(null);
+            setSessionRetryKey((key) => key + 1);
+          }}
         />
-      ) : null}
-
-      {orderingEnabled && (sessionOrder || sessionLoading) ? (
-        <ActiveSessionBanner
-          loading={sessionLoading}
-          order={sessionOrder}
-          tableNumber={cartTable}
-        />
-      ) : null}
-
-      {orderingEnabled && sessionError && !sessionOrder ? (
-        <div
-          role="status"
-          className="-mx-4 mb-1 border-b border-border bg-secondary px-4 py-2.5 text-xs font-medium text-muted-foreground"
-        >
-          {sessionError}
-        </div>
       ) : null}
 
       <CategoryBar
@@ -281,7 +323,7 @@ export function MenuView({
 
       <div
         aria-label="Platillos del menú"
-        className="flex flex-col gap-9 pb-32 pt-5"
+        className="flex flex-col gap-8 pb-32 pt-4"
       >
         {sections.map((section) => (
           <section
@@ -291,16 +333,16 @@ export function MenuView({
               if (node) sectionRefs.current.set(section.id, node);
               else sectionRefs.current.delete(section.id);
             }}
-            className="scroll-mt-24"
+            className="scroll-mt-16"
             aria-labelledby={`heading-${section.id}`}
           >
             <h2
               id={`heading-${section.id}`}
-              className="mb-3 text-base font-bold tracking-tight text-foreground"
+              className="mb-2.5 text-sm font-semibold tracking-tight text-muted-foreground"
             >
               {section.name}
             </h2>
-            <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+            <ul className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/80 bg-card">
               {section.products.map((product) => (
                 <li key={product.uuid}>
                   <ProductCard
@@ -322,10 +364,12 @@ export function MenuView({
           isEditingTable={isEditingTable}
           draftTable={draftTable}
           tableEditError={tableEditError}
+          pendingTableChange={pendingTableChange}
           onDraftTableChange={setDraftTable}
           onChangeTable={handleChangeTable}
           onConfirmTableEdit={handleConfirmTableEdit}
           onCancelTableEdit={handleCancelTableEdit}
+          onCancelPendingTableChange={handleCancelPendingTableChange}
         />
       ) : (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 text-center backdrop-blur-sm">
@@ -338,94 +382,106 @@ export function MenuView({
   );
 }
 
-function OrderModeStatus({
+/**
+ * Una sola franja de contexto (mesa / sesión / error).
+ * Sin mesa QR: no se muestra — el modo vive en el carrito.
+ */
+function MenuContextStrip({
   tableLockedFromQr,
   tableNumber,
-  hasOpenAccount,
+  cartCount,
   sessionLoading,
-  modules,
+  sessionOrder,
+  sessionError,
+  onLeaveWrongTable,
+  onRetrySession,
 }: {
   tableLockedFromQr: boolean;
   tableNumber: string | null;
-  hasOpenAccount: boolean;
+  cartCount: number;
   sessionLoading: boolean;
-  modules?: OrderModules;
+  sessionOrder: Order | null;
+  sessionError: string | null;
+  onLeaveWrongTable: () => void;
+  onRetrySession: () => void;
 }) {
-  // Con cuenta abierta, ActiveSessionBanner ya comunica la mesa.
-  if (hasOpenAccount || sessionLoading) return null;
+  const shell =
+    "-mx-4 border-b border-border/70 px-4 py-2 text-xs leading-snug text-muted-foreground";
+
+  if (sessionLoading && !sessionOrder) {
+    return (
+      <div role="status" className={shell}>
+        Consultando la cuenta…
+      </div>
+    );
+  }
+
+  if (sessionOrder && tableNumber) {
+    return (
+      <div
+        role="status"
+        className={`${shell} flex items-center justify-between gap-3`}
+      >
+        <p className="min-w-0 truncate">
+          <span className="font-medium text-foreground">
+            {formatTableLabel(tableNumber)}
+          </span>
+          {" · cuenta abierta · "}
+          {sessionOrder.formattedTotal ||
+            formatCurrency(sessionOrder.totalAmount)}
+        </p>
+        <Link
+          href={`/orders/${sessionOrder.uuid}`}
+          className="inline-flex min-h-11 shrink-0 items-center font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Ver pedido
+        </Link>
+      </div>
+    );
+  }
+
+  if (sessionError && tableLockedFromQr) {
+    return (
+      <div
+        role="status"
+        className={`${shell} flex items-center justify-between gap-3`}
+      >
+        <p className="min-w-0 truncate text-foreground/80">{sessionError}</p>
+        <button
+          type="button"
+          onClick={onRetrySession}
+          className="inline-flex min-h-11 shrink-0 items-center font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   if (tableLockedFromQr && tableNumber) {
     return (
       <div
         role="status"
-        className="-mx-4 mb-1 border-b border-border bg-card px-4 py-2.5"
+        className={`${shell} flex items-center justify-between gap-3`}
       >
-        <p className="text-sm font-semibold tracking-tight">
-          {formatTableLabel(tableNumber)}
-          <span className="font-medium text-muted-foreground">
-            {" "}
-            · pedís a esta mesa
+        <p className="min-w-0">
+          <span className="font-medium text-foreground">
+            {formatTableLabel(tableNumber)}
           </span>
+          <span> · pedís aquí</span>
         </p>
+        {cartCount === 0 ? (
+          <button
+            type="button"
+            onClick={onLeaveWrongTable}
+            className="inline-flex min-h-11 shrink-0 items-center font-medium underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            ¿No es tu mesa?
+          </button>
+        ) : null}
       </div>
     );
   }
 
-  const hasPickup = modules?.hasPickup ?? true;
-  const hasDelivery = modules?.hasDelivery ?? false;
-  const label =
-    hasPickup && hasDelivery
-      ? "Para llevar o delivery"
-      : hasDelivery
-        ? "Pedido a domicilio"
-        : "Pedido para llevar";
-
-  return (
-    <div
-      role="status"
-      className="-mx-4 mb-1 border-b border-border bg-card px-4 py-2.5"
-    >
-      <p className="text-sm font-semibold tracking-tight">
-        {label}
-        <span className="font-medium text-muted-foreground">
-          {" "}
-          · sin mesa asignada
-        </span>
-      </p>
-    </div>
-  );
-}
-
-function ActiveSessionBanner({
-  loading,
-  order,
-  tableNumber,
-}: {
-  loading: boolean;
-  order: Order | null;
-  tableNumber: string | null;
-}) {
-  if (loading && !order) {
-    return (
-      <div className="-mx-4 mb-1 border-b border-live/20 bg-live-muted px-4 py-2.5 text-center text-xs font-medium text-live-ink">
-        Consultando cuenta de la mesa…
-      </div>
-    );
-  }
-  if (!order || !tableNumber) return null;
-
-  return (
-    <div className="-mx-4 mb-1 flex flex-wrap items-center justify-between gap-2 border-b border-live/25 bg-live-muted px-4 py-2.5 text-live-ink">
-      <p className="min-w-0 text-xs font-semibold leading-snug">
-        {formatTableLabel(tableNumber)} · cuenta abierta ·{" "}
-        {order.formattedTotal || formatCurrency(order.totalAmount)}
-      </p>
-      <Link
-        href={`/orders/${order.uuid}`}
-        className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-foreground px-3 text-xs font-bold text-background transition-opacity hover:opacity-90"
-      >
-        Ver pedido
-      </Link>
-    </div>
-  );
+  return null;
 }

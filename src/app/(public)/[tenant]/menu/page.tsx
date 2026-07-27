@@ -7,10 +7,6 @@ import { ApiError } from "@/services/apiClient";
 import type { Product, RestaurantProfile } from "@/types/api";
 import { MenuView } from "@/components/customer/menu-view";
 import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
-import {
-  formatTableLabel,
-  normalizeTableParam,
-} from "@/lib/table-session";
 
 type TenantMenuPageProps = {
   params: Promise<{ tenant: string }>;
@@ -105,8 +101,8 @@ export default async function TenantMenuPage({
       <header
         className={
           hasBrandFill
-            ? "relative -mx-0 overflow-hidden px-5 pb-7 pt-9 text-[var(--menu-accent-fg)]"
-            : "border-b border-border bg-card px-5 pb-6 pt-9"
+            ? "relative overflow-hidden px-5 pb-5 pt-7 text-[var(--menu-accent-fg)]"
+            : "border-b border-border bg-card px-5 pb-5 pt-7"
         }
         style={
           hasBrandFill
@@ -119,15 +115,15 @@ export default async function TenantMenuPage({
         {hasBrandFill ? (
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-40"
+            className="pointer-events-none absolute inset-0 opacity-25"
             style={{
               backgroundImage:
-                "radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--menu-accent-soft) 55%, transparent), transparent 55%)",
+                "radial-gradient(100% 70% at 100% 0%, color-mix(in srgb, var(--menu-accent-soft) 40%, transparent), transparent 60%)",
             }}
           />
         ) : null}
 
-        <div className="relative flex items-center gap-3.5">
+        <div className="relative flex items-center gap-3">
           {profile?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -135,8 +131,8 @@ export default async function TenantMenuPage({
               alt={`Logo de ${restaurantName}`}
               className={
                 hasBrandFill
-                  ? "size-14 rounded-2xl object-cover ring-2 ring-[var(--menu-accent-fg)]/25"
-                  : "size-14 rounded-2xl object-cover ring-1 ring-border"
+                  ? "size-12 rounded-xl object-cover ring-1 ring-[var(--menu-accent-fg)]/20"
+                  : "size-12 rounded-xl object-cover ring-1 ring-border"
               }
             />
           ) : (
@@ -144,29 +140,28 @@ export default async function TenantMenuPage({
               aria-hidden
               className={
                 hasBrandFill
-                  ? "flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--menu-accent-fg)]/15 text-lg font-black tracking-tight"
-                  : "flex size-14 shrink-0 items-center justify-center rounded-2xl bg-secondary text-lg font-black tracking-tight text-foreground"
+                  ? "flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--menu-accent-fg)]/12 text-base font-bold tracking-tight"
+                  : "flex size-12 shrink-0 items-center justify-center rounded-xl bg-secondary text-base font-bold tracking-tight text-foreground"
               }
             >
               {restaurantName.slice(0, 1).toUpperCase()}
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-[1.75rem] font-extrabold leading-tight tracking-tight">
+            <h1 className="truncate text-xl font-bold leading-tight tracking-tight">
               {restaurantName}
             </h1>
-            <p
-              className={
-                hasBrandFill
-                  ? "mt-1 text-sm leading-snug text-[var(--menu-accent-fg)]/85"
-                  : "mt-1 text-sm leading-snug text-muted-foreground"
-              }
-            >
-              {headerStatus({
-                profile,
-                tableFromQuery,
-              })}
-            </p>
+            {headerSupport(profile) ? (
+              <p
+                className={
+                  hasBrandFill
+                    ? "mt-0.5 line-clamp-1 text-sm leading-snug text-[var(--menu-accent-fg)]/80"
+                    : "mt-0.5 line-clamp-1 text-sm leading-snug text-muted-foreground"
+                }
+              >
+                {headerSupport(profile)}
+              </p>
+            ) : null}
           </div>
         </div>
       </header>
@@ -245,28 +240,13 @@ function accentForeground(hex: string): string {
   return L > 0.45 ? "#171717" : "#ffffff";
 }
 
-function headerStatus({
-  profile,
-  tableFromQuery,
-}: {
-  profile: RestaurantProfile | null;
-  tableFromQuery: string | null;
-}): string {
+function headerSupport(profile: RestaurantProfile | null): string | null {
   if (profile?.orderingEnabled === false) {
     return "Solo consulta · pedidos desactivados";
   }
-
-  const table = normalizeTableParam(tableFromQuery);
-  if (table) {
-    return `Pidiendo en ${formatTableLabel(table)}`;
-  }
-
-  const hasPickup = profile?.hasPickup ?? true;
-  const hasDelivery = profile?.hasDelivery ?? false;
-  if (hasPickup && hasDelivery) return "Pedido para llevar o delivery";
-  if (hasDelivery) return "Pedido a domicilio";
-  if (hasPickup) return "Pedido para llevar";
-  return "Arma tu pedido";
+  const description = profile?.description?.trim();
+  if (description) return description;
+  return null;
 }
 
 function MenuUnavailableState({

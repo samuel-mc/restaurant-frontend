@@ -155,6 +155,7 @@ export interface ActiveSessionResult {
 export async function getActiveOrderSession(
   tableNumber: string,
   tenantSlug?: string | null,
+  options?: { signal?: AbortSignal },
 ): Promise<ActiveSessionResult> {
   const table = tableNumber.trim();
   if (!table) {
@@ -170,6 +171,7 @@ export async function getActiveOrderSession(
   } | null>(path, {
     headers: { [TENANT_HEADER]: slug },
     cache: "no-store",
+    signal: options?.signal,
   });
 
   if (!payload?.hasActiveOrder || !payload.order?.uuid) {

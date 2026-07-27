@@ -45,10 +45,9 @@ function ProductImage({
       ) : (
         <div
           aria-hidden
-          className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-muted-foreground"
+          className="flex h-full w-full items-center justify-center text-muted-foreground/70"
         >
-          <UtensilsCrossed className="size-5 stroke-[1.5]" />
-          <span className="text-xs font-semibold tracking-wide">Sin foto</span>
+          <UtensilsCrossed className="size-5 stroke-[1.25]" />
         </div>
       )}
     </div>
@@ -74,7 +73,10 @@ export function ProductCard({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-semibold leading-snug tracking-tight">
+          <h3
+            className="min-w-0 line-clamp-2 text-sm font-semibold leading-snug tracking-tight break-words"
+            title={product.name}
+          >
             {product.name}
           </h3>
           {unavailable ? (

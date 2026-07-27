@@ -28,7 +28,7 @@ export function QuantityStepper({
         type="button"
         onClick={onDecrement}
         aria-label={`Quitar uno de ${label}`}
-        className={`${focusRing} flex size-11 items-center justify-center rounded-lg bg-card text-lg font-semibold text-foreground transition-transform active:scale-90`}
+        className={`${focusRing} flex size-11 items-center justify-center rounded-lg bg-card text-lg font-semibold text-foreground transition-transform active:scale-[0.96]`}
       >
         −
       </button>
@@ -42,7 +42,7 @@ export function QuantityStepper({
         type="button"
         onClick={onIncrement}
         aria-label={`Agregar uno de ${label}`}
-        className={`${focusRing} flex size-11 items-center justify-center rounded-lg bg-[var(--menu-accent)] text-lg font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-90`}
+        className={`${focusRing} flex size-11 items-center justify-center rounded-lg bg-[var(--menu-accent)] text-lg font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.96]`}
       >
         +
       </button>

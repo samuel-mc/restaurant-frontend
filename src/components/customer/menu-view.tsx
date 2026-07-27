@@ -75,8 +75,12 @@ export function MenuView({
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const [tableLockedFromQr, setTableLockedFromQr] = useState(false);
+  const [isEditingTable, setIsEditingTable] = useState(false);
+  const [draftTable, setDraftTable] = useState("");
+  const [tableEditError, setTableEditError] = useState<string | null>(null);
   const [sessionOrder, setSessionOrder] = useState<Order | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const setActiveOrderSession = useCartStore((s) => s.setActiveOrderSession);
   const clearActiveOrderSession = useCartStore((s) => s.clearActiveOrderSession);
@@ -92,12 +96,16 @@ export function MenuView({
       writeStoredTable(tenantSlug, fromQuery);
       setTableLockedFromQr(true);
       setCartTable(fromQuery);
+      setIsEditingTable(false);
+      setTableEditError(null);
       return;
     }
 
     clearStoredTable(tenantSlug);
     setTableLockedFromQr(false);
     setCartTable(null);
+    setIsEditingTable(false);
+    setTableEditError(null);
     releaseActiveOrder();
     setSessionOrder(null);
   }, [
@@ -110,13 +118,17 @@ export function MenuView({
   // Consulta sesión activa de la mesa
   useEffect(() => {
     const table = cartTable?.trim();
-    if (!orderingEnabled || !table) {
-      setSessionOrder(null);
+    if (!orderingEnabled || !table || isEditingTable) {
+      if (!table) {
+        setSessionOrder(null);
+        setSessionError(null);
+      }
       return;
     }
 
     let cancelled = false;
     setSessionLoading(true);
+    setSessionError(null);
 
     void (async () => {
       try {
@@ -135,7 +147,12 @@ export function MenuView({
           setCartTable(table);
         }
       } catch {
-        if (!cancelled) setSessionOrder(null);
+        if (!cancelled) {
+          setSessionOrder(null);
+          setSessionError(
+            "No pudimos consultar la cuenta de la mesa. Puedes seguir armando el pedido.",
+          );
+        }
       } finally {
         if (!cancelled) setSessionLoading(false);
       }
@@ -145,7 +162,7 @@ export function MenuView({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reconsultar al cambiar mesa
-  }, [cartTable, tenantSlug, orderingEnabled]);
+  }, [cartTable, tenantSlug, orderingEnabled, isEditingTable]);
 
   useEffect(() => {
     if (sections.length === 0) return;
@@ -190,24 +207,70 @@ export function MenuView({
     }, 600);
   }
 
+  /** Abrir edición de mesa (sigue en modo mesa; no pasa a pickup). */
   function handleChangeTable() {
-    clearStoredTable(tenantSlug);
-    setTableLockedFromQr(false);
+    setDraftTable(cartTable ?? normalizeTableParam(tableFromQuery) ?? "");
+    setTableEditError(null);
+    setIsEditingTable(true);
+  }
+
+  function handleCancelTableEdit() {
+    setIsEditingTable(false);
+    setTableEditError(null);
+    setDraftTable("");
+  }
+
+  function handleConfirmTableEdit() {
+    const next = normalizeTableParam(draftTable);
+    if (!next) {
+      setTableEditError("Indica el número de mesa.");
+      return;
+    }
+
+    const current = normalizeTableParam(cartTable ?? tableFromQuery);
+    if (current && current === next) {
+      setIsEditingTable(false);
+      setTableEditError(null);
+      return;
+    }
+
     clearActiveOrderSession();
     setSessionOrder(null);
-    setCartTable(null);
-    // Quitar ?m= para pasar a exploración / pickup.
-    router.replace("/menu");
+    writeStoredTable(tenantSlug, next);
+    setCartTable(next);
+    setTableLockedFromQr(true);
+    setIsEditingTable(false);
+    setTableEditError(null);
+    router.replace(`/menu?m=${encodeURIComponent(next)}`);
   }
 
   return (
     <>
+      {orderingEnabled ? (
+        <OrderModeStatus
+          tableLockedFromQr={tableLockedFromQr}
+          tableNumber={cartTable}
+          hasOpenAccount={Boolean(sessionOrder)}
+          sessionLoading={sessionLoading}
+          modules={modules}
+        />
+      ) : null}
+
       {orderingEnabled && (sessionOrder || sessionLoading) ? (
         <ActiveSessionBanner
           loading={sessionLoading}
           order={sessionOrder}
           tableNumber={cartTable}
         />
+      ) : null}
+
+      {orderingEnabled && sessionError && !sessionOrder ? (
+        <div
+          role="status"
+          className="-mx-4 mb-1 border-b border-border bg-secondary px-4 py-2.5 text-xs font-medium text-muted-foreground"
+        >
+          {sessionError}
+        </div>
       ) : null}
 
       <CategoryBar
@@ -256,7 +319,13 @@ export function MenuView({
           tenantSlug={tenantSlug}
           modules={modules}
           tableLockedFromQr={tableLockedFromQr}
+          isEditingTable={isEditingTable}
+          draftTable={draftTable}
+          tableEditError={tableEditError}
+          onDraftTableChange={setDraftTable}
           onChangeTable={handleChangeTable}
+          onConfirmTableEdit={handleConfirmTableEdit}
+          onCancelTableEdit={handleCancelTableEdit}
         />
       ) : (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 text-center backdrop-blur-sm">
@@ -266,6 +335,64 @@ export function MenuView({
         </div>
       )}
     </>
+  );
+}
+
+function OrderModeStatus({
+  tableLockedFromQr,
+  tableNumber,
+  hasOpenAccount,
+  sessionLoading,
+  modules,
+}: {
+  tableLockedFromQr: boolean;
+  tableNumber: string | null;
+  hasOpenAccount: boolean;
+  sessionLoading: boolean;
+  modules?: OrderModules;
+}) {
+  // Con cuenta abierta, ActiveSessionBanner ya comunica la mesa.
+  if (hasOpenAccount || sessionLoading) return null;
+
+  if (tableLockedFromQr && tableNumber) {
+    return (
+      <div
+        role="status"
+        className="-mx-4 mb-1 border-b border-border bg-card px-4 py-2.5"
+      >
+        <p className="text-sm font-semibold tracking-tight">
+          {formatTableLabel(tableNumber)}
+          <span className="font-medium text-muted-foreground">
+            {" "}
+            · pedís a esta mesa
+          </span>
+        </p>
+      </div>
+    );
+  }
+
+  const hasPickup = modules?.hasPickup ?? true;
+  const hasDelivery = modules?.hasDelivery ?? false;
+  const label =
+    hasPickup && hasDelivery
+      ? "Para llevar o delivery"
+      : hasDelivery
+        ? "Pedido a domicilio"
+        : "Pedido para llevar";
+
+  return (
+    <div
+      role="status"
+      className="-mx-4 mb-1 border-b border-border bg-card px-4 py-2.5"
+    >
+      <p className="text-sm font-semibold tracking-tight">
+        {label}
+        <span className="font-medium text-muted-foreground">
+          {" "}
+          · sin mesa asignada
+        </span>
+      </p>
+    </div>
   );
 }
 
@@ -280,7 +407,7 @@ function ActiveSessionBanner({
 }) {
   if (loading && !order) {
     return (
-      <div className="sticky top-0 z-20 -mx-4 mb-1 border-b border-live/20 bg-live-muted px-4 py-2.5 text-center text-xs font-medium text-live-ink">
+      <div className="-mx-4 mb-1 border-b border-live/20 bg-live-muted px-4 py-2.5 text-center text-xs font-medium text-live-ink">
         Consultando cuenta de la mesa…
       </div>
     );
@@ -288,16 +415,16 @@ function ActiveSessionBanner({
   if (!order || !tableNumber) return null;
 
   return (
-    <div className="sticky top-0 z-20 -mx-4 mb-1 flex flex-wrap items-center justify-between gap-2 border-b border-live/25 bg-live-muted px-4 py-2.5 text-live-ink">
+    <div className="-mx-4 mb-1 flex flex-wrap items-center justify-between gap-2 border-b border-live/25 bg-live-muted px-4 py-2.5 text-live-ink">
       <p className="min-w-0 text-xs font-semibold leading-snug">
         {formatTableLabel(tableNumber)} · cuenta abierta ·{" "}
         {order.formattedTotal || formatCurrency(order.totalAmount)}
       </p>
       <Link
         href={`/orders/${order.uuid}`}
-        className="inline-flex min-h-9 shrink-0 items-center rounded-xl bg-foreground px-3 text-xs font-bold text-background transition-opacity hover:opacity-90"
+        className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-foreground px-3 text-xs font-bold text-background transition-opacity hover:opacity-90"
       >
-        Ver ticket
+        Ver pedido
       </Link>
     </div>
   );

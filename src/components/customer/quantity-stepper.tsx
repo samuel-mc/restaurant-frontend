@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Control táctil compacto para ajustar cantidades (− valor +).
- * Reutilizado en la tarjeta de producto y en el resumen del carrito.
+ * Control táctil para ajustar cantidades (− valor +).
+ * Targets ≥44px para uso con pulgar en mesa.
  */
 
 interface QuantityStepperProps {
@@ -23,18 +23,18 @@ export function QuantityStepper({
   label,
 }: QuantityStepperProps) {
   return (
-    <div className="flex items-center gap-0.5 rounded-xl bg-[var(--menu-accent-muted)] p-1">
+    <div className="flex items-center gap-0.5 rounded-xl bg-[var(--menu-accent-muted)] p-0.5">
       <button
         type="button"
         onClick={onDecrement}
         aria-label={`Quitar uno de ${label}`}
-        className={`${focusRing} flex size-8 items-center justify-center rounded-lg bg-card text-lg font-semibold text-foreground transition-transform active:scale-90`}
+        className={`${focusRing} flex size-11 items-center justify-center rounded-lg bg-card text-lg font-semibold text-foreground transition-transform active:scale-90`}
       >
         −
       </button>
       <span
         aria-live="polite"
-        className="min-w-7 text-center text-sm font-bold tabular-nums"
+        className="min-w-8 text-center text-sm font-bold tabular-nums"
       >
         {quantity}
       </span>
@@ -42,7 +42,7 @@ export function QuantityStepper({
         type="button"
         onClick={onIncrement}
         aria-label={`Agregar uno de ${label}`}
-        className={`${focusRing} flex size-8 items-center justify-center rounded-lg bg-[var(--menu-accent)] text-lg font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-90`}
+        className={`${focusRing} flex size-11 items-center justify-center rounded-lg bg-[var(--menu-accent)] text-lg font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-90`}
       >
         +
       </button>

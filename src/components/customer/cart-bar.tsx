@@ -33,7 +33,13 @@ interface CartBarProps {
   modules?: OrderModules;
   /** Mesa anclada por QR (?m=): campo bloqueado. */
   tableLockedFromQr?: boolean;
+  isEditingTable?: boolean;
+  draftTable?: string;
+  tableEditError?: string | null;
+  onDraftTableChange?: (value: string) => void;
   onChangeTable?: () => void;
+  onConfirmTableEdit?: () => void;
+  onCancelTableEdit?: () => void;
 }
 
 type OrderTypeOption = {
@@ -77,7 +83,13 @@ export function CartBar({
   tenantSlug,
   modules,
   tableLockedFromQr = false,
+  isEditingTable = false,
+  draftTable = "",
+  tableEditError = null,
+  onDraftTableChange,
   onChangeTable,
+  onConfirmTableEdit,
+  onCancelTableEdit,
 }: CartBarProps) {
   const router = useRouter();
   const titleId = useId();
@@ -89,6 +101,7 @@ export function CartBar({
   const [orderType, setOrderType] = useState<OrderType>("PICKUP");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const count = useCartCount();
   const subtotal = useCartSubtotal();
@@ -140,10 +153,59 @@ export function CartBar({
     if (!isOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || isSubmitting) return;
+      event.preventDefault();
+      if (confirmClear) {
+        setConfirmClear(false);
+        return;
+      }
+      closeSheet();
+    };
+    window.addEventListener("keydown", onKey);
+
     return () => {
       document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
     };
-  }, [isOpen]);
+  }, [isOpen, isSubmitting, confirmClear, isEditingTable]);
+
+  // Si el padre pide editar mesa, abrir el sheet para que solo exista un editor.
+  useEffect(() => {
+    if (isEditingTable) {
+      setErrorMessage(null);
+      setConfirmClear(false);
+      setIsOpen(true);
+    }
+  }, [isEditingTable]);
+
+  function closeSheet() {
+    if (isSubmitting) return;
+    if (isEditingTable) onCancelTableEdit?.();
+    setConfirmClear(false);
+    setIsOpen(false);
+    setErrorMessage(null);
+  }
+
+  function openSheet() {
+    setErrorMessage(null);
+    setConfirmClear(false);
+    setIsOpen(true);
+  }
+
+  function handleClearCart() {
+    if (isSubmitting) return;
+    if (!confirmClear) {
+      setConfirmClear(true);
+      return;
+    }
+    clearCart();
+    setConfirmClear(false);
+    setIsOpen(false);
+    setErrorMessage(null);
+    if (isEditingTable) onCancelTableEdit?.();
+  }
 
   async function handleConfirmOrder() {
     if (isSubmitting || orderedLines.length === 0) return;
@@ -219,7 +281,7 @@ export function CartBar({
   if (count === 0) return null;
 
   const sheetTitle = isAddition
-    ? "Adición a tu mesa"
+    ? "Sumar a tu cuenta"
     : isPickupFlow
       ? "Pedido para llevar"
       : orderType === "DELIVERY"
@@ -227,19 +289,19 @@ export function CartBar({
         : "Tu pedido";
 
   const sheetHint = isAddition && sessionTable
-    ? `Se suma a la cuenta · ${formatTableLabel(sessionTable)}`
+    ? `Se agrega a ${formatTableLabel(sessionTable)}`
     : isPickupFlow
       ? "Recoges en el local · te avisamos al teléfono"
       : tableLockedFromQr
-        ? `${formatTableLabel(tableNumber || sessionTable || "")} · detectada por QR`
+        ? `${formatTableLabel(tableNumber || sessionTable || "")} · pedís a esta mesa`
         : null;
 
   const confirmLabel = isSubmitting
     ? isAddition
-      ? "Enviando adición…"
+      ? "Enviando a cocina…"
       : "Enviando pedido…"
     : isAddition
-      ? "Enviar adición a cocina"
+      ? "Sumar a la cuenta"
       : isPickupFlow
         ? "Confirmar para llevar"
         : orderType === "DELIVERY"
@@ -247,7 +309,7 @@ export function CartBar({
           : "Confirmar pedido";
 
   const barLabel = isAddition
-    ? `Adición · ${itemLabel}`
+    ? `Sumar · ${itemLabel}`
     : isPickupFlow
       ? `Para llevar · ${itemLabel}`
       : `Ver pedido · ${itemLabel}`;
@@ -257,10 +319,7 @@ export function CartBar({
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <button
           type="button"
-          onClick={() => {
-            setErrorMessage(null);
-            setIsOpen(true);
-          }}
+          onClick={openSheet}
           className={`${focusRing} pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_10px_28px_rgba(0,0,0,0.22)] transition-transform active:scale-[0.98]`}
         >
           <span className="flex min-w-0 items-center gap-2.5">
@@ -286,7 +345,7 @@ export function CartBar({
             type="button"
             aria-label="Cerrar resumen"
             disabled={isSubmitting}
-            onClick={() => setIsOpen(false)}
+            onClick={closeSheet}
             className="absolute inset-0 bg-black/45 disabled:cursor-wait"
           />
 
@@ -307,17 +366,40 @@ export function CartBar({
                   </p>
                 ) : null}
               </div>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => {
-                  setIsOpen(false);
-                  clearCart();
-                }}
-                className={`${focusRing} shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-destructive transition-transform active:scale-95 disabled:opacity-40`}
-              >
-                Vaciar
-              </button>
+              {confirmClear ? (
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <p className="text-xs font-medium text-destructive">
+                    ¿Vaciar el pedido?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleClearCart}
+                      className={`${focusRing} rounded-lg bg-destructive px-2.5 py-1 text-xs font-bold text-white`}
+                    >
+                      Sí, vaciar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => setConfirmClear(false)}
+                      className={`${focusRing} rounded-lg bg-secondary px-2.5 py-1 text-xs font-bold text-muted-foreground`}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleClearCart}
+                  className={`${focusRing} shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-destructive transition-transform active:scale-95 disabled:opacity-40`}
+                >
+                  Vaciar
+                </button>
+              )}
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -349,7 +431,7 @@ export function CartBar({
               </ul>
 
               <div className="space-y-4 px-5 py-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                <p className="text-sm font-semibold tracking-tight text-muted-foreground">
                   Datos del pedido
                 </p>
 
@@ -428,7 +510,10 @@ export function CartBar({
                   </label>
                 </div>
 
-                {isAddition || tableLockedFromQr || orderType === "IN_TABLE" ? (
+                {isAddition ||
+                tableLockedFromQr ||
+                isEditingTable ||
+                orderType === "IN_TABLE" ? (
                   <div className="space-y-2">
                     <label className="flex flex-col gap-1.5">
                       <span className="text-xs font-medium text-muted-foreground">
@@ -440,19 +525,65 @@ export function CartBar({
                         inputMode="numeric"
                         maxLength={10}
                         placeholder="Ej. 12"
-                        value={tableNumber}
-                        readOnly={tableLockedFromQr || isAddition}
-                        disabled={
-                          isSubmitting || tableLockedFromQr || isAddition
+                        value={isEditingTable ? draftTable : tableNumber}
+                        readOnly={
+                          (tableLockedFromQr && !isEditingTable) || isAddition
                         }
-                        onChange={(event) => setTableNumber(event.target.value)}
+                        disabled={
+                          isSubmitting ||
+                          ((tableLockedFromQr && !isEditingTable) ||
+                            isAddition)
+                        }
+                        onChange={(event) => {
+                          if (isEditingTable) {
+                            onDraftTableChange?.(event.target.value);
+                            return;
+                          }
+                          setTableNumber(event.target.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (!isEditingTable) return;
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            onConfirmTableEdit?.();
+                          }
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            onCancelTableEdit?.();
+                          }
+                        }}
                         className={fieldClass}
+                        aria-invalid={Boolean(tableEditError)}
                       />
                     </label>
-                    {tableLockedFromQr ? (
+                    {tableEditError ? (
+                      <p role="alert" className="text-xs font-medium text-destructive">
+                        {tableEditError}
+                      </p>
+                    ) : null}
+                    {isEditingTable ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={onConfirmTableEdit}
+                          className={`${focusRing} rounded-xl bg-[var(--menu-accent)] px-3.5 py-2 text-xs font-bold text-[var(--menu-accent-fg)]`}
+                        >
+                          Usar esta mesa
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={onCancelTableEdit}
+                          className={`${focusRing} rounded-xl bg-secondary px-3.5 py-2 text-xs font-bold text-muted-foreground`}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : tableLockedFromQr ? (
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="inline-flex items-center rounded-lg bg-live-muted px-2.5 py-1 text-xs font-bold text-live-ink">
-                          {formatTableLabel(tableNumber || "")} · QR
+                          {formatTableLabel(tableNumber || "")} · pedís aquí
                         </span>
                         {onChangeTable ? (
                           <button
@@ -509,13 +640,13 @@ export function CartBar({
 
               <button
                 type="button"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isEditingTable}
                 onClick={() => {
                   void handleConfirmOrder();
                 }}
                 className={`${focusRing} w-full rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70`}
               >
-                {confirmLabel}
+                {isEditingTable ? "Confirma la mesa primero" : confirmLabel}
               </button>
             </div>
           </div>

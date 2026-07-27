@@ -7,6 +7,10 @@ import { ApiError } from "@/services/apiClient";
 import type { Product, RestaurantProfile } from "@/types/api";
 import { MenuView } from "@/components/customer/menu-view";
 import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
+import {
+  formatTableLabel,
+  normalizeTableParam,
+} from "@/lib/table-session";
 
 type TenantMenuPageProps = {
   params: Promise<{ tenant: string }>;
@@ -128,7 +132,7 @@ export default async function TenantMenuPage({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={profile.logoUrl}
-              alt=""
+              alt={`Logo de ${restaurantName}`}
               className={
                 hasBrandFill
                   ? "size-14 rounded-2xl object-cover ring-2 ring-[var(--menu-accent-fg)]/25"
@@ -158,7 +162,10 @@ export default async function TenantMenuPage({
                   : "mt-1 text-sm leading-snug text-muted-foreground"
               }
             >
-              {menuSubtitle(profile)}
+              {headerStatus({
+                profile,
+                tableFromQuery,
+              })}
             </p>
           </div>
         </div>
@@ -217,7 +224,7 @@ function brandFromProfile(profile: RestaurantProfile | null): {
     accent,
     style: {
       ["--menu-accent" as string]: accent,
-      ["--menu-accent-fg" as string]: "#ffffff",
+      ["--menu-accent-fg" as string]: accentForeground(accent),
       ["--menu-accent-muted" as string]:
         `color-mix(in srgb, ${accent} 14%, transparent)`,
       ["--menu-accent-soft" as string]: soft ?? accent,
@@ -225,15 +232,41 @@ function brandFromProfile(profile: RestaurantProfile | null): {
   };
 }
 
-function menuSubtitle(profile: RestaurantProfile | null): string {
+/** Blanco u oscuro según luminancia relativa del accent (WCAG-ish). */
+function accentForeground(hex: string): string {
+  const raw = hex.replace("#", "");
+  const r = Number.parseInt(raw.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(raw.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(raw.slice(4, 6), 16) / 255;
+  const toLinear = (c: number) =>
+    c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  const L =
+    0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  return L > 0.45 ? "#171717" : "#ffffff";
+}
+
+function headerStatus({
+  profile,
+  tableFromQuery,
+}: {
+  profile: RestaurantProfile | null;
+  tableFromQuery: string | null;
+}): string {
   if (profile?.orderingEnabled === false) {
-    return "Consulta el catálogo. Los pedidos desde esta carta están desactivados.";
+    return "Solo consulta · pedidos desactivados";
   }
-  const bits: string[] = [];
-  if (profile?.hasPickup) bits.push("para llevar");
-  if (profile?.hasDelivery) bits.push("delivery");
-  if (bits.length === 0) return "Arma tu pedido desde tu mesa.";
-  return `Sin mesa: ${bits.join(" o ")}. Con QR de mesa, pedís al instante.`;
+
+  const table = normalizeTableParam(tableFromQuery);
+  if (table) {
+    return `Pidiendo en ${formatTableLabel(table)}`;
+  }
+
+  const hasPickup = profile?.hasPickup ?? true;
+  const hasDelivery = profile?.hasDelivery ?? false;
+  if (hasPickup && hasDelivery) return "Pedido para llevar o delivery";
+  if (hasDelivery) return "Pedido a domicilio";
+  if (hasPickup) return "Pedido para llevar";
+  return "Arma tu pedido";
 }
 
 function MenuUnavailableState({

@@ -106,7 +106,7 @@ export function ProductCard({
             <button
               type="button"
               onClick={() => addItem(product)}
-              className={`${focusRing} inline-flex min-h-10 items-center gap-1 rounded-xl bg-[var(--menu-accent)] px-3.5 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.97]`}
+              className={`${focusRing} inline-flex min-h-11 items-center gap-1 rounded-xl bg-[var(--menu-accent)] px-3.5 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.97]`}
             >
               <span className="text-base leading-none" aria-hidden>
                 +

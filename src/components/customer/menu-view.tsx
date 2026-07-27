@@ -297,6 +297,12 @@ export function MenuView({
     setPendingTableChange(null);
   }
 
+  const exploreOrdersUnavailable =
+    !tableLockedFromQr &&
+    Boolean(modules) &&
+    !(modules?.hasPickup ?? true) &&
+    !modules?.hasDelivery;
+
   return (
     <>
       {orderingEnabled ? (
@@ -307,6 +313,7 @@ export function MenuView({
           sessionLoading={sessionLoading}
           sessionOrder={sessionOrder}
           sessionError={sessionError}
+          exploreOrdersUnavailable={exploreOrdersUnavailable}
           onLeaveWrongTable={handleLeaveWrongTable}
           onRetrySession={() => {
             setSessionError(null);
@@ -383,8 +390,7 @@ export function MenuView({
 }
 
 /**
- * Una sola franja de contexto (mesa / sesión / error).
- * Sin mesa QR: no se muestra — el modo vive en el carrito.
+ * Una sola franja de contexto (mesa / sesión / error / explore sin canales).
  */
 function MenuContextStrip({
   tableLockedFromQr,
@@ -393,6 +399,7 @@ function MenuContextStrip({
   sessionLoading,
   sessionOrder,
   sessionError,
+  exploreOrdersUnavailable = false,
   onLeaveWrongTable,
   onRetrySession,
 }: {
@@ -402,6 +409,7 @@ function MenuContextStrip({
   sessionLoading: boolean;
   sessionOrder: Order | null;
   sessionError: string | null;
+  exploreOrdersUnavailable?: boolean;
   onLeaveWrongTable: () => void;
   onRetrySession: () => void;
 }) {
@@ -464,11 +472,11 @@ function MenuContextStrip({
         role="status"
         className={`${shell} flex items-center justify-between gap-3`}
       >
-        <p className="min-w-0">
+        <p className="min-w-0 truncate">
           <span className="font-medium text-foreground">
             {formatTableLabel(tableNumber)}
           </span>
-          <span> · pedís aquí</span>
+          <span> · pedido en esta mesa</span>
         </p>
         {cartCount === 0 ? (
           <button
@@ -479,6 +487,17 @@ function MenuContextStrip({
             ¿No es tu mesa?
           </button>
         ) : null}
+      </div>
+    );
+  }
+
+  if (exploreOrdersUnavailable) {
+    return (
+      <div role="status" className={shell}>
+        <p>
+          <span className="font-medium text-foreground">Solo consulta</span>
+          {" · para pedir usa el QR de tu mesa"}
+        </p>
       </div>
     );
   }

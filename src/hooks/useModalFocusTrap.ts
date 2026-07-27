@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Focus trap + Escape + restore focus for admin modal overlays.
- * Mirrors AdminShell drawer behaviour.
+ * Focus trap + Escape + restore focus for modal overlays
+ * (admin dialogs and customer cart sheet).
  */
 
 import { useEffect, useRef, type RefObject } from "react";

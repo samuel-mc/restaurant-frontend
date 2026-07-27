@@ -2,10 +2,10 @@
 
 /**
  * Barra sticky de categorías.
- * ≤4: chips en fila. >4: fila scrolleable + «Más» con lista completa.
+ * ≤4: chips en fila. ≥5: fila scrolleable + «Más» como salto (cerca → resto).
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 export interface CategoryTab {
   /** Identificador de la categoría. */
@@ -25,16 +25,44 @@ const OVERFLOW_AT = 5;
 const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
+/** Activa ± vecinos para saltos cortos en «Más». */
+function nearbyCategories(
+  categories: CategoryTab[],
+  activeId: string,
+  radius = 1,
+): CategoryTab[] {
+  if (categories.length === 0) return [];
+  const idx = categories.findIndex((category) => category.id === activeId);
+  if (idx < 0) return categories.slice(0, Math.min(3, categories.length));
+  const start = Math.max(0, idx - radius);
+  const end = Math.min(categories.length, idx + radius + 1);
+  return categories.slice(start, end);
+}
+
 export function CategoryBar({
   categories,
   activeId,
   onSelect,
 }: CategoryBarProps) {
+  const navRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
   const hasOverflow = categories.length >= OVERFLOW_AT;
+
+  const nearby = useMemo(
+    () => nearbyCategories(categories, activeId),
+    [categories, activeId],
+  );
+  const nearbyIds = useMemo(
+    () => new Set(nearby.map((category) => category.id)),
+    [nearby],
+  );
+  const rest = useMemo(
+    () => categories.filter((category) => !nearbyIds.has(category.id)),
+    [categories, nearbyIds],
+  );
 
   useEffect(() => {
     const tab = tabRefs.current.get(activeId);
@@ -60,8 +88,17 @@ export function CategoryBar({
         setMoreOpen(false);
       }
     };
+    const onPointer = (event: PointerEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) {
+        setMoreOpen(false);
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
   }, [moreOpen]);
 
   function selectCategory(id: string) {
@@ -71,6 +108,7 @@ export function CategoryBar({
 
   return (
     <nav
+      ref={navRef}
       aria-label="Categorías del menú"
       className="sticky top-0 z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 py-2 backdrop-blur-sm"
     >
@@ -91,7 +129,7 @@ export function CategoryBar({
                   }}
                   onClick={() => selectCategory(category.id)}
                   aria-pressed={isActive}
-                  className={`${focusRing} whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors active:scale-[0.98] ${
+                  className={`${focusRing} inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm transition-colors active:scale-[0.98] ${
                     isActive
                       ? "bg-[var(--menu-accent-muted)] font-semibold text-foreground"
                       : "font-medium text-muted-foreground hover:text-foreground"
@@ -110,9 +148,9 @@ export function CategoryBar({
             aria-expanded={moreOpen}
             aria-controls={moreId}
             onClick={() => setMoreOpen((open) => !open)}
-            className={`${focusRing} shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-foreground`}
+            className={`${focusRing} inline-flex min-h-11 shrink-0 items-center rounded-lg px-2.5 text-sm font-semibold text-foreground`}
           >
-          Más
+            Más
             <span className="sr-only"> categorías</span>
           </button>
         ) : null}
@@ -121,10 +159,13 @@ export function CategoryBar({
       {moreOpen && hasOverflow ? (
         <div
           id={moreId}
-          className="mt-2 max-h-[40vh] overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+          className="mt-2 max-h-[40vh] overflow-y-auto rounded-xl border border-border bg-card p-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
         >
-          <ul className="flex flex-col">
-            {categories.map((category) => {
+          <p className="px-2 pb-1.5 text-xs font-medium text-muted-foreground">
+            Cerca
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            {nearby.map((category) => {
               const isActive = category.id === activeId;
               return (
                 <li key={category.id}>
@@ -132,15 +173,15 @@ export function CategoryBar({
                     type="button"
                     onClick={() => selectCategory(category.id)}
                     aria-pressed={isActive}
-                    className={`${focusRing} flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm ${
+                    className={`${focusRing} flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-sm ${
                       isActive
                         ? "bg-[var(--menu-accent-muted)] font-semibold text-foreground"
-                        : "font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        : "font-medium text-foreground hover:bg-secondary"
                     }`}
                   >
-                    {category.name}
+                    <span className="min-w-0 truncate">{category.name}</span>
                     {isActive ? (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="shrink-0 text-xs text-muted-foreground">
                         Actual
                       </span>
                     ) : null}
@@ -149,6 +190,28 @@ export function CategoryBar({
               );
             })}
           </ul>
+
+          {rest.length > 0 ? (
+            <>
+              <p className="mt-3 px-2 pb-1.5 text-xs font-medium text-muted-foreground">
+                Todas
+              </p>
+              <ul className="flex flex-col">
+                {rest.map((category) => (
+                  <li key={category.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectCategory(category.id)}
+                      aria-pressed={false}
+                      className={`${focusRing} flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground`}
+                    >
+                      <span className="min-w-0 truncate">{category.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
         </div>
       ) : null}
     </nav>

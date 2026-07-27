@@ -21,14 +21,20 @@ import {
   updateOrderItemStatus,
   updateOrderStatus,
 } from "@/services/adminOrderService";
-import { ApiError } from "@/services/apiClient";
+import { getAdminErrorMessage } from "@/lib/admin-error";
 import { maxBatchNumber } from "@/lib/order-mapper";
 
 const UNDO_WINDOW_MS = 9_000;
 /** Misma regla visual que el borde rojo del ticket. */
 const URGENT_AFTER_MS = 15 * 60 * 1000;
-/** Solo Recibidos + En cocina cuentan para urgencia cross-lane. */
-const URGENCY_LANES: readonly OrderStatus[] = ["PENDING", "IN_KITCHEN"];
+/** Tras saltar al urgente: si el ticket sigue seleccionado, se libera el gate. */
+const REVIEW_GATE_DWELL_MS = 2_500;
+/** Carriles donde la edad cuenta como urgente (cross-lane). */
+const URGENCY_LANES: readonly OrderStatus[] = [
+  "PENDING",
+  "ACCEPTED",
+  "IN_KITCHEN",
+];
 
 const ACTIVE_STATUSES: OrderStatus[] = [
   "PENDING",
@@ -61,7 +67,7 @@ const COLUMNS: Array<{
   {
     status: "IN_KITCHEN",
     title: "En cocina",
-    cue: "Preparando · Listo al terminar",
+    cue: "Preparando · Listo = a cobrar · check = platillo servido",
     empty: "Cocina libre. Manda un aceptado con Cocinar.",
     chip: "bg-warn-muted text-warn-ink",
   },
@@ -336,7 +342,7 @@ export function KitchenDashboard({
   });
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 15_000);
+    const id = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -394,10 +400,10 @@ export function KitchenDashboard({
     } catch (error) {
       handleOrderEvent(order);
       clearStatusUndo();
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo mover la comanda. Revisa la conexión e inténtalo de nuevo.";
+      const message = getAdminErrorMessage(
+        error,
+        "No se pudo mover la comanda. Revisa la conexión e inténtalo de nuevo.",
+      );
       setTicketErrors((prev) => ({ ...prev, [order.uuid]: message }));
     } finally {
       setUpdatingUuid(null);
@@ -429,10 +435,10 @@ export function KitchenDashboard({
       );
       window.setTimeout(() => setBanner(null), 3_500);
     } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo deshacer. La comanda quedó en la etapa nueva.";
+      const message = getAdminErrorMessage(
+        error,
+        "No se pudo deshacer. La comanda quedó en la etapa nueva.",
+      );
       setTicketErrors((prev) => ({ ...prev, [previous.uuid]: message }));
     } finally {
       setUpdatingUuid(null);
@@ -471,10 +477,10 @@ export function KitchenDashboard({
       handleOrderEvent(updated);
     } catch (error) {
       handleOrderEvent(order);
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo marcar el platillo. Inténtalo de nuevo.";
+      const message = getAdminErrorMessage(
+        error,
+        "No se pudo marcar el platillo. Inténtalo de nuevo.",
+      );
       setTicketErrors((prev) => ({ ...prev, [order.uuid]: message }));
     } finally {
       setUpdatingUuid(null);
@@ -505,10 +511,10 @@ export function KitchenDashboard({
       );
       window.setTimeout(() => setBanner(null), 3_500);
     } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo cobrar. La cuenta sigue abierta; inténtalo de nuevo.";
+      const message = getAdminErrorMessage(
+        error,
+        "No se pudo cobrar. La cuenta sigue abierta; inténtalo de nuevo.",
+      );
       setTicketErrors((prev) => ({ ...prev, [order.uuid]: message }));
     } finally {
       setClosing(false);
@@ -538,6 +544,7 @@ export function KitchenDashboard({
   const overdueCounts = useMemo(() => {
     const counts: Partial<Record<OrderStatus, number>> = {
       PENDING: 0,
+      ACCEPTED: 0,
       IN_KITCHEN: 0,
     };
     for (const order of orders) {
@@ -563,9 +570,14 @@ export function KitchenDashboard({
 
   function jumpToUrgent() {
     if (!oldestOverdue) return;
+    const alreadySelected = selectedUuid === oldestOverdue.uuid;
     focusTouchedRef.current = true;
     setFocusStatus(oldestOverdue.status);
     setSelectedUuid(oldestOverdue.uuid);
+    if (alreadySelected) {
+      setReviewGate(null);
+      return;
+    }
     setReviewGate({
       uuid: oldestOverdue.uuid,
       status: oldestOverdue.status,
@@ -583,6 +595,17 @@ export function KitchenDashboard({
       setReviewGate(null);
     }
   }, [orders, reviewGate]);
+
+  useEffect(() => {
+    if (!reviewGate) return;
+    if (selectedUuid !== reviewGate.uuid) return;
+    const id = window.setTimeout(() => {
+      setReviewGate((current) =>
+        current?.uuid === reviewGate.uuid ? null : current,
+      );
+    }, REVIEW_GATE_DWELL_MS);
+    return () => window.clearTimeout(id);
+  }, [reviewGate, selectedUuid]);
 
   useEffect(() => {
     if (focusOrders.length === 0) {
@@ -733,6 +756,7 @@ export function KitchenDashboard({
               <OrderTicket
                 key={order.uuid}
                 order={order}
+                now={now}
                 isNew={flashUuid === order.uuid}
                 isAddition={additionUuid === order.uuid}
                 isSelected={selectedUuid === order.uuid}
@@ -759,25 +783,28 @@ export function KitchenDashboard({
 
   return (
     <div className="flex flex-col pb-8 font-jakarta-sans">
-      <header className="border-b border-border px-4 py-4 md:px-6 md:py-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight">Cocina</h1>
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">
-              {restaurantName}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ConnectionBadge state={connection} />
-            <span className="rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold tabular-nums">
-              {orders.length} activas
+      <header className="sticky top-14 z-20 border-b border-border bg-background/95 backdrop-blur-sm md:top-0">
+        <div className="flex items-center justify-between gap-2 px-4 py-2 md:px-6">
+          <h1
+            className="truncate text-lg font-bold tracking-tight md:text-xl"
+            title={restaurantName}
+          >
+            Cocina
+          </h1>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <ConnectionBadge state={connection} compact />
+            <span
+              className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold tabular-nums"
+              aria-label={`${orders.length} comandas activas`}
+            >
+              {orders.length}
             </span>
           </div>
         </div>
 
         <AdminRovingTablist
           aria-label="Etapas de cocina"
-          className="mt-3 flex gap-2 overflow-x-auto pb-1"
+          className="flex gap-1.5 overflow-x-auto px-4 pb-2 md:px-6"
         >
           {COLUMNS.map((column, index) => {
             const count = grouped[column.status]?.length ?? 0;
@@ -801,7 +828,7 @@ export function KitchenDashboard({
                   focusTouchedRef.current = true;
                   setFocusStatus(column.status);
                 }}
-                className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3.5 text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                   selected
                     ? "bg-primary text-primary-foreground"
                     : overdue > 0
@@ -821,7 +848,7 @@ export function KitchenDashboard({
                 </span>
                 {column.title}
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${
+                  className={`rounded-full px-1.5 py-0.5 text-xs tabular-nums ${
                     selected
                       ? "bg-primary-foreground/20"
                       : column.chip
@@ -831,13 +858,13 @@ export function KitchenDashboard({
                 </span>
                 {overdue > 0 ? (
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${
+                    className={`rounded-full px-1.5 py-0.5 text-xs font-bold tabular-nums ${
                       selected
                         ? "bg-primary-foreground/25 text-primary-foreground"
                         : "bg-destructive/15 text-destructive"
                     }`}
                   >
-                    {overdue} urg
+                    {overdue}
                   </span>
                 ) : null}
               </button>
@@ -845,45 +872,60 @@ export function KitchenDashboard({
           })}
         </AdminRovingTablist>
 
-        <KitchenShortcutCheatsheet />
-
-        <KitchenStatusRail
-          slot={
-            actionsLocked
-              ? "offline"
-              : reviewGate && reviewGateOrder
-                ? "review"
-                : showUrgentJump && oldestOverdue
-                  ? "urgent"
-                  : statusUndo
-                    ? "undo"
-                    : banner
-                      ? "banner"
-                      : null
-          }
-          offlineMessage="Sin conexión · no se pueden avanzar ni cobrar hasta reconectar"
-          banner={banner}
-          reviewOrder={reviewGateOrder}
-          oldestOverdue={oldestOverdue}
-          focusStatus={focusStatus}
-          now={now}
-          statusUndo={statusUndo}
-          undoSecondsLeft={undoSecondsLeft}
-          undoDisabled={Boolean(updatingUuid) || closing || actionsLocked}
-          onJumpUrgent={jumpToUrgent}
-          onReviewed={() => setReviewGate(null)}
-          onUndo={() => void handleUndoAdvance()}
-        />
+        <div className="space-y-1.5 px-4 pb-2 md:px-6">
+          <KitchenStatusRail
+            offline={actionsLocked}
+            offlineMessage="Sin conexión · no se pueden avanzar ni cobrar hasta reconectar"
+            banner={banner}
+            reviewOrder={reviewGateOrder}
+            oldestOverdue={showUrgentJump ? oldestOverdue : null}
+            focusStatus={focusStatus}
+            now={now}
+            statusUndo={statusUndo}
+            undoSecondsLeft={undoSecondsLeft}
+            undoDisabled={Boolean(updatingUuid) || closing || actionsLocked}
+            onJumpUrgent={jumpToUrgent}
+            onReviewed={() => setReviewGate(null)}
+            onUndo={() => void handleUndoAdvance()}
+          />
+          <KitchenShortcutCheatsheet />
+        </div>
       </header>
 
-      <div className="flex-1 p-4 md:p-6">
-        <div
-          id={LANE_PANEL_ID}
-          role="tabpanel"
-          aria-labelledby={`kitchen-tab-${focusStatus}`}
-          className="mx-auto w-full max-w-2xl xl:max-w-3xl"
-        >
-          {renderLane(focusStatus, focusOrders)}
+      <div className="flex-1 px-4 py-3 md:px-6 md:py-4">
+        <div className="mx-auto grid w-full max-w-2xl gap-4 xl:max-w-6xl xl:grid-cols-[minmax(0,1fr)_minmax(15rem,17.5rem)]">
+          <div
+            id={LANE_PANEL_ID}
+            role="tabpanel"
+            aria-labelledby={`kitchen-tab-${focusStatus}`}
+          >
+            {renderLane(focusStatus, focusOrders)}
+          </div>
+          <aside
+            className="hidden xl:flex xl:flex-col xl:gap-2"
+            aria-label="Otras etapas"
+          >
+            <p className="px-1 text-xs font-semibold text-muted-foreground">
+              Otras etapas
+            </p>
+            {COLUMNS.filter((column) => column.status !== focusStatus).map(
+              (column) => (
+                <StagePeekCard
+                  key={column.status}
+                  title={column.title}
+                  cue={column.cue}
+                  chip={column.chip}
+                  orders={grouped[column.status] ?? []}
+                  overdueCount={overdueCounts[column.status] ?? 0}
+                  now={now}
+                  onFocus={() => {
+                    focusTouchedRef.current = true;
+                    setFocusStatus(column.status);
+                  }}
+                />
+              ),
+            )}
+          </aside>
         </div>
       </div>
 
@@ -911,19 +953,106 @@ export function KitchenDashboard({
   );
 }
 
-function ConnectionBadge({ state }: { state: KitchenConnectionState }) {
-  const label =
+function StagePeekCard({
+  title,
+  cue,
+  chip,
+  orders,
+  overdueCount,
+  now,
+  onFocus,
+}: {
+  title: string;
+  cue: string;
+  chip: string;
+  orders: Order[];
+  overdueCount: number;
+  now: number;
+  onFocus: () => void;
+}) {
+  const preview = orders.slice(0, 2);
+
+  return (
+    <button
+      type="button"
+      onClick={onFocus}
+      className="rounded-2xl border border-border bg-card p-3 text-left outline-none transition-colors hover:bg-secondary/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-bold tracking-tight">{title}</p>
+          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+            {cue}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${chip}`}
+          >
+            {orders.length}
+          </span>
+          {overdueCount > 0 ? (
+            <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-bold tabular-nums text-destructive">
+              {overdueCount} urg
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {preview.length === 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">Sin comandas</p>
+      ) : (
+        <ul className="mt-2 space-y-1.5">
+          {preview.map((order) => (
+            <li
+              key={order.uuid}
+              className="truncate text-xs font-medium text-foreground"
+            >
+              <span className="text-muted-foreground">
+                {orderAgeMinutes(order, now)}m
+              </span>
+              {" · "}
+              {orderWho(order)}
+            </li>
+          ))}
+          {orders.length > preview.length ? (
+            <li className="text-xs text-muted-foreground">
+              +{orders.length - preview.length} más
+            </li>
+          ) : null}
+        </ul>
+      )}
+    </button>
+  );
+}
+
+function ConnectionBadge({
+  state,
+  compact = false,
+}: {
+  state: KitchenConnectionState;
+  compact?: boolean;
+}) {
+  const fullLabel =
     state === "connected"
       ? "En vivo"
       : state === "connecting"
         ? "Conectando…"
         : "Sin conexión · reintentando…";
+  const label =
+    compact && state === "connected"
+      ? "Vivo"
+      : compact && state === "disconnected"
+        ? "Offline"
+        : fullLabel;
 
   return (
     <span
       role="status"
       aria-live="polite"
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
+      aria-label={fullLabel}
+      className={`inline-flex items-center gap-1.5 rounded-full text-xs font-semibold ${
+        compact ? "px-2 py-1" : "gap-2 px-3 py-1.5"
+      } ${
         state === "connected"
           ? "bg-live-muted text-live-ink"
           : "bg-warn-muted text-warn-ink"
@@ -988,7 +1117,7 @@ function ShortcutList({ className }: { className?: string }) {
       </li>
       <li className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
         <Kbd>Enter</Kbd>
-        <span>acción</span>
+        <span>avanzar / cobrar</span>
       </li>
       <li className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
         <Kbd>U</Kbd>
@@ -1021,13 +1150,13 @@ function KitchenShortcutCheatsheet() {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="mt-2 overflow-hidden rounded-xl border border-border/70 bg-secondary/30">
+    <div className="overflow-hidden rounded-xl border border-border/70 bg-secondary/30">
       <button
         type="button"
         aria-expanded={expanded}
         aria-controls="kitchen-shortcuts-panel"
         onClick={() => setExpanded((open) => !open)}
-        className="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         <span className="min-w-0">
           <span className="text-xs font-bold tracking-tight text-muted-foreground">
@@ -1058,13 +1187,15 @@ function KitchenShortcutCheatsheet() {
   );
 }
 
-type StatusSlot = "offline" | "review" | "urgent" | "undo" | "banner" | null;
+type StatusStrip = "offline" | "undo" | "review" | "urgent" | "banner";
 
 /**
- * Una sola franja de estado: prioridad offline → revisión → urgente → undo → banner.
+ * Hasta 2 franjas pineadas (offline → undo → hueco para secundario).
+ * Si offline+undo llenan el rail, review/urgent/banner salen en overflow
+ * para no perder avisos críticos durante la ventana de deshacer.
  */
 function KitchenStatusRail({
-  slot,
+  offline,
   offlineMessage,
   banner,
   reviewOrder,
@@ -1078,7 +1209,7 @@ function KitchenStatusRail({
   onReviewed,
   onUndo,
 }: {
-  slot: StatusSlot;
+  offline: boolean;
   offlineMessage: string;
   banner: string | null;
   reviewOrder: Order | null;
@@ -1092,113 +1223,158 @@ function KitchenStatusRail({
   onReviewed: () => void;
   onUndo: () => void;
 }) {
-  if (!slot) return null;
+  const strips: StatusStrip[] = [];
+  if (offline) strips.push("offline");
+  if (statusUndo && strips.length < 2) strips.push("undo");
 
-  if (slot === "offline") {
-    return (
-      <p
-        role="alert"
-        aria-live="assertive"
-        className="mt-2 rounded-xl border border-warn/40 bg-warn-muted px-4 py-2.5 text-center text-sm font-semibold text-warn-ink"
-      >
-        {offlineMessage}
-      </p>
-    );
-  }
+  let secondary: StatusStrip | null = null;
+  if (reviewOrder) secondary = "review";
+  else if (oldestOverdue) secondary = "urgent";
+  else if (banner) secondary = "banner";
 
-  if (slot === "review" && reviewOrder) {
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/40 bg-warn-muted px-4 py-2.5"
-      >
-        <div className="min-w-0 text-sm">
-          <p className="font-semibold text-warn-ink">Revisa antes de avanzar</p>
-          <p className="mt-0.5 text-muted-foreground">
-            {orderWho(reviewOrder)} · {columnTitleFor(reviewOrder.status)}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onReviewed}
-          className="min-h-11 shrink-0 rounded-xl bg-warn px-4 py-2 text-sm font-bold text-warn-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+  const secondaryInRail = Boolean(secondary && strips.length < 2);
+  if (secondaryInRail && secondary) strips.push(secondary);
+  const overflow = secondary && !secondaryInRail ? secondary : null;
+
+  if (strips.length === 0 && !overflow) return null;
+
+  function renderStrip(strip: StatusStrip, denser: boolean) {
+    const pad = denser ? "px-3 py-2" : "px-4 py-2.5";
+
+    if (strip === "offline") {
+      return (
+        <p
+          key="offline"
+          role="alert"
+          aria-live="assertive"
+          className={`rounded-xl border border-warn/40 bg-warn-muted text-center text-sm font-semibold text-warn-ink ${pad}`}
         >
-          Revisado
-        </button>
-      </div>
-    );
-  }
+          {offlineMessage}
+        </p>
+      );
+    }
 
-  if (slot === "urgent" && oldestOverdue) {
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5"
-      >
-        <div className="min-w-0 text-sm">
-          <p className="font-semibold text-destructive">
-            Urgente · {orderWho(oldestOverdue)}
-          </p>
-          <p className="mt-0.5 text-muted-foreground">
-            {orderAgeMinutes(oldestOverdue, now)} min ·{" "}
-            {columnTitleFor(oldestOverdue.status)}
-            {focusStatus !== oldestOverdue.status ? " · otra etapa" : ""}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onJumpUrgent}
-          className="min-h-11 shrink-0 rounded-xl bg-destructive px-4 py-2 text-sm font-bold text-destructive-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    if (strip === "undo" && statusUndo) {
+      return (
+        <div
+          key="undo"
+          role="status"
+          aria-live="polite"
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-secondary/60 text-sm ${pad}`}
         >
-          Ir al urgente
-        </button>
-      </div>
-    );
-  }
-
-  if (slot === "undo" && statusUndo) {
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm"
-      >
-        <div className="min-w-0">
-          <p className="font-semibold">
-            {orderWho(statusUndo.previous)} →{" "}
-            {columnTitleFor(statusUndo.toStatus)}
-          </p>
-          <p className="mt-0.5 text-muted-foreground">
-            Deshacer ·{" "}
-            <span className="font-bold tabular-nums text-foreground">
-              {undoSecondsLeft}s
-            </span>
-          </p>
+          <div className="min-w-0">
+            <p className="font-semibold">
+              {orderWho(statusUndo.previous)} →{" "}
+              {columnTitleFor(statusUndo.toStatus)}
+            </p>
+            <p className="mt-0.5 text-muted-foreground">
+              Deshacer ·{" "}
+              <span className="font-bold tabular-nums text-foreground">
+                {undoSecondsLeft}s
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={undoDisabled}
+            title={
+              offline
+                ? "Sin conexión · no se puede deshacer"
+                : undoDisabled
+                  ? "Espera a que termine la acción en curso"
+                  : undefined
+            }
+            onClick={onUndo}
+            className="min-h-11 shrink-0 rounded-xl bg-card px-4 py-2 text-sm font-bold shadow-sm outline-none ring-1 ring-border transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
+          >
+            Deshacer
+          </button>
         </div>
-        <button
-          type="button"
-          disabled={undoDisabled}
-          onClick={onUndo}
-          className="min-h-11 shrink-0 rounded-xl bg-card px-4 py-2 text-sm font-bold shadow-sm outline-none ring-1 ring-border transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
+      );
+    }
+
+    if (strip === "review" && reviewOrder) {
+      return (
+        <div
+          key="review"
+          role="status"
+          aria-live="polite"
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/40 bg-warn-muted ${pad}`}
         >
-          Deshacer
-        </button>
-      </div>
-    );
+          <div className="min-w-0 text-sm">
+            <p className="font-semibold text-warn-ink">
+              Revisa antes de avanzar
+            </p>
+            <p className="mt-0.5 text-muted-foreground">
+              {orderWho(reviewOrder)} · {columnTitleFor(reviewOrder.status)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onReviewed}
+            className="min-h-11 shrink-0 rounded-xl bg-warn px-4 py-2 text-sm font-bold text-warn-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Revisado
+          </button>
+        </div>
+      );
+    }
+
+    if (strip === "urgent" && oldestOverdue) {
+      return (
+        <div
+          key="urgent"
+          role="status"
+          aria-live="polite"
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 ${pad}`}
+        >
+          <div className="min-w-0 text-sm">
+            <p className="font-semibold text-destructive">
+              Urgente · {orderWho(oldestOverdue)}
+            </p>
+            <p className="mt-0.5 text-muted-foreground">
+              {orderAgeMinutes(oldestOverdue, now)} min ·{" "}
+              {columnTitleFor(oldestOverdue.status)}
+              {focusStatus !== oldestOverdue.status ? " · otra etapa" : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onJumpUrgent}
+            className="min-h-11 shrink-0 rounded-xl bg-destructive px-4 py-2 text-sm font-bold text-destructive-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Ir al urgente
+          </button>
+        </div>
+      );
+    }
+
+    if (strip === "banner" && banner) {
+      return (
+        <p
+          key="banner"
+          role="status"
+          aria-live="polite"
+          className={`rounded-xl border border-border bg-secondary/50 text-center text-sm font-semibold text-foreground ${pad}`}
+        >
+          {banner}
+        </p>
+      );
+    }
+
+    return null;
   }
 
-  if (slot === "banner" && banner) {
-    return (
-      <p
-        role="status"
-        className="mt-2 rounded-xl border border-border bg-secondary/50 px-4 py-2.5 text-center text-sm font-semibold text-foreground"
-      >
-        {banner}
-      </p>
-    );
-  }
-
-  return null;
+  return (
+    <div
+      role="region"
+      aria-label="Estado de cocina"
+      className="flex flex-col gap-1.5"
+    >
+      {strips.map((strip) => renderStrip(strip, false))}
+      {overflow ? (
+        <div aria-label="Aviso adicional">{renderStrip(overflow, true)}</div>
+      ) : null}
+    </div>
+  );
 }

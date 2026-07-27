@@ -24,7 +24,7 @@ import {
   type ProductFormSubmitPayload,
 } from "@/services/adminCatalogService";
 import { downloadMenuExcelTemplate } from "@/services/adminMenuImportService";
-import { ApiError } from "@/services/apiClient";
+import { getAdminErrorMessage } from "@/lib/admin-error";
 import {
   BASIC_MAX_PRODUCTS,
   isProPlan,
@@ -135,9 +135,7 @@ export function MenuManager({
       showBanner("Plantilla Excel descargada");
     } catch (error) {
       showBanner(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo descargar la plantilla.",
+        getAdminErrorMessage(error, "No se pudo descargar la plantilla."),
       );
     } finally {
       setTemplateBusy(false);
@@ -266,9 +264,7 @@ export function MenuManager({
       setConfirm({ open: false });
     } catch (error) {
       showBanner(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo eliminar. Intenta de nuevo.",
+        getAdminErrorMessage(error, "No se pudo eliminar. Intenta de nuevo."),
       );
     } finally {
       setConfirmBusy(false);
@@ -310,9 +306,7 @@ export function MenuManager({
       setFormError(null);
     } catch (error) {
       setFormError(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo guardar el platillo.",
+        getAdminErrorMessage(error, "No se pudo guardar el platillo."),
       );
     } finally {
       setFormSubmitting(false);
@@ -353,9 +347,10 @@ export function MenuManager({
         );
       });
       showBanner(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo cambiar la disponibilidad.",
+        getAdminErrorMessage(
+          error,
+          "No se pudo cambiar la disponibilidad.",
+        ),
       );
     } finally {
       setTogglingUuid(null);
@@ -431,9 +426,7 @@ export function MenuManager({
       setMobileCatsOpen(false);
     } catch (error) {
       setCategoryError(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo guardar la categoría.",
+        getAdminErrorMessage(error, "No se pudo guardar la categoría."),
       );
     } finally {
       setCategoryBusy(false);

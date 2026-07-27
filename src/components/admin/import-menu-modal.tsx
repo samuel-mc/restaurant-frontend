@@ -8,7 +8,7 @@ import { useCallback, useId, useRef, useState, type DragEvent } from "react";
 import { FileSpreadsheet, Upload, X } from "lucide-react";
 import type { MenuImportResult } from "@/types/menu-import";
 import { uploadMenuExcel } from "@/services/adminMenuImportService";
-import { ApiError } from "@/services/apiClient";
+import { getAdminErrorMessage } from "@/lib/admin-error";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 interface ImportMenuModalProps {
@@ -89,9 +89,7 @@ export function ImportMenuModal({
       onImported(imported);
     } catch (err) {
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "No se pudo procesar el archivo.",
+        getAdminErrorMessage(err, "No se pudo procesar el archivo."),
       );
     } finally {
       setUploading(false);

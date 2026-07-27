@@ -4,13 +4,15 @@
  * Tarjeta/comanda del monitor de cocina — agrupada por rondas.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Check } from "lucide-react";
 import type { Order, OrderItem, OrderItemStatus, OrderStatus } from "@/types/api";
 import { maxBatchNumber } from "@/lib/order-mapper";
 
 interface OrderTicketProps {
   order: Order;
+  /** Reloj compartido del monitor (evita un interval por ticket). */
+  now: number;
   isNew?: boolean;
   isAddition?: boolean;
   isSelected?: boolean;
@@ -99,6 +101,7 @@ function groupByBatch(items: OrderItem[]): Array<{
 
 export function OrderTicket({
   order,
+  now,
   isNew = false,
   isAddition = false,
   isSelected = false,
@@ -112,7 +115,6 @@ export function OrderTicket({
   onItemStatus,
   onSelect,
 }: OrderTicketProps) {
-  const [now, setNow] = useState(() => Date.now());
   const action = nextAction(order.status);
   const latestBatch = maxBatchNumber(order);
   const rounds = useMemo(() => groupByBatch(order.items), [order.items]);
@@ -120,11 +122,6 @@ export function OrderTicket({
   const showTotal = order.status === "DELIVERED";
   const controlsDisabled = isUpdating || actionsLocked;
   const stageDisabled = controlsDisabled || advanceLocked;
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(id);
-  }, []);
 
   const elapsed = formatElapsed(order.createdAt, now);
   const ageMs = now - new Date(order.createdAt).getTime();
@@ -153,7 +150,7 @@ export function OrderTicket({
       className={`flex flex-col rounded-2xl border bg-background p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-[box-shadow,border-color] duration-200 ${
         isSelected
           ? "border-live ring-2 ring-live/40 ring-offset-2 ring-offset-card"
-          : order.orderType === "PICKUP"
+          : order.orderType === "PICKUP" || order.orderType === "DELIVERY"
             ? "border-warn/60"
             : isNew || isAddition
               ? "border-warn"
@@ -173,7 +170,7 @@ export function OrderTicket({
           <h3 className="truncate text-xl font-bold tracking-tight">
             {orderTypeLabel(order)}
           </h3>
-          {order.orderType === "PICKUP" ? (
+          {order.orderType === "PICKUP" || order.orderType === "DELIVERY" ? (
             <p className="mt-0.5 truncate text-sm font-medium text-muted-foreground">
               {[order.customerName?.trim(), order.customerPhone?.trim()]
                 .filter(Boolean)
@@ -201,6 +198,11 @@ export function OrderTicket({
       </header>
 
       <div className="mb-3 flex-1 space-y-3 border-y border-dashed border-border py-3">
+        {latestBatch > 1 ? (
+          <p className="text-xs text-muted-foreground">
+            Cada ronda es un envío aparte · prioriza la marcada Nueva
+          </p>
+        ) : null}
         {rounds.map(({ batch, items }) => {
           const isLatest = batch === latestBatch && latestBatch > 1;
           return (
@@ -211,7 +213,10 @@ export function OrderTicket({
                     Ronda {batch}
                   </h4>
                   {isLatest ? (
-                    <span className="rounded-full bg-warn-muted px-2 py-0.5 text-xs font-bold text-warn-ink">
+                    <span
+                      className="rounded-full bg-warn-muted px-2 py-0.5 text-xs font-bold text-warn-ink"
+                      title="Último envío del comensal"
+                    >
                       Nueva
                     </span>
                   ) : null}
@@ -264,24 +269,27 @@ export function OrderTicket({
                             title={
                               actionsLocked
                                 ? "Sin conexión · no se puede marcar"
-                                : "Marcar ítem entregado"
+                                : "Marcar platillo servido (no cierra la comanda)"
                             }
-                            aria-label={`Marcar entregado: ${item.productName}`}
+                            aria-label={`Marcar platillo servido: ${item.productName}`}
                             onClick={(event) => {
                               event.stopPropagation();
                               onItemStatus(order, item, "DELIVERED");
                             }}
-                            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50 ${focusRing}`}
+                            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`}
                           >
                             {itemBusy ? (
                               <span className="text-xs font-bold">…</span>
                             ) : (
-                              <Check className="size-3.5 opacity-70" aria-hidden />
+                              <Check
+                                className="size-5 stroke-[2.5]"
+                                aria-hidden
+                              />
                             )}
                           </button>
                         ) : delivered ? (
                           <Check
-                            className="mt-1.5 size-3.5 shrink-0 text-muted-foreground"
+                            className="mt-1.5 size-4 shrink-0 text-live"
                             aria-hidden
                           />
                         ) : null}
@@ -323,7 +331,7 @@ export function OrderTicket({
         <p className="mb-2 text-xs text-muted-foreground">
           {advanceLocked
             ? "Confirma Revisado arriba antes de marcar Listo"
-            : "Listo cierra la comanda · ✓ es opcional por platillo"}
+            : "Listo pasa la comanda a Por cobrar. El check marca un platillo ya servido; no cierra la cuenta."}
         </p>
       ) : null}
 
@@ -336,7 +344,9 @@ export function OrderTicket({
               ? "Sin conexión · espera a reconectar"
               : advanceLocked
                 ? "Revisa la comanda y pulsa Revisado"
-                : undefined
+                : action.label === "Listo"
+                  ? "Pasa la comanda a Por cobrar"
+                  : undefined
           }
           onClick={(event) => {
             event.stopPropagation();
@@ -351,24 +361,35 @@ export function OrderTicket({
       ) : null}
 
       {order.status === "DELIVERED" ? (
-        <button
-          type="button"
-          disabled={stageDisabled}
-          title={
-            actionsLocked
-              ? "Sin conexión · no se puede cobrar"
-              : advanceLocked
-                ? "Revisa la comanda y pulsa Revisado"
-                : undefined
-          }
-          onClick={(event) => {
-            event.stopPropagation();
-            onCloseAccount(order);
-          }}
-          className={`min-h-12 w-full rounded-xl bg-live px-4 py-3 text-base font-bold text-live-foreground transition-transform hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 ${focusRing}`}
-        >
-          {isUpdating && updatingItemId == null ? "Cerrando…" : "Cobrar"}
-        </button>
+        <>
+          <p className="mb-2 text-xs text-muted-foreground">
+            {advanceLocked
+              ? "Confirma Revisado arriba antes de cobrar"
+              : order.orderType === "IN_TABLE"
+                ? "Cobrar registra el pago, cierra la cuenta y libera la mesa."
+                : "Cobrar registra el pago y cierra la cuenta."}
+          </p>
+          <button
+            type="button"
+            disabled={stageDisabled}
+            title={
+              actionsLocked
+                ? "Sin conexión · no se puede cobrar"
+                : advanceLocked
+                  ? "Revisa la comanda y pulsa Revisado"
+                  : order.orderType === "IN_TABLE"
+                    ? "Cierra la cuenta y libera la mesa"
+                    : "Cierra la cuenta"
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              onCloseAccount(order);
+            }}
+            className={`min-h-12 w-full rounded-xl bg-live px-4 py-3 text-base font-bold text-live-foreground transition-transform hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 ${focusRing}`}
+          >
+            {isUpdating && updatingItemId == null ? "Cerrando…" : "Cobrar"}
+          </button>
+        </>
       ) : null}
     </article>
   );

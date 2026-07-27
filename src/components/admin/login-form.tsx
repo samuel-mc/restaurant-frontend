@@ -82,14 +82,14 @@ export function LoginForm({ tenantSlug, restaurantLabel }: LoginFormProps) {
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="flex w-full flex-col gap-5 rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-neutral-900"
+      className="flex w-full flex-col gap-5 rounded-2xl border border-border bg-card p-6 shadow-sm"
     >
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 dark:text-white/45">
+        <p className="text-xs font-semibold text-muted-foreground">
           Acceso seguro
         </p>
         <h2 className="text-lg font-bold text-foreground">{restaurantLabel}</h2>
-        <p className="text-sm text-black/55 dark:text-white/55">
+        <p className="text-sm text-muted-foreground">
           Usa las credenciales de administrador de este local.
         </p>
       </div>

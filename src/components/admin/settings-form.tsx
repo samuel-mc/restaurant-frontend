@@ -16,7 +16,7 @@ import {
   updateRestaurantProfile,
   type RestaurantProfileFormPayload,
 } from "@/services/adminRestaurantService";
-import { ApiError } from "@/services/apiClient";
+import { getAdminErrorMessage } from "@/lib/admin-error";
 import { redeemCoupon } from "@/services/adminBillingService";
 import {
   canPublishWebsite,
@@ -231,9 +231,7 @@ export function SettingsForm({
       }, 4000);
     } catch (error) {
       setCouponError(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo canjear el cupón.",
+        getAdminErrorMessage(error, "No se pudo canjear el cupón."),
       );
     } finally {
       setCouponBusy(false);
@@ -278,10 +276,10 @@ export function SettingsForm({
       }, 3200);
     } catch (error) {
       setErrors({
-        form:
-          error instanceof ApiError
-            ? error.message
-            : "No se pudo guardar la configuración.",
+        form: getAdminErrorMessage(
+          error,
+          "No se pudo guardar la configuración.",
+        ),
       });
     } finally {
       setSubmitting(false);
@@ -789,14 +787,14 @@ function ModuleSwitch({
         aria-label={label}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${focusRing} ${
+        className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${focusRing} ${
           checked ? "bg-live" : "bg-muted-foreground/30"
         }`}
       >
         <span
           aria-hidden
-          className={`inline-block size-6 rounded-full bg-white shadow transition-transform ${
-            checked ? "translate-x-7" : "translate-x-1"
+          className={`inline-block size-7 rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-8" : "translate-x-1"
           }`}
         />
       </button>

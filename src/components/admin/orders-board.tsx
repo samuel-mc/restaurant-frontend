@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Eye, Receipt, X } from "lucide-react";
+import { ChefHat, Eye, Receipt, X } from "lucide-react";
 import type { AdminOrderListFilter, Order, OrderItem, OrderPage } from "@/types/api";
 import { AdminOptionGroup } from "@/components/admin/admin-option-group";
 import {
@@ -16,15 +16,15 @@ import {
 } from "@/hooks/useKitchenOrdersSubscription";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { adminKitchenOrderHref } from "@/lib/admin-nav";
+import { getAdminErrorMessage } from "@/lib/admin-error";
 import { listOrders } from "@/services/adminOrderService";
-import { ApiError } from "@/services/apiClient";
 import { formatCurrency } from "@/lib/format";
 
 const PAGE_SIZE = 20;
 
 const FILTERS: Array<{ id: AdminOrderListFilter; label: string }> = [
   { id: "ALL", label: "Todas" },
-  { id: "OPEN", label: "Abiertas" },
+  { id: "OPEN", label: "Mesas abiertas" },
   { id: "CLOSED", label: "Cerradas" },
   { id: "PICKUP", label: "Para llevar" },
 ];
@@ -158,6 +158,55 @@ function summarizeItems(order: Order): string {
     .join(" · ");
 }
 
+function filterEmptyCopy(filter: AdminOrderListFilter): {
+  title: string;
+  body: string;
+} {
+  switch (filter) {
+    case "OPEN":
+      return {
+        title: "Sin mesas abiertas",
+        body: "Solo cuentas en mesa aún sin cobrar. Para llevar está en su propio filtro.",
+      };
+    case "PICKUP":
+      return {
+        title: "Sin pedidos para llevar",
+        body: "Cuando lleguen comandas para llevar aparecerán aquí.",
+      };
+    case "CLOSED":
+      return {
+        title: "Sin cuentas cerradas",
+        body: "Las cuentas cobradas aparecen aquí.",
+      };
+    case "ALL":
+    default:
+      return {
+        title: "Sin pedidos en este filtro",
+        body: "Cuando lleguen comandas aparecerán aquí automáticamente.",
+      };
+  }
+}
+
+function kitchenListAction(order: Order): {
+  href: string;
+  label: string;
+  tone: "live" | "primary";
+} | null {
+  if (order.status === "CLOSED" || order.status === "CANCELLED") return null;
+  if (order.status === "DELIVERED") {
+    return {
+      href: adminKitchenOrderHref(order.uuid),
+      label: "Cobrar en Cocina",
+      tone: "live",
+    };
+  }
+  return {
+    href: adminKitchenOrderHref(order.uuid),
+    label: "Abrir en Cocina",
+    tone: "primary",
+  };
+}
+
 function matchesFilter(order: Order, filter: AdminOrderListFilter): boolean {
   switch (filter) {
     case "OPEN":
@@ -207,9 +256,7 @@ export function OrdersBoard({
         setPageIndex(result.number);
       } catch (err) {
         setError(
-          err instanceof ApiError
-            ? err.message
-            : "No se pudieron cargar los pedidos.",
+          getAdminErrorMessage(err, "No se pudieron cargar los pedidos."),
         );
       } finally {
         setLoading(false);
@@ -353,22 +400,11 @@ export function OrdersBoard({
         ) : null}
 
         {page.empty ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
-            <Receipt
-              className="mx-auto size-10 text-muted-foreground"
-              aria-hidden
-            />
-            <p className="mt-3 text-base font-bold tracking-tight">
-              Sin pedidos en este filtro
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Cuando lleguen comandas aparecerán aquí automáticamente.
-            </p>
-          </div>
+          <OrdersFilterEmpty filter={filter} />
         ) : (
           <>
-            <div className="hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
-              <table className="w-full min-w-[720px] text-left text-sm">
+            <div className="hidden overflow-x-auto rounded-2xl border border-border bg-card lg:block">
+              <table className="w-full text-left text-sm">
                 <thead className="border-b border-border bg-secondary/50 text-xs font-semibold text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Orden</th>
@@ -418,16 +454,11 @@ export function OrdersBoard({
                           </span>
                         </td>
                         <td className="px-4 py-4 align-top">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setDetailOrder(order)}
-                              className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-secondary px-3.5 text-sm font-semibold hover:bg-secondary/80 ${focusRing}`}
-                            >
-                              <Eye className="size-3.5" aria-hidden />
-                              Ver detalle
-                            </button>
-                          </div>
+                          <OrderListActions
+                            order={order}
+                            onDetail={() => setDetailOrder(order)}
+                            layout="row"
+                          />
                         </td>
                       </tr>
                     );
@@ -436,7 +467,7 @@ export function OrdersBoard({
               </table>
             </div>
 
-            <ul className="grid gap-3 md:hidden">
+            <ul className="grid gap-3 lg:hidden">
               {page.content.map((order) => {
                 const badge = badgeMeta(order);
                 return (
@@ -449,9 +480,11 @@ export function OrdersBoard({
                         <p className="font-bold tracking-tight">
                           {orderTitle(order)}
                         </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {order.customerName}
-                        </p>
+                        {order.orderType !== "PICKUP" && order.customerName ? (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {order.customerName}
+                          </p>
+                        ) : null}
                       </div>
                       <span
                         className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}
@@ -463,22 +496,18 @@ export function OrdersBoard({
                       Inicio {formatClock(order.createdAt)} · Act.{" "}
                       {formatClock(order.updatedAt ?? order.createdAt)}
                     </p>
-                    <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+                    <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-foreground/80">
                       {summarizeItems(order)}
                     </p>
-                    <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                       <p className="text-lg font-bold tabular-nums">
                         {order.formattedTotal}
                       </p>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setDetailOrder(order)}
-                          className={`min-h-11 rounded-xl bg-secondary px-3.5 text-sm font-semibold ${focusRing}`}
-                        >
-                          Ver detalle
-                        </button>
-                      </div>
+                      <OrderListActions
+                        order={order}
+                        onDetail={() => setDetailOrder(order)}
+                        layout="stack"
+                      />
                     </div>
                   </li>
                 );
@@ -488,12 +517,12 @@ export function OrdersBoard({
         )}
 
         {!page.empty && page.totalPages > 1 ? (
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
               Página {page.number + 1} de {page.totalPages} ·{" "}
               {page.totalElements} pedidos
             </p>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex">
               <button
                 type="button"
                 disabled={page.first || loading}
@@ -522,6 +551,69 @@ export function OrdersBoard({
           onClose={() => setDetailOrder(null)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function OrderListActions({
+  order,
+  onDetail,
+  layout,
+}: {
+  order: Order;
+  onDetail: () => void;
+  layout: "row" | "stack";
+}) {
+  const kitchen = kitchenListAction(order);
+  const stack = layout === "stack";
+
+  return (
+    <div
+      className={
+        stack
+          ? "flex w-full flex-col gap-2 sm:w-auto sm:min-w-[12rem]"
+          : "flex flex-wrap justify-end gap-2"
+      }
+    >
+      {kitchen ? (
+        <Link
+          href={kitchen.href}
+          className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-3.5 text-sm font-bold ${focusRing} ${
+            stack ? "w-full" : ""
+          } ${
+            kitchen.tone === "live"
+              ? "bg-live text-live-foreground hover:brightness-110"
+              : "bg-primary text-primary-foreground hover:bg-primary/90"
+          }`}
+        >
+          <ChefHat className="size-3.5" aria-hidden />
+          {kitchen.label}
+        </Link>
+      ) : null}
+      <button
+        type="button"
+        onClick={onDetail}
+        className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-secondary px-3.5 text-sm font-semibold hover:bg-secondary/80 ${focusRing} ${
+          stack ? "w-full" : ""
+        }`}
+      >
+        <Eye className="size-3.5" aria-hidden />
+        Ver detalle
+      </button>
+    </div>
+  );
+}
+
+function OrdersFilterEmpty({ filter }: { filter: AdminOrderListFilter }) {
+  const { title, body } = filterEmptyCopy(filter);
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+      <Receipt
+        className="mx-auto size-10 text-muted-foreground"
+        aria-hidden
+      />
+      <p className="mt-3 text-base font-bold tracking-tight">{title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{body}</p>
     </div>
   );
 }
@@ -612,6 +704,11 @@ function OrderDetailModal({
             <p className="mt-6 text-sm text-muted-foreground">Sin consumos.</p>
           ) : (
             <div className="mt-4 space-y-5">
+              {rounds.length > 1 ? (
+                <p className="text-xs text-muted-foreground">
+                  Cada ronda es un envío distinto del comensal.
+                </p>
+              ) : null}
               {rounds.map(({ batch, items }) => (
                 <section key={batch}>
                   <h3 className="text-xs font-semibold text-muted-foreground">
@@ -664,7 +761,7 @@ function OrderDetailModal({
               href={adminKitchenOrderHref(order.uuid)}
               className={`mt-2 flex min-h-11 w-full items-center justify-center rounded-xl bg-live px-4 text-sm font-bold text-live-foreground hover:brightness-110 ${focusRing}`}
             >
-              Ir a Cocina a cobrar
+              Cobrar en Cocina
             </Link>
           ) : order.status !== "CLOSED" && order.status !== "CANCELLED" ? (
             <Link

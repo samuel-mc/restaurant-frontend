@@ -226,7 +226,7 @@ function LogoutButton({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-60 ${focusRing}`}
+      className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-60 ${focusRing}`}
     >
       <LogOut className="size-4 shrink-0" aria-hidden />
       <span className="truncate">
@@ -245,7 +245,7 @@ function SidebarBrand({
 }) {
   return (
     <div className="border-b border-border px-4 py-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-live-ink">
         PlatoListo
       </p>
       <p className="mt-1.5 truncate text-base font-bold tracking-tight">
@@ -278,7 +278,7 @@ function NavList({
               aria-current={active ? "page" : undefined}
               className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${focusRing} ${
                 active
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-live-muted text-live-ink"
                   : "text-foreground/80 hover:bg-secondary hover:text-foreground"
               }`}
             >

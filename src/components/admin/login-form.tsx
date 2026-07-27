@@ -108,11 +108,11 @@ export function LoginForm({ tenantSlug, restaurantLabel }: LoginFormProps) {
             onChange={(event) => setEmail(event.target.value)}
             aria-invalid={Boolean(fieldErrors.email)}
             aria-describedby={fieldErrors.email ? "email-error" : undefined}
-            className="rounded-xl border border-black/10 bg-black/2 px-3.5 py-2.5 text-sm outline-none ring-amber-500/30 transition focus:ring-2 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+            className="min-h-11 rounded-xl border border-border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:opacity-60"
             placeholder="admin@restaurante.com"
           />
           {fieldErrors.email ? (
-            <span id="email-error" className="text-xs text-red-600 dark:text-red-400">
+            <span id="email-error" className="text-xs font-medium text-destructive">
               {fieldErrors.email}
             </span>
           ) : null}
@@ -132,13 +132,13 @@ export function LoginForm({ tenantSlug, restaurantLabel }: LoginFormProps) {
             aria-describedby={
               fieldErrors.password ? "password-error" : undefined
             }
-            className="rounded-xl border border-black/10 bg-black/2 px-3.5 py-2.5 text-sm outline-none ring-amber-500/30 transition focus:ring-2 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+            className="min-h-11 rounded-xl border border-border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:opacity-60"
             placeholder="••••••••"
           />
           {fieldErrors.password ? (
             <span
               id="password-error"
-              className="text-xs text-red-600 dark:text-red-400"
+              className="text-xs font-medium text-destructive"
             >
               {fieldErrors.password}
             </span>
@@ -149,7 +149,7 @@ export function LoginForm({ tenantSlug, restaurantLabel }: LoginFormProps) {
       {formError ? (
         <p
           role="alert"
-          className="rounded-xl bg-red-500/10 px-3.5 py-3 text-sm leading-snug text-red-700 dark:text-red-300"
+          className="rounded-xl bg-destructive/10 px-3.5 py-3 text-sm font-medium leading-snug text-destructive"
         >
           {formError}
         </p>
@@ -158,9 +158,9 @@ export function LoginForm({ tenantSlug, restaurantLabel }: LoginFormProps) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="mt-1 w-full rounded-xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 dark:bg-white dark:text-neutral-900"
+        className="mt-1 min-h-11 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
       >
-        {isSubmitting ? "Iniciando sesión..." : "Entrar al panel"}
+        {isSubmitting ? "Iniciando sesión…" : "Entrar al panel"}
       </button>
     </form>
   );

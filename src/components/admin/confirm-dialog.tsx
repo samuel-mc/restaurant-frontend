@@ -4,11 +4,15 @@
  * Diálogo de confirmación reutilizable (overlay admin).
  */
 
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
+
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
   description: string;
   confirmLabel?: string;
+  /** Texto del botón confirm mientras `busy` (p. ej. "Cerrando…"). */
+  busyLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
   tone?: "danger" | "neutral";
@@ -24,12 +28,19 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = "Confirmar",
+  busyLabel = "Procesando…",
   cancelLabel = "Cancelar",
   busy = false,
   tone = "danger",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const panelRef = useModalFocusTrap({
+    open,
+    onEscape: onCancel,
+    escapeEnabled: !busy,
+  });
+
   if (!open) return null;
 
   const confirmClass =
@@ -46,6 +57,7 @@ export function ConfirmDialog({
       }}
     >
       <div
+        ref={panelRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
@@ -69,7 +81,7 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`}
+            className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`}
           >
             {cancelLabel}
           </button>
@@ -77,9 +89,9 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${confirmClass} ${focusRing}`}
+            className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold ${confirmClass} ${focusRing}`}
           >
-            {busy ? "Eliminando…" : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

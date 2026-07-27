@@ -9,6 +9,7 @@ import { FileSpreadsheet, Upload, X } from "lucide-react";
 import type { MenuImportResult } from "@/types/menu-import";
 import { uploadMenuExcel } from "@/services/adminMenuImportService";
 import { ApiError } from "@/services/apiClient";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 interface ImportMenuModalProps {
   open: boolean;
@@ -97,21 +98,28 @@ export function ImportMenuModal({
     }
   }
 
-  if (!open) return null;
-
   const focusRing =
     "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
   const locked = uploading || busy;
+  const panelRef = useModalFocusTrap({
+    open,
+    onEscape: handleClose,
+    escapeEnabled: !locked,
+  });
+
+  if (!open) return null;
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={`${inputId}-title`}
+      role="presentation"
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
       onClick={handleClose}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${inputId}-title`}
         className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-card shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -150,7 +158,7 @@ export function ImportMenuModal({
             onDrop={onDrop}
             className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
               dragging
-                ? "border-emerald-500 bg-emerald-500/10"
+                ? "border-live bg-live-muted"
                 : "border-border bg-secondary/60"
             }`}
           >
@@ -175,7 +183,7 @@ export function ImportMenuModal({
           {file ? (
             <div className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3">
               <FileSpreadsheet
-                className="size-5 shrink-0 text-emerald-600"
+                className="size-5 shrink-0 text-live"
                 aria-hidden
               />
               <div className="min-w-0 flex-1">
@@ -198,7 +206,7 @@ export function ImportMenuModal({
           {uploading ? (
             <p
               role="status"
-              className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-950 dark:text-amber-100"
+              className="rounded-xl bg-warn-muted px-4 py-3 text-sm font-medium text-warn-ink"
             >
               Procesando platillos y categorías…
             </p>
@@ -216,14 +224,14 @@ export function ImportMenuModal({
           {result ? (
             <div className="space-y-3 rounded-xl border border-border p-4">
               <div className="flex flex-wrap gap-2">
-                <span className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-800 dark:text-emerald-200">
+                <span className="inline-flex rounded-full bg-live-muted px-3 py-1 text-xs font-bold text-live-ink">
                   {result.creadosExitosamente} importados
                 </span>
                 <span className="inline-flex rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
                   {result.totalProcesados} filas procesadas
                 </span>
                 {result.errores.length > 0 ? (
-                  <span className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-950 dark:text-amber-100">
+                  <span className="inline-flex rounded-full bg-warn-muted px-3 py-1 text-xs font-bold text-warn-ink">
                     {result.errores.length} con error
                   </span>
                 ) : null}
@@ -241,7 +249,7 @@ export function ImportMenuModal({
                   {result.errores.map((err) => (
                     <li
                       key={`${err.row}-${err.reason}`}
-                      className="rounded-lg bg-amber-500/10 px-3 py-2 text-amber-950 dark:text-amber-50"
+                      className="rounded-lg bg-warn-muted px-3 py-2 text-warn-ink"
                     >
                       <span className="font-bold">Fila {err.row}:</span>{" "}
                       {err.reason}
@@ -249,7 +257,7 @@ export function ImportMenuModal({
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                <p className="text-sm text-live-ink">
                   Todos los platillos válidos se importaron correctamente.
                 </p>
               )}

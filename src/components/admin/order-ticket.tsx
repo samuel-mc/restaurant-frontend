@@ -13,12 +13,16 @@ interface OrderTicketProps {
   order: Order;
   isNew?: boolean;
   isAddition?: boolean;
+  isSelected?: boolean;
   isUpdating?: boolean;
   updatingItemId?: number | null;
   errorMessage?: string | null;
+  /** Bloquea mutaciones (p. ej. sin conexión). */
+  actionsLocked?: boolean;
   onAdvance: (order: Order) => void;
   onCloseAccount: (order: Order) => void;
   onItemStatus: (order: Order, item: OrderItem, status: OrderItemStatus) => void;
+  onSelect?: (order: Order) => void;
 }
 
 const focusRing =
@@ -43,7 +47,7 @@ function orderTypeLabel(order: Order): string {
     case "IN_TABLE":
       return order.tableNumber ? `Mesa ${order.tableNumber}` : "En mesa";
     case "PICKUP":
-      return "Pickup · Para recoger";
+      return "Para llevar";
     case "DELIVERY":
       return "Delivery";
     default:
@@ -58,32 +62,21 @@ function nextAction(status: OrderStatus): {
   switch (status) {
     case "PENDING":
       return {
-        label: "Aceptar pedido",
-        className: "bg-amber-500 text-amber-950 hover:bg-amber-400",
+        label: "Aceptar",
+        className: "bg-warn text-warn-foreground hover:brightness-95",
       };
     case "ACCEPTED":
       return {
-        label: "Empezar a cocinar",
+        label: "Cocinar",
         className: "bg-primary text-primary-foreground hover:bg-primary/90",
       };
     case "IN_KITCHEN":
       return {
-        label: "Marcar como listo",
-        className: "bg-emerald-600 text-white hover:bg-emerald-500",
+        label: "Listo",
+        className: "bg-live text-live-foreground hover:brightness-110",
       };
     default:
       return null;
-  }
-}
-
-function closeActionLabel(order: Order): string {
-  switch (order.orderType) {
-    case "PICKUP":
-      return "Cobrar / Entregar";
-    case "DELIVERY":
-      return "Cobrar / Despachar";
-    default:
-      return "Cobrar / Cerrar cuenta";
   }
 }
 
@@ -106,17 +99,23 @@ export function OrderTicket({
   order,
   isNew = false,
   isAddition = false,
+  isSelected = false,
   isUpdating = false,
   updatingItemId = null,
   errorMessage = null,
+  actionsLocked = false,
   onAdvance,
   onCloseAccount,
   onItemStatus,
+  onSelect,
 }: OrderTicketProps) {
   const [now, setNow] = useState(() => Date.now());
   const action = nextAction(order.status);
   const latestBatch = maxBatchNumber(order);
   const rounds = useMemo(() => groupByBatch(order.items), [order.items]);
+  const showItemDeliver = order.status === "IN_KITCHEN";
+  const showTotal = order.status === "DELIVERED";
+  const controlsDisabled = isUpdating || actionsLocked;
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -129,83 +128,92 @@ export function OrderTicket({
 
   return (
     <article
+      tabIndex={onSelect ? 0 : undefined}
+      onClick={onSelect ? () => onSelect(order) : undefined}
+      onKeyDown={
+        onSelect
+          ? (event) => {
+              if (event.key === " " || event.key === "Spacebar") {
+                event.preventDefault();
+                onSelect(order);
+              }
+            }
+          : undefined
+      }
+      aria-current={isSelected ? "true" : undefined}
+      aria-label={
+        onSelect
+          ? `${orderTypeLabel(order)}${isSelected ? ", seleccionada" : ""}`
+          : undefined
+      }
       className={`flex flex-col rounded-2xl border bg-background p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-[box-shadow,border-color] duration-200 ${
-        order.orderType === "PICKUP"
-          ? "border-amber-500/50"
-          : isNew || isAddition
-            ? "border-amber-500"
-            : urgent
-              ? "border-destructive"
-              : "border-border"
+        isSelected
+          ? "border-live ring-2 ring-live/40 ring-offset-2 ring-offset-card"
+          : order.orderType === "PICKUP"
+            ? "border-warn/60"
+            : isNew || isAddition
+              ? "border-warn"
+              : urgent
+                ? "border-destructive"
+                : "border-border"
       }`}
     >
       <header className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-mono text-xs font-semibold tracking-wide text-muted-foreground">
-            #{order.uuid.slice(0, 8).toUpperCase()}
+            #
+            {order.id != null
+              ? order.id
+              : order.uuid.slice(0, 8).toUpperCase()}
           </p>
           <h3 className="truncate text-xl font-bold tracking-tight">
             {orderTypeLabel(order)}
           </h3>
           {order.orderType === "PICKUP" ? (
-            <div className="mt-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2">
-              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-                Cliente · para recoger
-              </p>
-              <p className="truncate text-base font-bold text-foreground">
-                {order.customerName?.trim() || "Sin nombre"}
-              </p>
-              {order.customerPhone?.trim() ? (
-                <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-muted-foreground">
-                  {order.customerPhone.trim()}
-                </p>
-              ) : (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Sin teléfono
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="mt-0.5 text-sm font-medium text-muted-foreground">
+            <p className="mt-0.5 truncate text-sm font-medium text-muted-foreground">
+              {[order.customerName?.trim(), order.customerPhone?.trim()]
+                .filter(Boolean)
+                .join(" · ") || "Sin datos del cliente"}
+            </p>
+          ) : order.customerName ? (
+            <p className="mt-0.5 truncate text-sm font-medium text-muted-foreground">
               {order.customerName}
             </p>
-          )}
+          ) : null}
           {isAddition ? (
-            <span className="mt-2 inline-flex rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-amber-950">
+            <span className="mt-2 inline-flex rounded-full bg-warn px-2.5 py-0.5 text-xs font-bold text-warn-foreground">
               Adición
             </span>
           ) : null}
         </div>
-        <div className="shrink-0 text-right">
-          <p
-            className={`text-2xl font-bold tabular-nums leading-none ${
-              urgent ? "text-destructive" : "text-foreground"
-            }`}
-          >
-            {elapsed}
-          </p>
-          <p className="mt-1 text-xs font-semibold text-muted-foreground">
-            tiempo
-          </p>
-        </div>
+        <p
+          className={`shrink-0 text-2xl font-bold tabular-nums leading-none ${
+            urgent ? "text-destructive" : "text-foreground"
+          }`}
+          aria-label={`Tiempo ${elapsed}`}
+        >
+          {elapsed}
+        </p>
       </header>
 
-      <div className="mb-3 flex-1 space-y-4 border-y border-dashed border-border py-3">
+      <div className="mb-3 flex-1 space-y-3 border-y border-dashed border-border py-3">
         {rounds.map(({ batch, items }) => {
           const isLatest = batch === latestBatch && latestBatch > 1;
           return (
             <section key={batch}>
-              <div className="mb-2 flex items-center gap-2">
-                <h4 className="text-xs font-semibold text-muted-foreground">
-                  Ronda {batch}
-                </h4>
-                {isLatest ? (
-                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-200">
-                    Adición
-                  </span>
-                ) : null}
-              </div>
-              <ul className="space-y-2">
+              {latestBatch > 1 ? (
+                <div className="mb-1.5 flex items-center gap-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground">
+                    Ronda {batch}
+                  </h4>
+                  {isLatest ? (
+                    <span className="rounded-full bg-warn-muted px-2 py-0.5 text-xs font-bold text-warn-ink">
+                      Nueva
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              <ul className="space-y-1">
                 {items.map((item, index) => {
                   const delivered = item.status === "DELIVERED";
                   const key =
@@ -215,23 +223,17 @@ export function OrderTicket({
                   return (
                     <li
                       key={key}
-                      className={`rounded-xl px-3 py-2.5 ${
+                      className={`rounded-lg px-2.5 py-1.5 ${
                         delivered
-                          ? "bg-emerald-500/10 opacity-70"
+                          ? "opacity-55"
                           : isLatest
-                            ? "bg-amber-500/10 ring-1 ring-amber-500/30"
-                            : "bg-secondary/70"
+                            ? "bg-warn-muted"
+                            : ""
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 text-base leading-snug">
                           <div className="flex items-baseline gap-2">
-                            {delivered ? (
-                              <Check
-                                className="mt-1 size-4 shrink-0 text-emerald-600"
-                                aria-hidden
-                              />
-                            ) : null}
                             <span className="font-bold tabular-nums">
                               {item.quantity}×
                             </span>
@@ -246,22 +248,38 @@ export function OrderTicket({
                             </span>
                           </div>
                           {item.notes ? (
-                            <p className="mt-0.5 pl-7 text-sm font-medium italic text-amber-900 dark:text-amber-300">
+                            <p className="mt-0.5 text-sm font-medium italic text-warn-ink">
                               Obs: {item.notes}
                             </p>
                           ) : null}
                         </div>
-                        {item.id != null && !delivered ? (
+                        {showItemDeliver && item.id != null && !delivered ? (
                           <button
                             type="button"
-                            disabled={isUpdating || itemBusy}
-                            onClick={() =>
-                              onItemStatus(order, item, "DELIVERED")
+                            disabled={controlsDisabled || itemBusy}
+                            title={
+                              actionsLocked
+                                ? "Sin conexión · no se puede marcar"
+                                : "Marcar ítem entregado"
                             }
-                            className={`shrink-0 rounded-xl bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50 ${focusRing}`}
+                            aria-label={`Marcar entregado: ${item.productName}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onItemStatus(order, item, "DELIVERED");
+                            }}
+                            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50 ${focusRing}`}
                           >
-                            {itemBusy ? "…" : "Entregado"}
+                            {itemBusy ? (
+                              <span className="text-xs font-bold">…</span>
+                            ) : (
+                              <Check className="size-3.5 opacity-70" aria-hidden />
+                            )}
                           </button>
+                        ) : delivered ? (
+                          <Check
+                            className="mt-1.5 size-3.5 shrink-0 text-muted-foreground"
+                            aria-hidden
+                          />
                         ) : null}
                       </div>
                     </li>
@@ -279,12 +297,14 @@ export function OrderTicket({
         </p>
       ) : null}
 
-      <div className="mb-3 flex items-center justify-between text-base">
-        <span className="font-medium text-muted-foreground">Total</span>
-        <span className="text-lg font-bold tabular-nums">
-          {order.formattedTotal}
-        </span>
-      </div>
+      {showTotal ? (
+        <div className="mb-3 flex items-center justify-between text-base">
+          <span className="font-medium text-muted-foreground">Total</span>
+          <span className="text-lg font-bold tabular-nums">
+            {order.formattedTotal}
+          </span>
+        </div>
+      ) : null}
 
       {errorMessage ? (
         <p
@@ -295,12 +315,26 @@ export function OrderTicket({
         </p>
       ) : null}
 
+      {showItemDeliver ? (
+        <p className="mb-2 text-xs text-muted-foreground">
+          Listo cierra la comanda · ✓ es opcional por platillo
+        </p>
+      ) : null}
+
       {action ? (
         <button
           type="button"
-          disabled={isUpdating}
-          onClick={() => onAdvance(order)}
-          className={`min-h-12 w-full rounded-xl px-4 py-3 text-base font-bold transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 ${action.className} ${focusRing}`}
+          disabled={controlsDisabled}
+          title={
+            actionsLocked
+              ? "Sin conexión · espera a reconectar"
+              : undefined
+          }
+          onClick={(event) => {
+            event.stopPropagation();
+            onAdvance(order);
+          }}
+          className={`min-h-12 w-full rounded-xl px-4 py-3 text-base font-bold transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 ${action.className} ${focusRing}`}
         >
           {isUpdating && updatingItemId == null
             ? "Actualizando…"
@@ -308,20 +342,22 @@ export function OrderTicket({
         </button>
       ) : null}
 
-      {order.status === "DELIVERED" || order.orderType === "IN_TABLE" ? (
+      {order.status === "DELIVERED" ? (
         <button
           type="button"
-          disabled={isUpdating}
-          onClick={() => onCloseAccount(order)}
-          className={
-            order.status === "DELIVERED"
-              ? `min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-bold text-white transition-transform hover:bg-emerald-500 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 ${action ? "mt-2" : ""} ${focusRing}`
-              : `mt-2 min-h-11 w-full rounded-xl border border-border bg-transparent px-4 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-wait disabled:opacity-70 ${focusRing}`
+          disabled={controlsDisabled}
+          title={
+            actionsLocked
+              ? "Sin conexión · no se puede cobrar"
+              : undefined
           }
+          onClick={(event) => {
+            event.stopPropagation();
+            onCloseAccount(order);
+          }}
+          className={`min-h-12 w-full rounded-xl bg-live px-4 py-3 text-base font-bold text-live-foreground transition-transform hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 ${focusRing}`}
         >
-          {isUpdating && updatingItemId == null
-            ? "Cerrando…"
-            : closeActionLabel(order)}
+          {isUpdating && updatingItemId == null ? "Cerrando…" : "Cobrar"}
         </button>
       ) : null}
     </article>

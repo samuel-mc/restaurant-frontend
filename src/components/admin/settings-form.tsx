@@ -296,7 +296,7 @@ export function SettingsForm({
           aria-live="polite"
           className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4 md:top-5"
         >
-          <p className="pointer-events-auto max-w-lg rounded-xl border border-emerald-500/25 bg-card px-4 py-3 text-center text-sm font-semibold text-emerald-900 shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:text-emerald-200">
+          <p className="pointer-events-auto max-w-lg rounded-xl border border-live/25 bg-card px-4 py-3 text-center text-sm font-semibold text-live-ink shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
             {savedBanner}
           </p>
         </div>
@@ -464,7 +464,7 @@ export function SettingsForm({
               </span>
             </p>
             {profile.paymentStatus === "PENDING_PAYMENT" ? (
-              <p className="mt-2 text-sm text-amber-900 dark:text-amber-200">
+              <p className="mt-2 text-sm text-warn-ink">
                 Early access: coordina el pago (efectivo o transferencia) y
                 canjea el cupón que te entreguen para activar Pro.
               </p>
@@ -570,8 +570,8 @@ export function SettingsForm({
               onChange={setHasDelivery}
             />
             <ModuleSwitch
-              label="Pickup"
-              description="Para llevar / recoger en local"
+              label="Para llevar"
+              description="Pedidos para recoger en el local"
               checked={hasPickup}
               disabled={submitting || !orderingEnabled}
               onChange={setHasPickup}
@@ -790,7 +790,7 @@ function ModuleSwitch({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${focusRing} ${
-          checked ? "bg-emerald-600 dark:bg-emerald-500" : "bg-muted-foreground/30"
+          checked ? "bg-live" : "bg-muted-foreground/30"
         }`}
       >
         <span

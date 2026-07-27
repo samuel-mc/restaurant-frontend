@@ -12,6 +12,7 @@ import { AvailabilityToggle } from "@/components/admin/availability-toggle";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ImportMenuModal } from "@/components/admin/import-menu-modal";
 import { ProductFormModal } from "@/components/admin/product-form-modal";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import {
   createCategory,
   createProductWithForm,
@@ -495,7 +496,7 @@ export function MenuManager({
         {!isProPlan(plan) ? (
           <p
             role="status"
-            className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-950 dark:text-amber-100"
+            className="mt-4 rounded-xl border border-warn/25 bg-warn-muted px-4 py-2.5 text-sm text-warn-ink"
           >
             Plan Básico: {products.length}/{BASIC_MAX_PRODUCTS} platillos
             {atProductLimit
@@ -506,7 +507,7 @@ export function MenuManager({
         {banner ? (
           <p
             role="status"
-            className="mt-3 rounded-xl bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-900 dark:text-emerald-200"
+            className="mt-3 rounded-xl bg-live-muted px-4 py-2.5 text-sm font-semibold text-live-ink"
           >
             {banner}
           </p>
@@ -631,6 +632,7 @@ export function MenuManager({
       <ConfirmDialog
         open={confirm.open}
         busy={confirmBusy}
+        busyLabel="Eliminando…"
         title={
           confirm.open && confirm.kind === "product"
             ? "Eliminar platillo"
@@ -674,79 +676,112 @@ export function MenuManager({
       />
 
       {categoryDialog.open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
-          role="presentation"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeCategoryDialog();
+        <CategoryDialogPanel
+          mode={categoryDialog.mode}
+          name={categoryNameDraft}
+          error={categoryError}
+          busy={categoryBusy}
+          onNameChange={(value) => {
+            setCategoryNameDraft(value);
+            setCategoryError(null);
           }}
-        >
-          <form
-            onSubmit={handleCategorySubmit}
-            className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="category-dialog-title"
-          >
-            <h2
-              id="category-dialog-title"
-              className="text-lg font-bold tracking-tight"
-            >
-              {categoryDialog.mode === "create"
-                ? "Nueva categoría"
-                : "Editar categoría"}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Aparecerá en el menú digital y en este panel.
-            </p>
-            <label className="mt-4 block">
-              <span className="sr-only">Nombre de la categoría</span>
-              <input
-                autoFocus
-                value={categoryNameDraft}
-                onChange={(e) => {
-                  setCategoryNameDraft(e.target.value);
-                  setCategoryError(null);
-                }}
-                maxLength={50}
-                placeholder="Ej. Entradas"
-                aria-invalid={Boolean(categoryError)}
-                className={`w-full rounded-xl border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 ${
-                  categoryError
-                    ? "border-destructive"
-                    : "border-border"
-                }`}
-              />
-            </label>
-            {categoryError ? (
-              <p className="mt-2 text-sm font-medium text-destructive" role="alert">
-                {categoryError}
-              </p>
-            ) : null}
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                disabled={categoryBusy}
-                onClick={closeCategoryDialog}
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary ${focusRing}`}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={categoryBusy}
-                className={`${btnPrimary} disabled:opacity-50`}
-              >
-                {categoryBusy
-                  ? "Guardando…"
-                  : categoryDialog.mode === "create"
-                    ? "Crear"
-                    : "Guardar"}
-              </button>
-            </div>
-          </form>
-        </div>
+          onClose={closeCategoryDialog}
+          onSubmit={handleCategorySubmit}
+        />
       ) : null}
+    </div>
+  );
+}
+
+function CategoryDialogPanel({
+  mode,
+  name,
+  error,
+  busy,
+  onNameChange,
+  onClose,
+  onSubmit,
+}: {
+  mode: "create" | "edit";
+  name: string;
+  error: string | null;
+  busy: boolean;
+  onNameChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: (event: FormEvent) => void;
+}) {
+  const panelRef = useModalFocusTrap({
+    open: true,
+    onEscape: onClose,
+    escapeEnabled: !busy,
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="category-dialog-title"
+        className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
+      >
+        <form onSubmit={onSubmit}>
+          <h2
+            id="category-dialog-title"
+            className="text-lg font-bold tracking-tight"
+          >
+            {mode === "create" ? "Nueva categoría" : "Editar categoría"}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Aparecerá en el menú digital y en este panel.
+          </p>
+          <label className="mt-4 block">
+            <span className="sr-only">Nombre de la categoría</span>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              maxLength={50}
+              placeholder="Ej. Entradas"
+              aria-invalid={Boolean(error)}
+              className={`w-full rounded-xl border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 ${
+                error ? "border-destructive" : "border-border"
+              }`}
+            />
+          </label>
+          {error ? (
+            <p
+              className="mt-2 text-sm font-medium text-destructive"
+              role="alert"
+            >
+              {error}
+            </p>
+          ) : null}
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onClose}
+              className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary ${focusRing}`}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className={`${btnPrimary} disabled:opacity-50`}
+            >
+              {busy ? "Guardando…" : mode === "create" ? "Crear" : "Guardar"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -925,7 +960,7 @@ function ProductAdminCard({
               onClick={onEdit}
               aria-label={`Editar ${product.name}`}
               title="Editar"
-              className={`inline-flex size-10 items-center justify-center rounded-xl bg-secondary text-foreground transition-colors hover:bg-secondary/80 ${focusRing}`}
+              className={`inline-flex size-11 items-center justify-center rounded-xl bg-secondary text-foreground transition-colors hover:bg-secondary/80 ${focusRing}`}
             >
               <Pencil className="size-3.5" aria-hidden />
             </button>
@@ -934,7 +969,7 @@ function ProductAdminCard({
               onClick={onDelete}
               aria-label={`Eliminar ${product.name}`}
               title="Eliminar"
-              className={`inline-flex size-10 items-center justify-center rounded-xl text-destructive transition-colors hover:bg-destructive/10 ${focusRing}`}
+              className={`inline-flex size-11 items-center justify-center rounded-xl text-destructive transition-colors hover:bg-destructive/10 ${focusRing}`}
             >
               <Trash2 className="size-3.5" aria-hidden />
             </button>

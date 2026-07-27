@@ -31,9 +31,7 @@ export function AvailabilityToggle({
       role="group"
       aria-label={`Disponibilidad de ${productName}`}
       className={`inline-flex rounded-full p-0.5 ${
-        isAvailable
-          ? "bg-emerald-500/15 dark:bg-emerald-400/15"
-          : "bg-secondary"
+        isAvailable ? "bg-live-muted" : "bg-secondary"
       }`}
     >
       <button
@@ -44,9 +42,9 @@ export function AvailabilityToggle({
         onClick={() => {
           if (!isAvailable) onChange();
         }}
-        className={`rounded-full px-2.5 py-1.5 text-xs font-bold tracking-wide transition disabled:cursor-default ${focusRing} ${
+        className={`inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-bold tracking-wide transition disabled:cursor-default ${focusRing} ${
           isAvailable
-            ? "bg-emerald-600 text-white shadow-sm dark:bg-emerald-500"
+            ? "bg-live text-live-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground disabled:opacity-100"
         } ${busy && !isAvailable ? "animate-pulse" : ""}`}
       >
@@ -60,7 +58,7 @@ export function AvailabilityToggle({
         onClick={() => {
           if (isAvailable) onChange();
         }}
-        className={`rounded-full px-2.5 py-1.5 text-xs font-bold tracking-wide transition disabled:cursor-default ${focusRing} ${
+        className={`inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-bold tracking-wide transition disabled:cursor-default ${focusRing} ${
           !isAvailable
             ? "bg-primary text-primary-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground disabled:opacity-100"

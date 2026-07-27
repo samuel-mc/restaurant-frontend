@@ -1,19 +1,20 @@
 "use client";
 
 /**
- * Listado y control de pedidos/cuentas (caja).
- * Filtros + tabla/cards + detalle + cobro; WS + refetch tras cerrar.
+ * Listado de pedidos/cuentas (auditoría).
+ * Filtros + tabla/cards + detalle; WS en vivo. Cobro solo en Cocina.
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Eye, Receipt, X } from "lucide-react";
 import type { AdminOrderListFilter, Order, OrderItem, OrderPage } from "@/types/api";
-import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
 import {
   useKitchenOrdersSubscription,
   type KitchenConnectionState,
 } from "@/hooks/useKitchenOrdersSubscription";
-import { closeOrder, listOrders } from "@/services/adminOrderService";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
+import { listOrders } from "@/services/adminOrderService";
 import { ApiError } from "@/services/apiClient";
 import { formatCurrency } from "@/lib/format";
 
@@ -59,8 +60,8 @@ function orderTitle(order: Order): string {
     const who = order.customerName?.trim() || "Cliente";
     const phone = order.customerPhone?.trim();
     return phone
-      ? `${code} · Pickup · ${who} · ${phone}`
-      : `${code} · Pickup · ${who}`;
+      ? `${code} · Para llevar · ${who} · ${phone}`
+      : `${code} · Para llevar · ${who}`;
   }
   if (order.orderType === "DELIVERY") return `${code} · Delivery`;
   return code;
@@ -103,27 +104,27 @@ function badgeMeta(order: Order): { label: string; className: string } {
     case "PENDING":
       return {
         label: "Recibido",
-        className: "bg-amber-500/15 text-amber-900 dark:text-amber-200",
+        className: "bg-warn-muted text-warn-ink",
       };
     case "ACCEPTED":
       return {
         label: "Aceptado",
-        className: "bg-secondary text-foreground",
+        className: "bg-secondary text-foreground ring-1 ring-border",
       };
     case "IN_KITCHEN":
       return {
         label: "En cocina",
-        className: "bg-amber-500/20 text-amber-950 dark:text-amber-100",
+        className: "bg-warn-muted text-warn-ink",
       };
     case "DELIVERED":
       return {
         label: "Por cobrar",
-        className: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-200",
+        className: "bg-live-muted text-live-ink",
       };
     default:
       return {
         label: "Abierta",
-        className: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-200",
+        className: "bg-live-muted text-live-ink",
       };
   }
 }
@@ -171,12 +172,9 @@ function matchesFilter(order: Order, filter: AdminOrderListFilter): boolean {
   }
 }
 
-function canClose(order: Order): boolean {
-  return order.status !== "CLOSED" && order.status !== "CANCELLED";
-}
-
 export function OrdersBoard({
   tenantSlug,
+  restaurantName,
   initialPage,
   initialFilter,
 }: OrdersBoardProps) {
@@ -188,9 +186,6 @@ export function OrdersBoard({
   const [connection, setConnection] =
     useState<KitchenConnectionState>("connecting");
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
-  const [closeTarget, setCloseTarget] = useState<Order | null>(null);
-  const [closing, setClosing] = useState(false);
-  const [banner, setBanner] = useState<string | null>(null);
   const detailTitleId = useId();
 
   const skipInitialFetch = useRef(true);
@@ -279,31 +274,10 @@ export function OrdersBoard({
     onConnectionChange: setConnection,
   });
 
-  async function handleConfirmClose() {
-    if (!closeTarget || closing) return;
-    setClosing(true);
-    setError(null);
-    try {
-      const updated = await closeOrder(closeTarget.uuid, tenantSlug);
-      setBanner(`Cuenta #${orderDisplayCode(updated)} cobrada y cerrada.`);
-      setCloseTarget(null);
-      setDetailOrder((current) =>
-        current?.uuid === updated.uuid ? updated : current,
-      );
-      await refresh(filter, pageIndex);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "No se pudo cerrar la cuenta.",
-      );
-    } finally {
-      setClosing(false);
-    }
-  }
-
   const connectionLabel = useMemo(() => {
     if (connection === "connected") return "En vivo";
     if (connection === "connecting") return "Conectando…";
-    return "Sin conexión";
+    return "Sin conexión · reintentando…";
   }, [connection]);
 
   return (
@@ -313,7 +287,8 @@ export function OrdersBoard({
           <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Pedidos</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Mesas, tickets y cobro · {connectionLabel}
+              {restaurantName} · historial y detalle · cobro en Cocina ·{" "}
+              {connectionLabel}
             </p>
           </div>
           <button
@@ -328,8 +303,7 @@ export function OrdersBoard({
       </header>
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 md:gap-6 md:px-6 md:py-6">
-        <div
-          role="tablist"
+        <AdminRovingTablist
           aria-label="Filtros de pedidos"
           className="flex flex-wrap gap-2"
         >
@@ -341,11 +315,12 @@ export function OrdersBoard({
                 type="button"
                 role="tab"
                 aria-selected={active}
+                tabIndex={active ? 0 : -1}
                 onClick={() => {
                   setFilter(item.id);
                   setPageIndex(0);
                 }}
-                className={`min-h-10 rounded-xl px-3.5 text-sm font-semibold transition-colors ${focusRing} ${
+                className={`min-h-11 rounded-xl px-3.5 text-sm font-semibold transition-colors ${focusRing} ${
                   active
                     ? "bg-primary text-primary-foreground"
                     : "border border-border bg-card text-foreground hover:bg-secondary"
@@ -355,16 +330,7 @@ export function OrdersBoard({
               </button>
             );
           })}
-        </div>
-
-        {banner ? (
-          <div
-            role="status"
-            className="rounded-xl border border-emerald-500/25 bg-emerald-500/15 px-4 py-3 text-sm font-medium text-emerald-900 dark:text-emerald-100"
-          >
-            {banner}
-          </div>
-        ) : null}
+        </AdminRovingTablist>
 
         {error ? (
           <div
@@ -445,20 +411,11 @@ export function OrdersBoard({
                             <button
                               type="button"
                               onClick={() => setDetailOrder(order)}
-                              className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-secondary px-3 text-xs font-semibold hover:bg-secondary/80 ${focusRing}`}
+                              className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-secondary px-3.5 text-sm font-semibold hover:bg-secondary/80 ${focusRing}`}
                             >
                               <Eye className="size-3.5" aria-hidden />
                               Ver detalle
                             </button>
-                            {canClose(order) ? (
-                              <button
-                                type="button"
-                                onClick={() => setCloseTarget(order)}
-                                className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-500 ${focusRing}`}
-                              >
-                                Cobrar y cerrar
-                              </button>
-                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -506,19 +463,10 @@ export function OrdersBoard({
                         <button
                           type="button"
                           onClick={() => setDetailOrder(order)}
-                          className={`min-h-9 rounded-xl bg-secondary px-3 text-xs font-semibold ${focusRing}`}
+                          className={`min-h-11 rounded-xl bg-secondary px-3.5 text-sm font-semibold ${focusRing}`}
                         >
                           Ver detalle
                         </button>
-                        {canClose(order) ? (
-                          <button
-                            type="button"
-                            onClick={() => setCloseTarget(order)}
-                            className={`min-h-9 rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white ${focusRing}`}
-                          >
-                            Cobrar y cerrar
-                          </button>
-                        ) : null}
                       </div>
                     </div>
                   </li>
@@ -539,7 +487,7 @@ export function OrdersBoard({
                 type="button"
                 disabled={page.first || loading}
                 onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-                className={`min-h-9 rounded-xl border border-border bg-card px-3 text-xs font-semibold disabled:opacity-40 ${focusRing}`}
+                className={`min-h-11 rounded-xl border border-border bg-card px-3.5 text-sm font-semibold disabled:opacity-40 ${focusRing}`}
               >
                 Anterior
               </button>
@@ -547,7 +495,7 @@ export function OrdersBoard({
                 type="button"
                 disabled={page.last || loading}
                 onClick={() => setPageIndex((p) => p + 1)}
-                className={`min-h-9 rounded-xl border border-border bg-card px-3 text-xs font-semibold disabled:opacity-40 ${focusRing}`}
+                className={`min-h-11 rounded-xl border border-border bg-card px-3.5 text-sm font-semibold disabled:opacity-40 ${focusRing}`}
               >
                 Siguiente
               </button>
@@ -561,29 +509,8 @@ export function OrdersBoard({
           order={detailOrder}
           titleId={detailTitleId}
           onClose={() => setDetailOrder(null)}
-          onCloseAccount={() => {
-            setCloseTarget(detailOrder);
-          }}
         />
       ) : null}
-
-      <ConfirmDialog
-        open={Boolean(closeTarget)}
-        title="¿Cobrar y cerrar cuenta?"
-        description={
-          closeTarget
-            ? `Se marcará ${orderTitle(closeTarget)} como pagada (${closeTarget.formattedTotal}) y se liberará la mesa.`
-            : ""
-        }
-        confirmLabel={closing ? "Cerrando…" : "Cobrar y cerrar"}
-        cancelLabel="Cancelar"
-        busy={closing}
-        tone="neutral"
-        onConfirm={() => void handleConfirmClose()}
-        onCancel={() => {
-          if (!closing) setCloseTarget(null);
-        }}
-      />
     </div>
   );
 }
@@ -592,15 +519,14 @@ function OrderDetailModal({
   order,
   titleId,
   onClose,
-  onCloseAccount,
 }: {
   order: Order;
   titleId: string;
   onClose: () => void;
-  onCloseAccount: () => void;
 }) {
   const rounds = groupByBatch(order.items);
   const badge = badgeMeta(order);
+  const panelRef = useModalFocusTrap({ open: true, onEscape: onClose });
 
   return (
     <div
@@ -611,6 +537,7 @@ function OrderDetailModal({
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -647,6 +574,12 @@ function OrderDetailModal({
               {order.customerName}
             </span>
           </p>
+          {order.status === "DELIVERED" ? (
+            <p className="mt-3 rounded-xl border border-border bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
+              Para cobrar y cerrar, usa{" "}
+              <span className="font-semibold text-foreground">Cocina</span>.
+            </p>
+          ) : null}
           {rounds.length === 0 ? (
             <p className="mt-6 text-sm text-muted-foreground">Sin consumos.</p>
           ) : (
@@ -691,24 +624,13 @@ function OrderDetailModal({
               {formatCurrency(order.totalAmount)}
             </p>
           </div>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={onClose}
-              className={`flex min-h-11 flex-1 items-center justify-center rounded-xl bg-secondary px-4 text-sm font-semibold ${focusRing}`}
-            >
-              Cerrar
-            </button>
-            {canClose(order) ? (
-              <button
-                type="button"
-                onClick={onCloseAccount}
-                className={`flex min-h-11 flex-1 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-500 ${focusRing}`}
-              >
-                Cobrar y cerrar
-              </button>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`mt-3 flex min-h-11 w-full items-center justify-center rounded-xl bg-secondary px-4 text-sm font-semibold ${focusRing}`}
+          >
+            Cerrar
+          </button>
         </div>
       </div>
     </div>

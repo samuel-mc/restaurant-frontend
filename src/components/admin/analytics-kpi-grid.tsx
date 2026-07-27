@@ -10,6 +10,8 @@ import type { AnalyticsKpis } from "@/types/analytics";
 
 interface AnalyticsKpiGridProps {
   kpis: AnalyticsKpis;
+  /** Copy del delta vs periodo anterior (p. ej. "vs mes anterior"). */
+  comparisonLabel?: string;
 }
 
 interface KpiCardConfig {
@@ -20,7 +22,13 @@ interface KpiCardConfig {
   icon: typeof Banknote;
 }
 
-function ChangeBadge({ changePercent }: { changePercent: number }) {
+function ChangeBadge({
+  changePercent,
+  comparisonLabel,
+}: {
+  changePercent: number;
+  comparisonLabel: string;
+}) {
   const isPositive = changePercent >= 0;
   const Icon = isPositive ? ArrowUpRight : ArrowDownRight;
   const formatted = `${isPositive ? "+" : ""}${changePercent.toFixed(1)}%`;
@@ -28,23 +36,24 @@ function ChangeBadge({ changePercent }: { changePercent: number }) {
   return (
     <p
       className={`mt-3 inline-flex items-center gap-1 text-sm font-semibold ${
-        isPositive
-          ? "text-emerald-700 dark:text-emerald-400"
-          : "text-destructive"
+        isPositive ? "text-live-ink" : "text-destructive"
       }`}
     >
       <Icon className="size-4 shrink-0" aria-hidden />
       <span>
         {formatted}{" "}
         <span className="font-medium text-muted-foreground">
-          vs periodo anterior
+          {comparisonLabel}
         </span>
       </span>
     </p>
   );
 }
 
-export function AnalyticsKpiGrid({ kpis }: AnalyticsKpiGridProps) {
+export function AnalyticsKpiGrid({
+  kpis,
+  comparisonLabel = "vs periodo anterior",
+}: AnalyticsKpiGridProps) {
   const cards: KpiCardConfig[] = [
     {
       id: "sales",
@@ -88,11 +97,14 @@ export function AnalyticsKpiGrid({ kpis }: AnalyticsKpiGridProps) {
                     {card.value}
                   </p>
                 </div>
-                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-foreground">
+                <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-foreground">
                   <Icon className="size-4" aria-hidden />
                 </span>
               </div>
-              <ChangeBadge changePercent={card.changePercent} />
+              <ChangeBadge
+                changePercent={card.changePercent}
+                comparisonLabel={comparisonLabel}
+              />
             </article>
           );
         })}

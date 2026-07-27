@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { AnalyticsOverview } from "@/components/admin/analytics-overview";
 import { getAdminAccessToken } from "@/lib/auth-server";
+import { parseAnalyticsPeriod } from "@/lib/analytics-period";
 import {
   emptyAnalyticsSummary,
   getAnalyticsSummary,
@@ -17,8 +18,13 @@ export const metadata: Metadata = {
 
 /**
  * Métricas — pantalla inicial del panel.
+ * Periodo vía `?period=week|month|year` (default month).
  */
-export default async function AdminAnalyticsPage() {
+export default async function AdminAnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string | string[] }>;
+}) {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
   if (!tenantSlug) {
     return (
@@ -38,16 +44,27 @@ export default async function AdminAnalyticsPage() {
     redirect("/admin/login");
   }
 
-  let analytics: AnalyticsSummary = emptyAnalyticsSummary("month");
+  const query = await searchParams;
+  const period = parseAnalyticsPeriod(query.period);
+
+  let analytics: AnalyticsSummary = emptyAnalyticsSummary(period);
+  let loadError = false;
 
   try {
-    analytics = await getAnalyticsSummary(tenantSlug, "month");
+    analytics = await getAnalyticsSummary(tenantSlug, period);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       redirect("/admin/login");
     }
-    analytics = emptyAnalyticsSummary("month");
+    loadError = true;
+    analytics = emptyAnalyticsSummary(period);
   }
 
-  return <AnalyticsOverview summary={analytics} />;
+  return (
+    <AnalyticsOverview
+      summary={analytics}
+      period={period}
+      loadError={loadError}
+    />
+  );
 }

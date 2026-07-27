@@ -21,6 +21,16 @@
   --input: transparent;
   --input-background: #f5f5f5;
   --ring: #171717;
+
+  /* Operate / service-line (PlatoListo): Kitchen Action + Ticket Amber */
+  --live: #047857;
+  --live-foreground: #ffffff;
+  --live-muted: #ecfdf5;
+  --live-ink: #065f46;
+  --warn: #f59e0b;
+  --warn-foreground: #451a03;
+  --warn-muted: #fffbeb;
+  --warn-ink: #92400e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +55,15 @@
     --input: transparent;
     --input-background: #1f1f1f;
     --ring: #ededed;
+
+    --live: #34d399;
+    --live-foreground: #022c22;
+    --live-muted: rgba(52, 211, 153, 0.15);
+    --live-ink: #6ee7b7;
+    --warn: #fbbf24;
+    --warn-foreground: #451a03;
+    --warn-muted: rgba(251, 191, 36, 0.15);
+    --warn-ink: #fcd34d;
   }
 }
 
@@ -69,6 +88,14 @@
   --color-input: var(--input);
   --color-input-background: var(--input-background);
   --color-ring: var(--ring);
+  --color-live: var(--live);
+  --color-live-foreground: var(--live-foreground);
+  --color-live-muted: var(--live-muted);
+  --color-live-ink: var(--live-ink);
+  --color-warn: var(--warn);
+  --color-warn-foreground: var(--warn-foreground);
+  --color-warn-muted: var(--warn-muted);
+  --color-warn-ink: var(--warn-ink);
 
   /* Landing: Playfair Display / Nunito Sans / Pinyon Script / Jakarta (next/font) */
   --font-playfair-display: var(--font-playfair), ui-serif, Georgia,

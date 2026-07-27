@@ -18,10 +18,9 @@ import type {
   AnalyticsTopProduct,
 } from "@/types/analytics";
 
-/** Ticket Amber — énfasis secundario de tendencia (DESIGN.md). */
-const CHART_TREND = "#D97706";
-/** Signal Emerald — top productos. */
-const CHART_RANK = "#059669";
+/** Ticket Amber / Kitchen Action — alineados a tokens Operate. */
+const CHART_TREND = "#f59e0b";
+const CHART_RANK = "#047857";
 
 const CHART_THEME = {
   light: {

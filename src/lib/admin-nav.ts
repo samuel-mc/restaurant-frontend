@@ -32,13 +32,13 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   {
     href: "/admin/dashboard/kitchen",
     label: "Cocina",
-    description: "Comandas en tiempo real",
+    description: "Comandas y cobro en vivo",
     icon: ChefHat,
   },
   {
     href: "/admin/dashboard/orders",
     label: "Pedidos",
-    description: "Listado, cobro y cierre de cuentas",
+    description: "Historial y detalle de cuentas",
     icon: ClipboardList,
   },
   {

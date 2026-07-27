@@ -10,7 +10,7 @@ import type { OrderPage } from "@/types/api";
 
 export const metadata: Metadata = {
   title: "Pedidos · Panel",
-  description: "Listado, control y cobro de pedidos del restaurante.",
+  description: "Historial y detalle de pedidos del restaurante.",
 };
 
 /**

@@ -14,6 +14,7 @@ import {
 import { Download, Printer, QrCode } from "lucide-react";
 import { toPng } from "html-to-image";
 import { QrCard } from "@/components/admin/qr-card";
+import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
 import {
   buildPublicMenuUrl,
   getPublicRootDomain,
@@ -47,7 +48,7 @@ const MODE_OPTIONS = [
   {
     id: "table" as const,
     label: "Mesa específica",
-    hint: "Ancla ?m= en la URL",
+    hint: "El comensal abre el menú de esa mesa",
   },
   {
     id: "bulk" as const,
@@ -195,9 +196,9 @@ export function QrGenerator({
       <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-5 print:hidden md:gap-8 md:px-6 md:py-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <section className="rounded-2xl border border-border bg-card p-5">
           <h2 className="text-sm font-bold tracking-tight">Tipo de QR</h2>
-          <div
-            role="tablist"
+          <AdminRovingTablist
             aria-label="Tipo de código QR"
+            orientation="vertical"
             className="mt-3 flex flex-col gap-2"
           >
             {MODE_OPTIONS.map((item) => {
@@ -208,6 +209,7 @@ export function QrGenerator({
                   type="button"
                   role="tab"
                   aria-selected={active}
+                  tabIndex={active ? 0 : -1}
                   onClick={() => setMode(item.id)}
                   className={`min-h-11 rounded-xl px-4 py-3 text-left transition-colors ${focusRing} ${
                     active
@@ -230,7 +232,7 @@ export function QrGenerator({
                 </button>
               );
             })}
-          </div>
+          </AdminRovingTablist>
 
           {mode === "table" ? (
             <div className="mt-5">
@@ -326,7 +328,7 @@ export function QrGenerator({
               type="button"
               disabled={targets.length === 0 || bulkTooLarge}
               onClick={handlePrint}
-              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 ${focusRing}`}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-live px-4 text-sm font-semibold text-live-foreground hover:brightness-110 disabled:opacity-50 ${focusRing}`}
             >
               <Printer className="size-4" aria-hidden />
               Imprimir / exportar PDF

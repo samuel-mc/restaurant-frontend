@@ -7,6 +7,7 @@
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import type { Category, Product } from "@/types/api";
 import type { ProductFormSubmitPayload } from "@/services/adminCatalogService";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 export interface ProductFormValues {
   name: string;
@@ -234,6 +235,12 @@ function ProductFormDialog({
   const focusRing =
     "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
+  const panelRef = useModalFocusTrap({
+    open: true,
+    onEscape: onClose,
+    escapeEnabled: !submitting,
+  });
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
@@ -243,6 +250,7 @@ function ProductFormDialog({
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

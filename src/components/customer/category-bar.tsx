@@ -203,7 +203,7 @@ export function CategoryBar({
                       type="button"
                       onClick={() => selectCategory(category.id)}
                       aria-pressed={false}
-                      className={`${focusRing} flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground`}
+                      className={`${focusRing} flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground`}
                     >
                       <span className="min-w-0 truncate">{category.name}</span>
                     </button>

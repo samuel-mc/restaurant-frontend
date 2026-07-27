@@ -92,6 +92,7 @@ export default async function TenantMenuPage({
   const restaurantName = profile?.name ?? prettifyTenant(tenant);
   const brand = brandFromProfile(profile);
   const hasBrandFill = Boolean(brand.accent);
+  const supportLine = headerSupport(profile);
 
   return (
     <main
@@ -151,15 +152,15 @@ export default async function TenantMenuPage({
             <h1 className="truncate text-xl font-bold leading-tight tracking-tight">
               {restaurantName}
             </h1>
-            {headerSupport(profile) ? (
+            {supportLine ? (
               <p
                 className={
                   hasBrandFill
-                    ? "mt-0.5 line-clamp-1 text-sm leading-snug text-[var(--menu-accent-fg)]/80"
-                    : "mt-0.5 line-clamp-1 text-sm leading-snug text-muted-foreground"
+                    ? "mt-0.5 line-clamp-2 text-sm leading-snug text-[var(--menu-accent-fg)]/80"
+                    : "mt-0.5 line-clamp-2 text-sm leading-snug text-muted-foreground"
                 }
               >
-                {headerSupport(profile)}
+                {supportLine}
               </p>
             ) : null}
           </div>

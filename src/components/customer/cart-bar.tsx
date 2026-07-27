@@ -81,6 +81,53 @@ function resolveOrderTypes(
   return options;
 }
 
+function ClearCartConfirm({
+  disabled,
+  onConfirm,
+  onCancel,
+}: {
+  disabled?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      role="alertdialog"
+      aria-labelledby="clear-cart-title"
+      aria-describedby="clear-cart-desc"
+      className="flex flex-wrap items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2"
+    >
+      <div className="min-w-0 flex-1">
+        <p
+          id="clear-cart-title"
+          className="text-xs font-medium text-destructive"
+        >
+          ¿Vaciar tu pedido?
+        </p>
+        <p id="clear-cart-desc" className="sr-only">
+          Se eliminan todos los platillos del carrito.
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onConfirm}
+        className={`${focusRing} inline-flex min-h-11 items-center rounded-lg bg-destructive px-3 text-xs font-bold text-white`}
+      >
+        Vaciar
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onCancel}
+        className={`${focusRing} inline-flex min-h-11 items-center rounded-lg px-3 text-xs font-medium text-muted-foreground`}
+      >
+        Cancelar
+      </button>
+    </div>
+  );
+}
+
 export function CartBar({
   tenantSlug,
   modules,
@@ -398,10 +445,20 @@ export function CartBar({
           type="button"
           onClick={openSheet}
           aria-label={`${barLabel}. Total ${formatCurrency(subtotal)}`}
-          className={`${focusRing} pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98]`}
+          className={`${focusRing} pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl px-5 py-4 font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98] ${
+            ordersUnavailable
+              ? "border border-border bg-card text-foreground"
+              : "bg-[var(--menu-accent)] text-[var(--menu-accent-fg)]"
+          }`}
         >
           <span className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-7 min-w-7 items-center justify-center rounded-lg bg-[var(--menu-accent-fg)]/20 px-2 text-sm tabular-nums">
+            <span
+              className={`flex h-7 min-w-7 items-center justify-center rounded-lg px-2 text-sm tabular-nums ${
+                ordersUnavailable
+                  ? "bg-secondary text-foreground"
+                  : "bg-[var(--menu-accent-fg)]/20"
+              }`}
+            >
               {count}
             </span>
             <span className="truncate">{barLabel}</span>
@@ -631,46 +688,17 @@ export function CartBar({
                     </ul>
                     <div className="pt-1">
                       {confirmClear ? (
-                        <div
-                          role="alertdialog"
-                          aria-labelledby="clear-cart-title"
-                          aria-describedby="clear-cart-desc"
-                          className="flex flex-wrap items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p
-                              id="clear-cart-title"
-                              className="text-xs font-medium text-destructive"
-                            >
-                              ¿Vaciar tu pedido?
-                            </p>
-                            <p id="clear-cart-desc" className="sr-only">
-                              Se eliminan todos los platillos del carrito.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={isSubmitting}
-                            onClick={handleClearCart}
-                            className={`${focusRing} rounded-lg bg-destructive px-2.5 py-1.5 text-xs font-bold text-white`}
-                          >
-                            Vaciar
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isSubmitting}
-                            onClick={() => setConfirmClear(false)}
-                            className={`${focusRing} rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground`}
-                          >
-                            Cancelar
-                          </button>
-                        </div>
+                        <ClearCartConfirm
+                          disabled={isSubmitting}
+                          onConfirm={handleClearCart}
+                          onCancel={() => setConfirmClear(false)}
+                        />
                       ) : (
                         <button
                           type="button"
                           disabled={isSubmitting}
                           onClick={handleClearCart}
-                          className={`${focusRing} text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive`}
+                          className={`${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive`}
                         >
                           Vaciar pedido
                         </button>
@@ -912,46 +940,17 @@ export function CartBar({
 
                   <div className="mt-3 pt-1">
                     {confirmClear ? (
-                      <div
-                        role="alertdialog"
-                        aria-labelledby="clear-cart-title"
-                        aria-describedby="clear-cart-desc"
-                        className="flex flex-wrap items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p
-                            id="clear-cart-title"
-                            className="text-xs font-medium text-destructive"
-                          >
-                            ¿Vaciar tu pedido?
-                          </p>
-                          <p id="clear-cart-desc" className="sr-only">
-                            Se eliminan todos los platillos del carrito.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={isSubmitting}
-                          onClick={handleClearCart}
-                          className={`${focusRing} rounded-lg bg-destructive px-2.5 py-1.5 text-xs font-bold text-white`}
-                        >
-                          Vaciar
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSubmitting}
-                          onClick={() => setConfirmClear(false)}
-                          className={`${focusRing} rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground`}
-                        >
-                          Cancelar
-                        </button>
-                      </div>
+                      <ClearCartConfirm
+                        disabled={isSubmitting}
+                        onConfirm={handleClearCart}
+                        onCancel={() => setConfirmClear(false)}
+                      />
                     ) : (
                       <button
                         type="button"
                         disabled={isSubmitting}
                         onClick={handleClearCart}
-                        className={`${focusRing} text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive`}
+                        className={`${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive`}
                       >
                         Vaciar pedido
                       </button>

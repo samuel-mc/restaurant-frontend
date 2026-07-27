@@ -9,20 +9,22 @@ import { ApiError } from "@/services/apiClient";
 import type { Order } from "@/types/api";
 
 export const metadata: Metadata = {
-  title: "Cocina en vivo",
+  title: "Cocina · Panel",
   description: "Monitor en tiempo real de comandas activas.",
 };
 
 /**
- * Cocina en vivo — monitor reactivo (WebSockets / STOMP).
+ * Cocina — monitor reactivo (WebSockets / STOMP).
  */
 export default async function AdminKitchenPage() {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
   if (!tenantSlug) {
     return (
       <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
-        <h1 className="text-2xl font-bold">Tenant no identificado</h1>
-        <p className="text-sm text-foreground/60">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Tenant no identificado
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Abre el panel desde el subdominio de tu restaurante.
         </p>
       </div>
@@ -52,8 +54,10 @@ export default async function AdminKitchenPage() {
   if (loadError) {
     return (
       <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
-        <h1 className="text-2xl font-bold">Monitor no disponible</h1>
-        <p className="text-sm text-foreground/60">{loadError}</p>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Monitor no disponible
+        </h1>
+        <p className="text-sm text-muted-foreground">{loadError}</p>
       </div>
     );
   }

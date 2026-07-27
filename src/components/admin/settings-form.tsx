@@ -41,6 +41,9 @@ const ACCEPTED_TYPES = new Set([
   "image/gif",
 ]);
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+
 type FieldErrors = Partial<
   Record<keyof RestaurantProfileFormPayload | "form", string>
 >;
@@ -51,7 +54,6 @@ function revokeIfBlob(url: string | null) {
 
 export function SettingsForm({
   tenantSlug,
-  restaurantName,
   initialProfile,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialProfile.name);
@@ -287,39 +289,32 @@ export function SettingsForm({
   }
 
   return (
-    <div className="relative flex flex-col pb-6">
+    <div className="relative flex flex-col pb-8 font-jakarta-sans">
       {savedBanner ? (
         <div
           role="status"
           aria-live="polite"
           className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4 md:top-5"
         >
-          <p className="pointer-events-auto max-w-lg rounded-2xl border border-emerald-500/20 bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white shadow-lg shadow-emerald-900/20">
+          <p className="pointer-events-auto max-w-lg rounded-xl border border-emerald-500/25 bg-card px-4 py-3 text-center text-sm font-semibold text-emerald-900 shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:text-emerald-200">
             {savedBanner}
           </p>
         </div>
       ) : null}
 
-      <header className="border-b border-black/5 px-4 py-5 md:px-6 dark:border-white/10">
-        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Ajustes
-            </p>
-            <h1 className="text-2xl font-extrabold tracking-tight md:text-3xl">
-              Identidad y módulos
-            </h1>
-            <p className="mt-1 text-sm font-medium text-black/50 dark:text-white/50">
-              {restaurantName}
-            </p>
-          </div>
+      <header className="border-b border-border px-4 py-5 md:px-6">
+        <div className="mx-auto w-full max-w-3xl">
+          <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Marca, horarios, plan y módulos del restaurante.
+          </p>
         </div>
       </header>
 
       <form
         onSubmit={handleSubmit}
         encType="multipart/form-data"
-        className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-6"
+        className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-4 md:gap-6 md:p-6"
         noValidate
       >
         <Section
@@ -447,44 +442,44 @@ export function SettingsForm({
 
         <Section
           title="Plan y website"
-          description="Tu plan, pago y sitio institucional a medida (incluido en el setup Pro)."
+          description="Tu plan, pago y sitio institucional a medida."
         >
-          <div className="mb-4 rounded-2xl border border-black/5 bg-black/[0.02] px-4 py-3 dark:border-white/10 dark:bg-white/5">
-            <p className="text-xs font-bold uppercase tracking-wide text-black/45 dark:text-white/45">
+          <div className="mb-4 rounded-xl border border-border bg-secondary/60 px-4 py-3">
+            <p className="text-xs font-semibold text-muted-foreground">
               Plan actual
             </p>
-            <p className="mt-1 text-base font-extrabold tracking-tight">
+            <p className="mt-1 text-base font-bold tracking-tight">
               {planLabel(profile.plan)}
             </p>
-            <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+            <p className="mt-1 text-sm text-muted-foreground">
               Estado de pago:{" "}
               <span className="font-semibold text-foreground">
                 {paymentStatusLabel(profile.paymentStatus)}
               </span>
             </p>
-            <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+            <p className="mt-1 text-sm text-muted-foreground">
               Landing custom:{" "}
               <span className="font-semibold text-foreground">
                 {landingDelivered ? "Entregada" : "En preparación / no asignada"}
               </span>
             </p>
             {profile.paymentStatus === "PENDING_PAYMENT" ? (
-              <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+              <p className="mt-2 text-sm text-amber-900 dark:text-amber-200">
                 Early access: coordina el pago (efectivo o transferencia) y
                 canjea el cupón que te entreguen para activar Pro.
               </p>
             ) : !isProPlan(profile.plan) ? (
-              <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+              <p className="mt-1 text-sm text-muted-foreground">
                 El sitio a medida y el menú ilimitado están en el Plan Pro (+
                 setup de instalación).
               </p>
             ) : landingDelivered ? (
-              <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Tu landing personalizada ya está en el deploy. Al publicar,
                 será visible en tu subdominio.
               </p>
             ) : (
-              <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Pro activo: el menú digital ya opera. La landing a medida la
                 entrega el equipo PlatoListo tras el setup; mientras, los
                 visitantes verán “sitio en preparación”.
@@ -492,9 +487,9 @@ export function SettingsForm({
             )}
           </div>
 
-          <div className="mb-5 rounded-2xl border border-black/5 bg-white p-4 dark:border-white/10 dark:bg-neutral-950/40">
-            <p className="text-sm font-bold tracking-tight">Canjear cupón</p>
-            <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+          <div className="mb-5 rounded-xl border border-border bg-background p-4">
+            <p className="text-sm font-semibold tracking-tight">Canjear cupón</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               Tras pagar en efectivo o transferencia, ingresa el código que te
               compartimos.
             </p>
@@ -502,26 +497,28 @@ export function SettingsForm({
               <input
                 value={couponCode}
                 disabled={couponBusy || submitting}
-                onChange={(e) =>
-                  setCouponCode(e.target.value.toUpperCase())
-                }
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                 className={inputClass(Boolean(couponError))}
                 placeholder="PRO-DEMO-2026"
                 maxLength={40}
                 autoComplete="off"
                 spellCheck={false}
+                aria-label="Código de cupón"
               />
               <button
                 type="button"
                 disabled={couponBusy || submitting || !couponCode.trim()}
                 onClick={() => void handleRedeemCoupon()}
-                className="shrink-0 rounded-xl bg-foreground px-4 py-2.5 text-sm font-bold text-background disabled:opacity-50"
+                className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 ${focusRing}`}
               >
                 {couponBusy ? "Canjeando…" : "Canjear"}
               </button>
             </div>
             {couponError ? (
-              <p role="alert" className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
+              <p
+                role="alert"
+                className="mt-2 text-xs font-medium text-destructive"
+              >
                 {couponError}
               </p>
             ) : null}
@@ -592,7 +589,7 @@ export function SettingsForm({
         {errors.form ? (
           <p
             role="alert"
-            className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-300"
+            className="rounded-xl bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive"
           >
             {errors.form}
           </p>
@@ -602,11 +599,9 @@ export function SettingsForm({
           <button
             type="submit"
             disabled={submitting}
-            className="flex w-full items-center justify-center rounded-2xl bg-foreground px-5 py-3.5 text-sm font-extrabold text-background shadow-lg disabled:opacity-60"
+            className={`flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_10px_28px_rgba(0,0,0,0.18)] disabled:opacity-60 ${focusRing}`}
           >
-            {submitting
-              ? "Guardando configuración de tu marca…"
-              : "Guardar cambios"}
+            {submitting ? "Guardando…" : "Guardar cambios"}
           </button>
         </div>
       </form>
@@ -624,12 +619,10 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-neutral-900 md:p-6">
+    <section className="rounded-2xl border border-border bg-card p-5 md:p-6">
       <header className="mb-5">
-        <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-          {description}
-        </p>
+        <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </header>
       {children}
     </section>
@@ -651,14 +644,10 @@ function Field({
 }) {
   return (
     <label className={`flex flex-col gap-1.5 ${className}`} htmlFor={htmlFor}>
-      <span className="text-xs font-bold uppercase tracking-wide text-black/50 dark:text-white/50">
-        {label}
-      </span>
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       {children}
       {error ? (
-        <span className="text-xs font-medium text-red-600 dark:text-red-400">
-          {error}
-        </span>
+        <span className="text-xs font-medium text-destructive">{error}</span>
       ) : null}
     </label>
   );
@@ -680,9 +669,7 @@ function ColorField({
   const textId = useId();
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-bold uppercase tracking-wide text-black/50 dark:text-white/50">
-        {label}
-      </span>
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       <div className="flex items-center gap-3">
         <input
           type="color"
@@ -691,7 +678,7 @@ function ColorField({
           onChange={(e: ChangeEvent<HTMLInputElement>) =>
             onChange(e.target.value.toUpperCase())
           }
-          className="size-11 cursor-pointer rounded-xl border border-black/10 bg-transparent p-1 dark:border-white/15"
+          className={`size-11 cursor-pointer rounded-xl border border-border bg-transparent p-1 ${focusRing}`}
           aria-label={`${label} picker`}
         />
         <input
@@ -702,12 +689,11 @@ function ColorField({
           className={inputClass(Boolean(error))}
           placeholder="#171717"
           maxLength={7}
+          aria-label={`${label} HEX`}
         />
       </div>
       {error ? (
-        <span className="text-xs font-medium text-red-600 dark:text-red-400">
-          {error}
-        </span>
+        <span className="text-xs font-medium text-destructive">{error}</span>
       ) : null}
     </div>
   );
@@ -731,11 +717,9 @@ function ImagePicker({
   const inputId = useId();
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs font-bold uppercase tracking-wide text-black/50 dark:text-white/50">
-        {label}
-      </span>
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       <div
-        className={`overflow-hidden rounded-2xl border border-dashed border-black/15 bg-neutral-50 dark:border-white/15 dark:bg-neutral-800/50 ${
+        className={`overflow-hidden rounded-xl border border-dashed border-border bg-secondary ${
           aspect === "square" ? "aspect-square" : "aspect-[16/9]"
         }`}
       >
@@ -747,14 +731,14 @@ function ImagePicker({
             className="size-full object-cover"
           />
         ) : (
-          <div className="flex size-full items-center justify-center px-3 text-center text-xs font-semibold text-black/35 dark:text-white/35">
+          <div className="flex size-full items-center justify-center px-3 text-center text-xs font-semibold text-muted-foreground">
             Sin imagen
           </div>
         )}
       </div>
       <label
         htmlFor={inputId}
-        className={`inline-flex cursor-pointer items-center justify-center rounded-2xl border border-black/10 bg-white px-3 py-2 text-xs font-bold hover:bg-black/[0.03] dark:border-white/15 dark:bg-neutral-900 dark:hover:bg-white/5 ${
+        className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-card px-3 text-sm font-semibold transition-colors hover:bg-secondary ${focusRing} ${
           disabled ? "pointer-events-none opacity-50" : ""
         }`}
       >
@@ -769,11 +753,9 @@ function ImagePicker({
         onChange={(e) => onChange(e.target.files)}
       />
       {error ? (
-        <span className="text-xs font-medium text-red-600 dark:text-red-400">
-          {error}
-        </span>
+        <span className="text-xs font-medium text-destructive">{error}</span>
       ) : (
-        <span className="text-[11px] text-black/40 dark:text-white/40">
+        <span className="text-xs text-muted-foreground">
           JPG, PNG, WEBP o GIF · máx. 5 MB
         </span>
       )}
@@ -795,10 +777,10 @@ function ModuleSwitch({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-black/5 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-neutral-800/40">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-secondary/50 px-4 py-3">
       <div className="min-w-0">
-        <p className="font-bold">{label}</p>
-        <p className="text-sm text-black/50 dark:text-white/50">{description}</p>
+        <p className="font-semibold">{label}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <button
         type="button"
@@ -807,8 +789,8 @@ function ModuleSwitch({
         aria-label={label}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:opacity-50 ${
-          checked ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-600"
+        className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${focusRing} ${
+          checked ? "bg-emerald-600 dark:bg-emerald-500" : "bg-muted-foreground/30"
         }`}
       >
         <span
@@ -823,7 +805,7 @@ function ModuleSwitch({
 }
 
 function inputClass(hasError: boolean): string {
-  return `w-full rounded-2xl border bg-neutral-50 px-3.5 py-2.5 text-sm outline-none transition focus:border-foreground focus:ring-2 focus:ring-foreground/10 dark:bg-neutral-800 ${
-    hasError ? "border-red-400" : "border-black/10 dark:border-white/15"
+  return `w-full rounded-xl border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:opacity-60 ${
+    hasError ? "border-destructive" : "border-border"
   }`;
 }

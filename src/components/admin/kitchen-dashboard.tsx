@@ -30,27 +30,27 @@ const ACTIVE_STATUSES: OrderStatus[] = [
 const COLUMNS: Array<{
   status: OrderStatus;
   title: string;
-  accent: string;
+  chip: string;
 }> = [
   {
     status: "PENDING",
     title: "Recibidos",
-    accent: "border-amber-400 bg-amber-50 dark:bg-amber-500/10",
+    chip: "bg-amber-500/15 text-amber-900 dark:text-amber-200",
   },
   {
     status: "ACCEPTED",
     title: "Aceptados",
-    accent: "border-sky-400 bg-sky-50 dark:bg-sky-500/10",
+    chip: "bg-secondary text-foreground",
   },
   {
     status: "IN_KITCHEN",
     title: "En cocina",
-    accent: "border-orange-400 bg-orange-50 dark:bg-orange-500/10",
+    chip: "bg-amber-500/20 text-amber-950 dark:text-amber-100",
   },
   {
     status: "DELIVERED",
     title: "Por cobrar",
-    accent: "border-emerald-400 bg-emerald-50 dark:bg-emerald-500/10",
+    chip: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-200",
   },
 ];
 
@@ -76,7 +76,6 @@ function sortByCreatedAt(orders: Order[]): Order[] {
 
 export function KitchenDashboard({
   tenantSlug,
-  restaurantName,
   initialOrders,
 }: KitchenDashboardProps) {
   const [orders, setOrders] = useState<Order[]>(() =>
@@ -275,23 +274,18 @@ export function KitchenDashboard({
   }, [orders]);
 
   return (
-    <div className="flex flex-col pb-6">
-      <header className="border-b border-black/5 px-4 py-5 md:px-6 dark:border-white/10">
+    <div className="flex flex-col pb-8 font-jakarta-sans">
+      <header className="border-b border-border px-4 py-5 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Cocina en vivo
-            </p>
-            <h1 className="text-2xl font-black tracking-tight md:text-3xl">
-              Monitor de comandas
-            </h1>
-            <p className="mt-1 text-sm font-medium text-black/50 dark:text-white/50">
-              {restaurantName}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight">Cocina</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Comandas activas en tiempo real.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <ConnectionBadge state={connection} />
-            <span className="rounded-full bg-black/5 px-3 py-1.5 text-sm font-black tabular-nums dark:bg-white/10">
+            <span className="rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold tabular-nums">
               {orders.length} activas
             </span>
           </div>
@@ -299,34 +293,36 @@ export function KitchenDashboard({
         {banner ? (
           <p
             role="status"
-            className="mt-3 rounded-2xl bg-amber-400 px-4 py-3 text-center text-base font-black text-amber-950 animate-pulse"
+            className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/15 px-4 py-3 text-center text-sm font-semibold text-amber-950 dark:text-amber-100"
           >
             {banner}
           </p>
         ) : null}
       </header>
 
-      <div className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:p-6">
+      <div className="grid flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-2 md:gap-5 md:p-6 lg:grid-cols-4">
         {COLUMNS.map((column) => {
           const columnOrders = grouped[column.status] ?? [];
           return (
             <section
               key={column.status}
               aria-label={column.title}
-              className={`flex min-h-72 flex-col rounded-3xl border-2 border-dashed p-3 md:p-4 ${column.accent}`}
+              className="flex min-h-72 flex-col rounded-2xl border border-border bg-card p-3 md:p-4"
             >
-              <header className="mb-3 flex items-center justify-between px-1">
-                <h2 className="text-base font-black uppercase tracking-wide">
+              <header className="mb-3 flex items-center justify-between gap-2 px-1">
+                <h2 className="text-sm font-bold tracking-tight">
                   {column.title}
                 </h2>
-                <span className="rounded-full bg-white/90 px-3 py-1 text-base font-black tabular-nums dark:bg-black/30">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${column.chip}`}
+                >
                   {columnOrders.length}
                 </span>
               </header>
 
-              <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
+              <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
                 {columnOrders.length === 0 ? (
-                  <p className="rounded-2xl bg-white/60 px-3 py-10 text-center text-base font-semibold text-black/40 dark:bg-black/20 dark:text-white/40">
+                  <p className="rounded-xl border border-dashed border-border bg-secondary/40 px-3 py-10 text-center text-sm text-muted-foreground">
                     Sin comandas
                   </p>
                 ) : (
@@ -366,17 +362,17 @@ function ConnectionBadge({ state }: { state: KitchenConnectionState }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black ${
+      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
         state === "connected"
-          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-          : "bg-amber-500/15 text-amber-800 dark:text-amber-200"
+          ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
+          : "bg-amber-500/15 text-amber-900 dark:text-amber-200"
       }`}
     >
       <span
         aria-hidden
-        className={`size-2.5 rounded-full ${
+        className={`size-2 rounded-full ${
           state === "connected"
-            ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+            ? "bg-emerald-500"
             : "animate-pulse bg-amber-500"
         }`}
       />

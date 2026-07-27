@@ -21,6 +21,9 @@ interface OrderTicketProps {
   onItemStatus: (order: Order, item: OrderItem, status: OrderItemStatus) => void;
 }
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+
 function formatElapsed(createdAt: string, now: number): string {
   const start = new Date(createdAt).getTime();
   if (!Number.isFinite(start)) return "—";
@@ -40,7 +43,7 @@ function orderTypeLabel(order: Order): string {
     case "IN_TABLE":
       return order.tableNumber ? `Mesa ${order.tableNumber}` : "En mesa";
     case "PICKUP":
-      return "🛍️ PICKUP - Para Recoger";
+      return "Pickup · Para recoger";
     case "DELIVERY":
       return "Delivery";
     default:
@@ -55,18 +58,18 @@ function nextAction(status: OrderStatus): {
   switch (status) {
     case "PENDING":
       return {
-        label: "Aceptar Pedido",
-        className: "bg-amber-500 text-amber-950 shadow-amber-500/30",
+        label: "Aceptar pedido",
+        className: "bg-amber-500 text-amber-950 hover:bg-amber-400",
       };
     case "ACCEPTED":
       return {
-        label: "Empezar a Cocinar",
-        className: "bg-sky-600 text-white shadow-sky-600/30",
+        label: "Empezar a cocinar",
+        className: "bg-primary text-primary-foreground hover:bg-primary/90",
       };
     case "IN_KITCHEN":
       return {
-        label: "Marcar como Listo",
-        className: "bg-emerald-600 text-white shadow-emerald-600/30",
+        label: "Marcar como listo",
+        className: "bg-emerald-600 text-white hover:bg-emerald-500",
       };
     default:
       return null;
@@ -115,100 +118,102 @@ export function OrderTicket({
 
   return (
     <article
-      className={`flex flex-col rounded-3xl bg-white p-5 shadow-md ring-1 transition-all duration-500 dark:bg-neutral-900 ${
+      className={`flex flex-col rounded-2xl border bg-background p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-[box-shadow,border-color] duration-200 ${
         order.orderType === "PICKUP"
-          ? "ring-2 ring-violet-500 shadow-lg shadow-violet-500/20"
+          ? "border-amber-500/50"
           : isNew || isAddition
-            ? "ring-4 ring-amber-400 shadow-lg shadow-amber-500/25"
+            ? "border-amber-500"
             : urgent
-              ? "ring-2 ring-red-500"
-              : "ring-black/10 dark:ring-white/10"
+              ? "border-destructive"
+              : "border-border"
       }`}
     >
-      <header className="mb-4 flex items-start justify-between gap-3">
+      <header className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-sm font-bold tracking-wide text-black/50 dark:text-white/50">
+          <p className="font-mono text-xs font-semibold tracking-wide text-muted-foreground">
             #{order.uuid.slice(0, 8).toUpperCase()}
           </p>
-          <h3 className="truncate text-2xl font-black tracking-tight">
+          <h3 className="truncate text-xl font-bold tracking-tight">
             {orderTypeLabel(order)}
           </h3>
           {order.orderType === "PICKUP" ? (
-            <div className="mt-2 rounded-2xl bg-violet-500/15 px-3 py-2 ring-1 ring-violet-500/30">
-              <p className="text-[10px] font-black uppercase tracking-wider text-violet-800 dark:text-violet-200">
+            <div className="mt-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2">
+              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
                 Cliente · para recoger
               </p>
-              <p className="truncate text-base font-bold text-violet-950 dark:text-violet-50">
+              <p className="truncate text-base font-bold text-foreground">
                 {order.customerName?.trim() || "Sin nombre"}
               </p>
               {order.customerPhone?.trim() ? (
-                <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-violet-900/80 dark:text-violet-100/80">
+                <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-muted-foreground">
                   {order.customerPhone.trim()}
                 </p>
               ) : (
-                <p className="mt-0.5 text-xs font-medium text-violet-800/70 dark:text-violet-200/70">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   Sin teléfono
                 </p>
               )}
             </div>
           ) : (
-            <p className="mt-0.5 text-base font-semibold text-black/60 dark:text-white/60">
+            <p className="mt-0.5 text-sm font-medium text-muted-foreground">
               {order.customerName}
             </p>
           )}
           {isAddition ? (
-            <span className="mt-2 inline-flex rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-950 animate-pulse">
-              ¡Nuevo / Adición!
+            <span className="mt-2 inline-flex rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-amber-950">
+              Adición
             </span>
           ) : null}
         </div>
         <div className="shrink-0 text-right">
           <p
-            className={`text-3xl font-black tabular-nums leading-none ${
-              urgent ? "text-red-600" : "text-foreground"
+            className={`text-2xl font-bold tabular-nums leading-none ${
+              urgent ? "text-destructive" : "text-foreground"
             }`}
           >
             {elapsed}
           </p>
-          <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-black/40 dark:text-white/40">
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">
             tiempo
           </p>
         </div>
       </header>
 
-      <div className="mb-4 flex-1 space-y-4 border-y border-dashed border-black/15 py-4 dark:border-white/15">
+      <div className="mb-3 flex-1 space-y-4 border-y border-dashed border-border py-3">
         {rounds.map(({ batch, items }) => {
           const isLatest = batch === latestBatch && latestBatch > 1;
           return (
             <section key={batch}>
               <div className="mb-2 flex items-center gap-2">
-                <h4 className="text-xs font-black uppercase tracking-wider text-black/45 dark:text-white/45">
+                <h4 className="text-xs font-semibold text-muted-foreground">
                   Ronda {batch}
                 </h4>
                 {isLatest ? (
-                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800 dark:text-amber-200">
+                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-200">
                     Adición
                   </span>
                 ) : null}
               </div>
-              <ul className="space-y-2.5">
+              <ul className="space-y-2">
                 {items.map((item, index) => {
                   const delivered = item.status === "DELIVERED";
-                  const key = item.id ?? `${item.productUuid}-${batch}-${index}`;
-                  const itemBusy = updatingItemId != null && item.id === updatingItemId;
+                  const key =
+                    item.id ?? `${item.productUuid}-${batch}-${index}`;
+                  const itemBusy =
+                    updatingItemId != null && item.id === updatingItemId;
                   return (
                     <li
                       key={key}
-                      className={`rounded-2xl px-3 py-2.5 transition ${
+                      className={`rounded-xl px-3 py-2.5 ${
                         delivered
                           ? "bg-emerald-500/10 opacity-70"
                           : isLatest
-                            ? "bg-amber-500/10 ring-1 ring-amber-400/40"
-                            : "bg-black/[0.03] dark:bg-white/[0.04]"
+                            ? "bg-amber-500/10 ring-1 ring-amber-500/30"
+                            : "bg-secondary/70"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 text-lg leading-snug">
+                        <div className="min-w-0 text-base leading-snug">
                           <div className="flex items-baseline gap-2">
                             {delivered ? (
                               <Check
@@ -216,19 +221,21 @@ export function OrderTicket({
                                 aria-hidden
                               />
                             ) : null}
-                            <span className="font-black tabular-nums">
+                            <span className="font-bold tabular-nums">
                               {item.quantity}×
                             </span>
                             <span
-                              className={`font-bold ${
-                                delivered ? "line-through text-black/50 dark:text-white/50" : ""
+                              className={`font-semibold ${
+                                delivered
+                                  ? "text-muted-foreground line-through"
+                                  : ""
                               }`}
                             >
                               {item.productName}
                             </span>
                           </div>
                           {item.notes ? (
-                            <p className="mt-0.5 pl-7 text-sm font-semibold italic text-amber-800 dark:text-amber-300">
+                            <p className="mt-0.5 pl-7 text-sm font-medium italic text-amber-900 dark:text-amber-300">
                               Obs: {item.notes}
                             </p>
                           ) : null}
@@ -237,8 +244,10 @@ export function OrderTicket({
                           <button
                             type="button"
                             disabled={isUpdating || itemBusy}
-                            onClick={() => onItemStatus(order, item, "DELIVERED")}
-                            className="shrink-0 rounded-xl bg-emerald-600 px-2.5 py-1.5 text-[11px] font-black uppercase tracking-wide text-white disabled:opacity-50"
+                            onClick={() =>
+                              onItemStatus(order, item, "DELIVERED")
+                            }
+                            className={`shrink-0 rounded-xl bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50 ${focusRing}`}
                           >
                             {itemBusy ? "…" : "Entregado"}
                           </button>
@@ -254,16 +263,14 @@ export function OrderTicket({
       </div>
 
       {order.deliveryAddress ? (
-        <p className="mb-3 text-sm font-semibold text-black/55 dark:text-white/55">
+        <p className="mb-3 text-sm font-medium text-muted-foreground">
           Dir: {order.deliveryAddress}
         </p>
       ) : null}
 
-      <div className="mb-4 flex items-center justify-between text-base">
-        <span className="font-semibold text-black/45 dark:text-white/45">
-          Total
-        </span>
-        <span className="text-xl font-black tabular-nums">
+      <div className="mb-3 flex items-center justify-between text-base">
+        <span className="font-medium text-muted-foreground">Total</span>
+        <span className="text-lg font-bold tabular-nums">
           {order.formattedTotal}
         </span>
       </div>
@@ -271,7 +278,7 @@ export function OrderTicket({
       {errorMessage ? (
         <p
           role="alert"
-          className="mb-3 rounded-xl bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 dark:text-red-300"
+          className="mb-3 rounded-xl bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive"
         >
           {errorMessage}
         </p>
@@ -282,9 +289,11 @@ export function OrderTicket({
           type="button"
           disabled={isUpdating}
           onClick={() => onAdvance(order)}
-          className={`w-full rounded-2xl px-4 py-4 text-lg font-black shadow-md transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 ${action.className}`}
+          className={`min-h-12 w-full rounded-xl px-4 py-3 text-base font-bold transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 ${action.className} ${focusRing}`}
         >
-          {isUpdating && updatingItemId == null ? "Actualizando…" : action.label}
+          {isUpdating && updatingItemId == null
+            ? "Actualizando…"
+            : action.label}
         </button>
       ) : null}
 
@@ -293,11 +302,11 @@ export function OrderTicket({
           type="button"
           disabled={isUpdating}
           onClick={() => onCloseAccount(order)}
-          className="mt-2 w-full rounded-2xl border-2 border-foreground/20 bg-transparent px-4 py-3 text-base font-black text-foreground transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
+          className={`mt-2 min-h-11 w-full rounded-xl border border-border bg-transparent px-4 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-secondary disabled:cursor-wait disabled:opacity-70 ${focusRing}`}
         >
           {isUpdating && updatingItemId == null
             ? "Cerrando…"
-            : "Cobrar / Cerrar Cuenta"}
+            : "Cobrar / Cerrar cuenta"}
         </button>
       ) : null}
     </article>

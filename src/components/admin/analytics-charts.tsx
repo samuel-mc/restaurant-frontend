@@ -18,8 +18,10 @@ import type {
   AnalyticsTopProduct,
 } from "@/types/analytics";
 
-const CHART_ORANGE = "#ea580c";
-const CHART_EMERALD = "#059669";
+/** Ticket Amber — énfasis secundario de tendencia (DESIGN.md). */
+const CHART_TREND = "#D97706";
+/** Signal Emerald — top productos. */
+const CHART_RANK = "#059669";
 
 const CHART_THEME = {
   light: {
@@ -88,11 +90,11 @@ function SalesTooltip({
   if (!active || !payload?.length) return null;
   const amount = payload[0]?.value ?? 0;
   return (
-    <div className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-neutral-900 shadow-lg dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-50">
-      <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-300">
+    <div className="rounded-xl border border-border bg-card px-3 py-2 text-foreground shadow-[0_12px_28px_rgba(0,0,0,0.16)]">
+      <p className="text-xs font-medium text-muted-foreground">
         {label ? formatShortDate(label) : ""}
       </p>
-      <p className="mt-0.5 text-sm font-black tabular-nums text-neutral-900 dark:text-white">
+      <p className="mt-0.5 text-sm font-bold tabular-nums">
         {formatCurrency(amount)}
       </p>
     </div>
@@ -113,16 +115,12 @@ function ProductTooltip({
   const row = payload[0]?.payload;
   if (!row) return null;
   return (
-    <div className="rounded-2xl border border-black/10 bg-white px-3 py-2 text-neutral-900 shadow-lg dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-50">
-      <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-300">
-        {row.name}
-      </p>
-      <p className="mt-0.5 text-sm font-black tabular-nums text-neutral-900 dark:text-white">
+    <div className="rounded-xl border border-border bg-card px-3 py-2 text-foreground shadow-[0_12px_28px_rgba(0,0,0,0.16)]">
+      <p className="text-xs font-medium text-muted-foreground">{row.name}</p>
+      <p className="mt-0.5 text-sm font-bold tabular-nums">
         {formatCurrency(row.revenue)}
       </p>
-      <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-        {row.quantity} vendidos
-      </p>
+      <p className="text-xs text-muted-foreground">{row.quantity} vendidos</p>
     </div>
   );
 }
@@ -158,13 +156,13 @@ export function AnalyticsCharts({
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-5">
       <section
         aria-label="Tendencia de facturación"
-        className="rounded-3xl border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-neutral-900 md:p-5 lg:col-span-3"
+        className="rounded-2xl border border-border bg-card p-4 md:p-5 lg:col-span-3"
       >
-        <header className="mb-4 px-1">
-          <h3 className="text-base font-black tracking-tight md:text-lg">
+        <header className="mb-4">
+          <h2 className="text-base font-bold tracking-tight md:text-lg">
             Facturación reciente
-          </h3>
-          <p className="text-sm font-medium text-black/45 dark:text-white/45">
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Tendencia diaria (hasta 30 días del periodo)
           </p>
         </header>
@@ -180,15 +178,23 @@ export function AnalyticsCharts({
               >
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={CHART_ORANGE} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={CHART_ORANGE} stopOpacity={0.02} />
+                    <stop
+                      offset="0%"
+                      stopColor={CHART_TREND}
+                      stopOpacity={0.28}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={CHART_TREND}
+                      stopOpacity={0.02}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke={theme.grid} vertical={false} />
                 <XAxis
                   dataKey="date"
                   tickFormatter={formatShortDate}
-                  tick={{ fontSize: 11, fill: theme.tickMuted }}
+                  tick={{ fontSize: 12, fill: theme.tickMuted }}
                   axisLine={false}
                   tickLine={false}
                   minTickGap={28}
@@ -200,7 +206,7 @@ export function AnalyticsCharts({
                       maximumFractionDigits: 1,
                     }).format(value)
                   }
-                  tick={{ fontSize: 11, fill: theme.tickMuted }}
+                  tick={{ fontSize: 12, fill: theme.tickMuted }}
                   axisLine={false}
                   tickLine={false}
                   width={48}
@@ -208,7 +214,7 @@ export function AnalyticsCharts({
                 <Tooltip
                   content={<SalesTooltip />}
                   cursor={{
-                    stroke: CHART_ORANGE,
+                    stroke: CHART_TREND,
                     strokeWidth: 1,
                     strokeDasharray: "4 4",
                   }}
@@ -216,10 +222,10 @@ export function AnalyticsCharts({
                 <Area
                   type="monotone"
                   dataKey="amount"
-                  stroke={CHART_ORANGE}
-                  strokeWidth={2.5}
+                  stroke={CHART_TREND}
+                  strokeWidth={2}
                   fill={`url(#${gradientId})`}
-                  activeDot={{ r: 5, strokeWidth: 0, fill: CHART_ORANGE }}
+                  activeDot={{ r: 4, strokeWidth: 0, fill: CHART_TREND }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -229,15 +235,13 @@ export function AnalyticsCharts({
 
       <section
         aria-label="Top platillos"
-        className="rounded-3xl border border-black/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-neutral-900 md:p-5 lg:col-span-2"
+        className="rounded-2xl border border-border bg-card p-4 md:p-5 lg:col-span-2"
       >
-        <header className="mb-4 px-1">
-          <h3 className="text-base font-black tracking-tight md:text-lg">
+        <header className="mb-4">
+          <h2 className="text-base font-bold tracking-tight md:text-lg">
             Top 5 platillos
-          </h3>
-          <p className="text-sm font-medium text-black/45 dark:text-white/45">
-            Por recaudación
-          </p>
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">Por recaudación</p>
         </header>
 
         {topData.length === 0 ? (
@@ -259,7 +263,7 @@ export function AnalyticsCharts({
                       maximumFractionDigits: 1,
                     }).format(value)
                   }
-                  tick={{ fontSize: 11, fill: theme.tickMuted }}
+                  tick={{ fontSize: 12, fill: theme.tickMuted }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -267,17 +271,17 @@ export function AnalyticsCharts({
                   type="category"
                   dataKey="label"
                   width={96}
-                  tick={{ fontSize: 11, fill: theme.tick }}
+                  tick={{ fontSize: 12, fill: theme.tick }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <Tooltip
                   content={<ProductTooltip />}
-                  cursor={{ fill: "rgba(5,150,105,0.12)" }}
+                  cursor={{ fill: "rgba(5,150,105,0.1)" }}
                 />
                 <Bar
                   dataKey="revenue"
-                  fill={CHART_EMERALD}
+                  fill={CHART_RANK}
                   radius={[0, 8, 8, 0]}
                   barSize={18}
                 />
@@ -292,7 +296,7 @@ export function AnalyticsCharts({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex h-64 items-center justify-center rounded-2xl bg-black/[0.03] px-4 text-center text-sm font-semibold text-black/40 dark:bg-white/[0.04] dark:text-white/40 md:h-72">
+    <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border bg-secondary/40 px-4 text-center text-sm text-muted-foreground md:h-72">
       {message}
     </div>
   );

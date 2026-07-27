@@ -11,20 +11,22 @@ import { ApiError } from "@/services/apiClient";
 import type { AnalyticsSummary } from "@/types/analytics";
 
 export const metadata: Metadata = {
-  title: "Dashboard · Métricas",
+  title: "Métricas · Panel",
   description: "KPIs, facturación y top platillos del restaurante.",
 };
 
 /**
- * Dashboard / métricas — pantalla inicial del panel.
+ * Métricas — pantalla inicial del panel.
  */
 export default async function AdminAnalyticsPage() {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
   if (!tenantSlug) {
     return (
       <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
-        <h1 className="text-2xl font-bold">Tenant no identificado</h1>
-        <p className="text-sm text-foreground/60">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Tenant no identificado
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Abre el panel desde el subdominio de tu restaurante.
         </p>
       </div>
@@ -47,9 +49,5 @@ export default async function AdminAnalyticsPage() {
     analytics = emptyAnalyticsSummary("month");
   }
 
-  return (
-    <div className="pb-8">
-      <AnalyticsOverview summary={analytics} />
-    </div>
-  );
+  return <AnalyticsOverview summary={analytics} />;
 }

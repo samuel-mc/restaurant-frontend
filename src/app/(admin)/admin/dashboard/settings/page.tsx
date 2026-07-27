@@ -9,20 +9,22 @@ import { ApiError } from "@/services/apiClient";
 import type { RestaurantProfile } from "@/types/api";
 
 export const metadata: Metadata = {
-  title: "Ajustes · Panel",
+  title: "Configuración · Panel",
   description: "Configura la identidad de marca, horarios y módulos activos.",
 };
 
 /**
- * Ajustes de identidad de marca, horarios y módulos.
+ * Configuración de identidad de marca, horarios y módulos.
  */
 export default async function AdminSettingsPage() {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
   if (!tenantSlug) {
     return (
       <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
-        <h1 className="text-2xl font-bold">Tenant no identificado</h1>
-        <p className="text-sm text-foreground/60">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Tenant no identificado
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Abre el panel desde el subdominio de tu restaurante.
         </p>
       </div>
@@ -52,8 +54,10 @@ export default async function AdminSettingsPage() {
   if (loadError || !profile) {
     return (
       <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
-        <h1 className="text-2xl font-bold">Configuración no disponible</h1>
-        <p className="text-sm text-foreground/60">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Configuración no disponible
+        </h1>
+        <p className="text-sm text-muted-foreground">
           {loadError ?? "Perfil no encontrado."}
         </p>
       </div>

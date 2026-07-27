@@ -129,6 +129,7 @@ export function OrderTicket({
 
   return (
     <article
+      id={`kitchen-ticket-${order.uuid}`}
       tabIndex={onSelect ? 0 : undefined}
       onClick={onSelect ? () => onSelect(order) : undefined}
       onKeyDown={
@@ -147,13 +148,13 @@ export function OrderTicket({
           ? `${orderTypeLabel(order)}${isSelected ? ", seleccionada" : ""}`
           : undefined
       }
-      className={`flex flex-col rounded-2xl border bg-background p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-[box-shadow,border-color] duration-200 ${
+      className={`flex flex-col rounded-2xl border bg-background p-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-[box-shadow,border-color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${
         isSelected
           ? "border-live ring-2 ring-live/40 ring-offset-2 ring-offset-card"
-          : order.orderType === "PICKUP" || order.orderType === "DELIVERY"
-            ? "border-warn/60"
-            : isNew || isAddition
-              ? "border-warn"
+          : isNew || isAddition
+            ? "border-warn"
+            : order.orderType === "PICKUP" || order.orderType === "DELIVERY"
+              ? "border-channel/70"
               : urgent
                 ? "border-destructive"
                 : "border-border"
@@ -171,7 +172,7 @@ export function OrderTicket({
             {orderTypeLabel(order)}
           </h3>
           {order.orderType === "PICKUP" || order.orderType === "DELIVERY" ? (
-            <p className="mt-0.5 truncate text-sm font-medium text-muted-foreground">
+            <p className="mt-0.5 truncate text-sm font-medium text-channel-ink">
               {[order.customerName?.trim(), order.customerPhone?.trim()]
                 .filter(Boolean)
                 .join(" · ") || "Sin datos del cliente"}
@@ -304,7 +305,7 @@ export function OrderTicket({
       </div>
 
       {order.deliveryAddress ? (
-        <p className="mb-3 text-sm font-medium text-muted-foreground">
+        <p className="mb-3 text-sm font-medium text-channel-ink">
           Dir: {order.deliveryAddress}
         </p>
       ) : null}

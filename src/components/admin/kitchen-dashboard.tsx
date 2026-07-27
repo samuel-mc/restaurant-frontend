@@ -6,8 +6,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { Keyboard } from "lucide-react";
 import type { Order, OrderItem, OrderItemStatus, OrderStatus } from "@/types/api";
+import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
 import { OrderTicket } from "@/components/admin/order-ticket";
@@ -69,7 +70,7 @@ const COLUMNS: Array<{
     title: "En cocina",
     cue: "Preparando · Listo = a cobrar · check = platillo servido",
     empty: "Cocina libre. Manda un aceptado con Cocinar.",
-    chip: "bg-warn-muted text-warn-ink",
+    chip: "bg-secondary text-foreground ring-1 ring-border",
   },
   {
     status: "DELIVERED",
@@ -608,6 +609,16 @@ export function KitchenDashboard({
   }, [reviewGate, selectedUuid]);
 
   useEffect(() => {
+    if (!selectedUuid) return;
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .getElementById(`kitchen-ticket-${selectedUuid}`)
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedUuid, focusStatus]);
+
+  useEffect(() => {
     if (focusOrders.length === 0) {
       setSelectedUuid(null);
       return;
@@ -781,10 +792,20 @@ export function KitchenDashboard({
     );
   }
 
+  const otherColumns = COLUMNS.filter(
+    (column) => column.status !== focusStatus,
+  );
+
+  function focusColumn(status: OrderStatus) {
+    focusTouchedRef.current = true;
+    setFocusStatus(status);
+  }
+
   return (
     <div className="flex flex-col pb-8 font-jakarta-sans">
+      {/* Solo título + tabs sticky: rail/atajos no consumen viewport en tablet. */}
       <header className="sticky top-14 z-20 border-b border-border bg-background/95 backdrop-blur-sm md:top-0">
-        <div className="flex items-center justify-between gap-2 px-4 py-2 md:px-6">
+        <div className="flex items-center justify-between gap-2 px-4 py-1.5 md:px-6 md:py-2">
           <h1
             className="truncate text-lg font-bold tracking-tight md:text-xl"
             title={restaurantName}
@@ -792,9 +813,10 @@ export function KitchenDashboard({
             Cocina
           </h1>
           <div className="flex shrink-0 items-center gap-1.5">
-            <ConnectionBadge state={connection} compact />
+            <KitchenShortcutCheatsheet />
+            <AdminConnectionBadge state={connection} compact />
             <span
-              className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold tabular-nums"
+              className="inline-flex min-h-11 items-center rounded-full bg-secondary px-2.5 text-xs font-semibold tabular-nums"
               aria-label={`${orders.length} comandas activas`}
             >
               {orders.length}
@@ -804,7 +826,7 @@ export function KitchenDashboard({
 
         <AdminRovingTablist
           aria-label="Etapas de cocina"
-          className="flex gap-1.5 overflow-x-auto px-4 pb-2 md:px-6"
+          className="flex gap-1 overflow-x-auto px-4 pb-2 md:gap-1.5 md:px-6"
         >
           {COLUMNS.map((column, index) => {
             const count = grouped[column.status]?.length ?? 0;
@@ -824,11 +846,8 @@ export function KitchenDashboard({
                     : undefined
                 }
                 tabIndex={selected ? 0 : -1}
-                onClick={() => {
-                  focusTouchedRef.current = true;
-                  setFocusStatus(column.status);
-                }}
-                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                onClick={() => focusColumn(column.status)}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2.5 text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:gap-1.5 md:px-3 ${
                   selected
                     ? "bg-primary text-primary-foreground"
                     : overdue > 0
@@ -872,27 +891,48 @@ export function KitchenDashboard({
           })}
         </AdminRovingTablist>
 
-        <div className="space-y-1.5 px-4 pb-2 md:px-6">
-          <KitchenStatusRail
-            offline={actionsLocked}
-            offlineMessage="Sin conexión · no se pueden avanzar ni cobrar hasta reconectar"
-            banner={banner}
-            reviewOrder={reviewGateOrder}
-            oldestOverdue={showUrgentJump ? oldestOverdue : null}
-            focusStatus={focusStatus}
-            now={now}
-            statusUndo={statusUndo}
-            undoSecondsLeft={undoSecondsLeft}
-            undoDisabled={Boolean(updatingUuid) || closing || actionsLocked}
-            onJumpUrgent={jumpToUrgent}
-            onReviewed={() => setReviewGate(null)}
-            onUndo={() => void handleUndoAdvance()}
-          />
-          <KitchenShortcutCheatsheet />
-        </div>
+        <KitchenShortcutHint />
       </header>
 
+      <div className="space-y-1.5 px-4 pt-2 md:px-6">
+        <KitchenStatusRail
+          offline={actionsLocked}
+          offlineMessage="Sin conexión · no se pueden avanzar ni cobrar hasta reconectar"
+          banner={banner}
+          reviewOrder={reviewGateOrder}
+          oldestOverdue={showUrgentJump ? oldestOverdue : null}
+          focusStatus={focusStatus}
+          now={now}
+          statusUndo={statusUndo}
+          undoSecondsLeft={undoSecondsLeft}
+          undoDisabled={Boolean(updatingUuid) || closing || actionsLocked}
+          onJumpUrgent={jumpToUrgent}
+          onReviewed={() => setReviewGate(null)}
+          onUndo={() => void handleUndoAdvance()}
+        />
+      </div>
+
       <div className="flex-1 px-4 py-3 md:px-6 md:py-4">
+        {/* Peek horizontal en md/lg; en xl+ vive el aside. */}
+        <div
+          className="mb-3 hidden gap-2 overflow-x-auto pb-0.5 md:flex xl:hidden"
+          aria-label="Otras etapas"
+        >
+          {otherColumns.map((column) => (
+            <StagePeekCard
+              key={column.status}
+              compact
+              title={column.title}
+              cue={column.cue}
+              chip={column.chip}
+              orders={grouped[column.status] ?? []}
+              overdueCount={overdueCounts[column.status] ?? 0}
+              now={now}
+              onFocus={() => focusColumn(column.status)}
+            />
+          ))}
+        </div>
+
         <div className="mx-auto grid w-full max-w-2xl gap-4 xl:max-w-6xl xl:grid-cols-[minmax(0,1fr)_minmax(15rem,17.5rem)]">
           <div
             id={LANE_PANEL_ID}
@@ -908,23 +948,18 @@ export function KitchenDashboard({
             <p className="px-1 text-xs font-semibold text-muted-foreground">
               Otras etapas
             </p>
-            {COLUMNS.filter((column) => column.status !== focusStatus).map(
-              (column) => (
-                <StagePeekCard
-                  key={column.status}
-                  title={column.title}
-                  cue={column.cue}
-                  chip={column.chip}
-                  orders={grouped[column.status] ?? []}
-                  overdueCount={overdueCounts[column.status] ?? 0}
-                  now={now}
-                  onFocus={() => {
-                    focusTouchedRef.current = true;
-                    setFocusStatus(column.status);
-                  }}
-                />
-              ),
-            )}
+            {otherColumns.map((column) => (
+              <StagePeekCard
+                key={column.status}
+                title={column.title}
+                cue={column.cue}
+                chip={column.chip}
+                orders={grouped[column.status] ?? []}
+                overdueCount={overdueCounts[column.status] ?? 0}
+                now={now}
+                onFocus={() => focusColumn(column.status)}
+              />
+            ))}
           </aside>
         </div>
       </div>
@@ -961,6 +996,7 @@ function StagePeekCard({
   overdueCount,
   now,
   onFocus,
+  compact = false,
 }: {
   title: string;
   cue: string;
@@ -969,21 +1005,28 @@ function StagePeekCard({
   overdueCount: number;
   now: number;
   onFocus: () => void;
+  compact?: boolean;
 }) {
-  const preview = orders.slice(0, 2);
+  const preview = orders.slice(0, compact ? 1 : 2);
 
   return (
     <button
       type="button"
       onClick={onFocus}
-      className="rounded-2xl border border-border bg-card p-3 text-left outline-none transition-colors hover:bg-secondary/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className={`border border-border bg-card text-left outline-none transition-colors hover:bg-secondary/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+        compact
+          ? "w-[10rem] shrink-0 rounded-xl p-2.5"
+          : "rounded-2xl p-3"
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-bold tracking-tight">{title}</p>
-          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-            {cue}
-          </p>
+          {!compact ? (
+            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+              {cue}
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span
@@ -1022,59 +1065,6 @@ function StagePeekCard({
         </ul>
       )}
     </button>
-  );
-}
-
-function ConnectionBadge({
-  state,
-  compact = false,
-}: {
-  state: KitchenConnectionState;
-  compact?: boolean;
-}) {
-  const fullLabel =
-    state === "connected"
-      ? "En vivo"
-      : state === "connecting"
-        ? "Conectando…"
-        : "Sin conexión · reintentando…";
-  const label =
-    compact && state === "connected"
-      ? "Vivo"
-      : compact && state === "disconnected"
-        ? "Offline"
-        : fullLabel;
-
-  return (
-    <span
-      role="status"
-      aria-live="polite"
-      aria-label={fullLabel}
-      className={`inline-flex items-center gap-1.5 rounded-full text-xs font-semibold ${
-        compact ? "px-2 py-1" : "gap-2 px-3 py-1.5"
-      } ${
-        state === "connected"
-          ? "bg-live-muted text-live-ink"
-          : "bg-warn-muted text-warn-ink"
-      }`}
-      title={
-        state === "connected"
-          ? "Comandas en tiempo real"
-          : state === "disconnected"
-            ? "Mutaciones bloqueadas hasta reconectar"
-            : "Estableciendo conexión en vivo"
-      }
-    >
-      <span
-        aria-hidden
-        className={`size-2 rounded-full ${
-          state === "connected"
-            ? "bg-live"
-            : "animate-pulse bg-warn"
-        }`}
-      />
-      {label}
-    </span>
   );
 }
 
@@ -1127,62 +1117,123 @@ function ShortcutList({ className }: { className?: string }) {
   );
 }
 
-function useTouchFirstLayout(): boolean {
-  const [touchFirst, setTouchFirst] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(hover: none), (pointer: coarse)");
-    const sync = () => setTouchFirst(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-
-  return touchFirst;
-}
+const SHORTCUT_HINT_KEY = "platolisto.kitchen.shortcutsHint.v1";
 
 /**
- * Atajos siempre colapsados por defecto (desktop y touch);
- * se expanden solo cuando el operador los pide.
+ * Atajos: label visible en md+; hint dismissible la primera vez en el turno.
  */
 function KitchenShortcutCheatsheet() {
-  const touchFirst = useTouchFirstLayout();
   const [expanded, setExpanded] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [expanded]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border/70 bg-secondary/30">
+    <div ref={wrapRef} className="relative">
       <button
         type="button"
         aria-expanded={expanded}
         aria-controls="kitchen-shortcuts-panel"
+        aria-label={
+          expanded ? "Ocultar atajos de teclado" : "Mostrar atajos de teclado"
+        }
+        title="Atajos de teclado"
         onClick={() => setExpanded((open) => !open)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-secondary px-2.5 text-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:px-3"
       >
-        <span className="min-w-0">
-          <span className="text-xs font-bold tracking-tight text-muted-foreground">
-            Atajos
-          </span>
-          {!expanded ? (
-            <span className="ml-2 text-xs text-muted-foreground/80">
-              {touchFirst ? "1–4 · j k · Enter · U" : "teclado"}
-            </span>
-          ) : null}
+        <Keyboard className="size-4 shrink-0" aria-hidden />
+        <span className="hidden text-xs font-bold tracking-tight md:inline">
+          Atajos
         </span>
-        <ChevronDown
-          aria-hidden
-          className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
-            expanded ? "rotate-180" : ""
-          }`}
-        />
       </button>
       {expanded ? (
         <div
           id="kitchen-shortcuts-panel"
-          className="border-t border-border/70 px-3 py-2"
+          role="region"
+          aria-label="Atajos de teclado"
+          className="absolute right-0 top-full z-30 mt-1.5 w-[min(calc(100vw-2rem),18rem)] rounded-xl border border-border bg-card p-3 shadow-md"
         >
-          <ShortcutList />
+          <ShortcutList className="flex-col items-start" />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function KitchenShortcutHint() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(SHORTCUT_HINT_KEY) === "1") return;
+      setVisible(true);
+    } catch {
+      /* private / blocked storage */
+    }
+  }, []);
+
+  if (!visible) return null;
+
+  function dismiss() {
+    try {
+      window.localStorage.setItem(SHORTCUT_HINT_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setVisible(false);
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-3 px-4 pb-2 md:px-6">
+      <p className="min-w-0 text-xs leading-snug text-muted-foreground">
+        <span className="font-semibold text-foreground">Teclado · </span>
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <Kbd>1</Kbd>
+          <Kbd>2</Kbd>
+          <Kbd>3</Kbd>
+          <Kbd>4</Kbd>
+          <span>etapas</span>
+          <span aria-hidden className="text-border">
+            ·
+          </span>
+          <Kbd>j</Kbd>
+          <Kbd>k</Kbd>
+          <span>ticket</span>
+          <span aria-hidden className="text-border">
+            ·
+          </span>
+          <Kbd>Enter</Kbd>
+          <span>avanzar</span>
+          <span aria-hidden className="text-border">
+            ·
+          </span>
+          <Kbd>U</Kbd>
+          <span>deshacer</span>
+        </span>
+      </p>
+      <button
+        type="button"
+        onClick={dismiss}
+        className="shrink-0 rounded-lg px-2 py-1 text-xs font-bold text-foreground outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        Entendido
+      </button>
     </div>
   );
 }
@@ -1190,9 +1241,9 @@ function KitchenShortcutCheatsheet() {
 type StatusStrip = "offline" | "undo" | "review" | "urgent" | "banner";
 
 /**
- * Hasta 2 franjas pineadas (offline → undo → hueco para secundario).
- * Si offline+undo llenan el rail, review/urgent/banner salen en overflow
- * para no perder avisos críticos durante la ventana de deshacer.
+ * Prioridad del rail: offline → (undo | review/urgent).
+ * Si offline+undo coinciden, el undo se pliega en la franja offline
+ * (compacto/deshabilitado) para que review/urgent nunca vayan a overflow.
  */
 function KitchenStatusRail({
   offline,
@@ -1223,18 +1274,24 @@ function KitchenStatusRail({
   onReviewed: () => void;
   onUndo: () => void;
 }) {
+  const foldUndoIntoOffline = offline && Boolean(statusUndo);
+
   const strips: StatusStrip[] = [];
   if (offline) strips.push("offline");
-  if (statusUndo && strips.length < 2) strips.push("undo");
+  if (statusUndo && !foldUndoIntoOffline && strips.length < 2) {
+    strips.push("undo");
+  }
 
   let secondary: StatusStrip | null = null;
   if (reviewOrder) secondary = "review";
   else if (oldestOverdue) secondary = "urgent";
   else if (banner) secondary = "banner";
 
-  const secondaryInRail = Boolean(secondary && strips.length < 2);
-  if (secondaryInRail && secondary) strips.push(secondary);
-  const overflow = secondary && !secondaryInRail ? secondary : null;
+  if (secondary && strips.length < 2) {
+    strips.push(secondary);
+    secondary = null;
+  }
+  const overflow = secondary;
 
   if (strips.length === 0 && !overflow) return null;
 
@@ -1243,14 +1300,29 @@ function KitchenStatusRail({
 
     if (strip === "offline") {
       return (
-        <p
+        <div
           key="offline"
           role="alert"
           aria-live="assertive"
-          className={`rounded-xl border border-warn/40 bg-warn-muted text-center text-sm font-semibold text-warn-ink ${pad}`}
+          className={`flex flex-wrap items-center justify-center gap-2 rounded-xl border border-warn/40 bg-warn-muted text-sm font-semibold text-warn-ink ${pad} ${
+            foldUndoIntoOffline ? "justify-between" : "justify-center text-center"
+          }`}
         >
-          {offlineMessage}
-        </p>
+          <p className={foldUndoIntoOffline ? "min-w-0" : undefined}>
+            {offlineMessage}
+          </p>
+          {foldUndoIntoOffline && statusUndo ? (
+            <button
+              type="button"
+              disabled
+              title="Sin conexión · no se puede deshacer"
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-warn/20 px-3 text-xs font-bold text-warn-ink opacity-80"
+            >
+              Deshacer
+              <span className="tabular-nums">{undoSecondsLeft}s</span>
+            </button>
+          ) : null}
+        </div>
       );
     }
 
@@ -1278,11 +1350,9 @@ function KitchenStatusRail({
             type="button"
             disabled={undoDisabled}
             title={
-              offline
-                ? "Sin conexión · no se puede deshacer"
-                : undoDisabled
-                  ? "Espera a que termine la acción en curso"
-                  : undefined
+              undoDisabled
+                ? "Espera a que termine la acción en curso"
+                : undefined
             }
             onClick={onUndo}
             className="min-h-11 shrink-0 rounded-xl bg-card px-4 py-2 text-sm font-bold shadow-sm outline-none ring-1 ring-border transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"

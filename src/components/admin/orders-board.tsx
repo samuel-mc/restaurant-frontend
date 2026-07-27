@@ -5,10 +5,11 @@
  * Filtros + tabla/cards + detalle; WS en vivo. Cobro solo en Cocina.
  */
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { ChefHat, Eye, Receipt, X } from "lucide-react";
 import type { AdminOrderListFilter, Order, OrderItem, OrderPage } from "@/types/api";
+import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { AdminOptionGroup } from "@/components/admin/admin-option-group";
 import {
   useKitchenOrdersSubscription,
@@ -65,8 +66,32 @@ function orderTitle(order: Order): string {
       ? `${code} · Para llevar · ${who} · ${phone}`
       : `${code} · Para llevar · ${who}`;
   }
-  if (order.orderType === "DELIVERY") return `${code} · A domicilio`;
+  if (order.orderType === "DELIVERY") {
+    const who = order.customerName?.trim() || "Cliente";
+    const phone = order.customerPhone?.trim();
+    return phone
+      ? `${code} · A domicilio · ${who} · ${phone}`
+      : `${code} · A domicilio · ${who}`;
+  }
   return code;
+}
+
+function isChannelOrder(order: Order): boolean {
+  return order.orderType === "PICKUP" || order.orderType === "DELIVERY";
+}
+
+function orderSecondaryLine(order: Order): {
+  text: string;
+  channel: boolean;
+} | null {
+  if (isChannelOrder(order)) {
+    if (order.orderType === "DELIVERY" && order.deliveryAddress?.trim()) {
+      return { text: order.deliveryAddress.trim(), channel: true };
+    }
+    return null;
+  }
+  const name = order.customerName?.trim();
+  return name ? { text: name, channel: false } : null;
 }
 
 function formatClock(iso: string | null | undefined): string {
@@ -116,7 +141,7 @@ function badgeMeta(order: Order): { label: string; className: string } {
     case "IN_KITCHEN":
       return {
         label: "En cocina",
-        className: "bg-warn-muted text-warn-ink",
+        className: "bg-secondary text-foreground ring-1 ring-border",
       };
     case "DELIVERED":
       return {
@@ -323,44 +348,44 @@ export function OrdersBoard({
     onConnectionChange: setConnection,
   });
 
-  const connectionLabel = useMemo(() => {
-    if (connection === "connected") return "En vivo";
-    if (connection === "connecting") return "Conectando…";
-    return "Sin conexión · reintentando…";
-  }, [connection]);
-
   return (
     <div className="font-jakarta-sans">
-      <header className="border-b border-border px-4 py-5 md:px-6">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight">Pedidos</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {restaurantName} · historial y detalle · {connectionLabel}
-            </p>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              Aquí solo consultas cuentas. Para avanzar o cobrar, ve a{" "}
-              <Link
-                href="/admin/dashboard/kitchen"
-                className={`font-semibold text-foreground underline-offset-2 hover:underline ${focusRing} rounded-sm`}
-              >
-                Cocina
-              </Link>
-              .
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void refresh(filter, pageIndex)}
-            disabled={loading}
-            className={`inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 ${focusRing}`}
+      <header className="sticky top-14 z-20 border-b border-border bg-background/95 backdrop-blur-sm md:top-0">
+        <div className="flex items-center justify-between gap-2 px-4 py-1.5 md:px-6 md:py-2">
+          <h1
+            className="truncate text-lg font-bold tracking-tight md:text-xl"
+            title={restaurantName}
           >
-            {loading ? "Actualizando…" : "Actualizar"}
-          </button>
+            Pedidos
+          </h1>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <AdminConnectionBadge state={connection} compact />
+            <button
+              type="button"
+              onClick={() => void refresh(filter, pageIndex)}
+              disabled={loading}
+              className={`inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 md:px-4 ${focusRing}`}
+            >
+              {loading ? "Actualizando…" : "Actualizar"}
+            </button>
+          </div>
         </div>
+        <p className="px-4 pb-2 text-xs text-muted-foreground md:px-6">
+          Solo consulta. Avanzar o cobrar en{" "}
+          <Link
+            href="/admin/dashboard/kitchen"
+            className={`font-semibold text-foreground underline-offset-2 hover:underline ${focusRing} rounded-sm`}
+          >
+            Cocina
+          </Link>
+          .
+        </p>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 md:gap-6 md:px-6 md:py-6">
+      <div
+        className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 md:gap-6 md:px-6 md:py-6"
+        aria-busy={loading}
+      >
         <AdminOptionGroup
           aria-label="Filtros de pedidos"
           className="flex flex-wrap gap-2"
@@ -420,6 +445,7 @@ export function OrdersBoard({
                 <tbody>
                   {page.content.map((order) => {
                     const badge = badgeMeta(order);
+                    const secondary = orderSecondaryLine(order);
                     return (
                       <tr
                         key={order.uuid}
@@ -429,9 +455,19 @@ export function OrdersBoard({
                           <p className="font-bold tracking-tight">
                             {orderTitle(order)}
                           </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {order.customerName}
-                          </p>
+                          {secondary ? (
+                            <p
+                              className={`mt-0.5 text-xs ${
+                                secondary.channel
+                                  ? "font-medium text-channel-ink"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {secondary.channel
+                                ? `Dir: ${secondary.text}`
+                                : secondary.text}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="px-4 py-4 align-top text-xs text-muted-foreground">
                           <p>Inicio {formatClock(order.createdAt)}</p>
@@ -470,19 +506,31 @@ export function OrdersBoard({
             <ul className="grid gap-3 lg:hidden">
               {page.content.map((order) => {
                 const badge = badgeMeta(order);
+                const secondary = orderSecondaryLine(order);
+                const channel = isChannelOrder(order);
                 return (
                   <li
                     key={order.uuid}
-                    className="rounded-2xl border border-border bg-card p-4"
+                    className={`rounded-2xl border bg-card p-4 ${
+                      channel ? "border-channel/70" : "border-border"
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-bold tracking-tight">
                           {orderTitle(order)}
                         </p>
-                        {order.orderType !== "PICKUP" && order.customerName ? (
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {order.customerName}
+                        {secondary ? (
+                          <p
+                            className={`mt-0.5 text-xs ${
+                              secondary.channel
+                                ? "font-medium text-channel-ink"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {secondary.channel
+                              ? `Dir: ${secondary.text}`
+                              : secondary.text}
                           </p>
                         ) : null}
                       </div>
@@ -674,9 +722,22 @@ function OrderDetailModal({
           <p className="text-sm text-muted-foreground">
             Cliente:{" "}
             <span className="font-semibold text-foreground">
-              {order.customerName}
+              {order.customerName || "—"}
             </span>
           </p>
+          {order.customerPhone?.trim() ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tel:{" "}
+              <span className="font-semibold text-foreground">
+                {order.customerPhone.trim()}
+              </span>
+            </p>
+          ) : null}
+          {order.deliveryAddress?.trim() ? (
+            <p className="mt-2 text-sm font-medium text-channel-ink">
+              Dir: {order.deliveryAddress.trim()}
+            </p>
+          ) : null}
           {order.status === "DELIVERED" ? (
             <p className="mt-3 rounded-xl border border-live/30 bg-live-muted px-3 py-2.5 text-sm text-live-ink">
               Lista para cobro. Cierra la cuenta en{" "}

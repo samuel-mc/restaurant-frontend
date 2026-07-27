@@ -22,7 +22,9 @@
   --input-background: #f5f5f5;
   --ring: #171717;
 
-  /* Operate / service-line (PlatoListo): Kitchen Action + Ticket Amber */
+  /* Operate / service-line (PlatoListo):
+     live = en vivo / listo; warn = atención ahora;
+     channel = tipo de pedido (llevar / domicilio), no alarma */
   --live: #047857;
   --live-foreground: #ffffff;
   --live-muted: #ecfdf5;
@@ -31,6 +33,10 @@
   --warn-foreground: #451a03;
   --warn-muted: #fffbeb;
   --warn-ink: #92400e;
+  --channel: #1d4ed8;
+  --channel-foreground: #ffffff;
+  --channel-muted: #eff6ff;
+  --channel-ink: #1e3a8a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,6 +70,10 @@
     --warn-foreground: #451a03;
     --warn-muted: rgba(251, 191, 36, 0.15);
     --warn-ink: #fcd34d;
+    --channel: #60a5fa;
+    --channel-foreground: #0f172a;
+    --channel-muted: rgba(96, 165, 250, 0.18);
+    --channel-ink: #93c5fd;
   }
 }
 
@@ -96,6 +106,10 @@
   --color-warn-foreground: var(--warn-foreground);
   --color-warn-muted: var(--warn-muted);
   --color-warn-ink: var(--warn-ink);
+  --color-channel: var(--channel);
+  --color-channel-foreground: var(--channel-foreground);
+  --color-channel-muted: var(--channel-muted);
+  --color-channel-ink: var(--channel-ink);
 
   /* Landing: Playfair Display / Nunito Sans / Pinyon Script / Jakarta (next/font) */
   --font-playfair-display: var(--font-playfair), ui-serif, Georgia,

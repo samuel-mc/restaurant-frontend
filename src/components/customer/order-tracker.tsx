@@ -20,6 +20,7 @@ import {
 } from "@/lib/order-status";
 import { maxBatchNumber } from "@/lib/order-mapper";
 import { useCartStore } from "@/store/cartStore";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   useOrderStatusSubscription,
   type OrderConnectionState,
@@ -107,8 +108,14 @@ export function OrderTracker({
     <div className="flex flex-col gap-6 pb-10">
       <section
         aria-live="polite"
-        className={`-mx-4 bg-linear-to-br px-6 pb-10 pt-10 text-white shadow-sm transition-[background] duration-700 ${theme.hero}`}
+        className={`relative -mx-4 bg-linear-to-br px-6 pb-10 pt-10 text-white shadow-sm transition-[background] duration-700 ${theme.hero}`}
       >
+        <div className="absolute right-4 top-4">
+          <ThemeToggle
+            compact
+            className="bg-white/20 text-white hover:bg-white/30"
+          />
+        </div>
         <p className="text-xs font-medium uppercase tracking-widest text-white/80">
           {restaurantName}
         </p>

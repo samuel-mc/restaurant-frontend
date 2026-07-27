@@ -54,28 +54,28 @@ const COLUMNS: Array<{
   {
     status: "PENDING",
     title: "Recibidos",
-    cue: "Nuevos · Aceptar para pasarlos",
+    cue: "Nuevo = recién llegado · Tarde = +15 min · Aceptar",
     empty: "Sin pedidos nuevos. Los que lleguen aparecen aquí al instante.",
     chip: "bg-warn-muted text-warn-ink",
   },
   {
     status: "ACCEPTED",
     title: "Aceptados",
-    cue: "En cola · Cocinar cuando toque",
+    cue: "En cola · prioriza las marcadas Tarde (+15 min)",
     empty: "Nada en cola. Los aceptados esperan aquí antes de cocina.",
     chip: "bg-secondary text-foreground ring-1 ring-border",
   },
   {
     status: "IN_KITCHEN",
     title: "En cocina",
-    cue: "Preparando · Listo = a cobrar · check = platillo servido",
+    cue: "Preparando · Tarde = +15 min · Listo = cobrar · check = servido",
     empty: "Cocina libre. Manda un aceptado con Cocinar.",
     chip: "bg-secondary text-foreground ring-1 ring-border",
   },
   {
     status: "DELIVERED",
     title: "Por cobrar",
-    cue: "Servidos · Cobrar cierra la cuenta",
+    cue: "Servidos · Cobrar cierra la cuenta · Tarde = +15 min",
     empty: "Nada por cobrar. El cobro solo se hace en esta etapa.",
     chip: "bg-live-muted text-live-ink",
   },
@@ -842,7 +842,7 @@ export function KitchenDashboard({
                 aria-controls={LANE_PANEL_ID}
                 aria-label={
                   overdue > 0
-                    ? `${column.title}, ${count} activas, ${overdue} urgentes`
+                    ? `${column.title}, ${count} activas, ${overdue} tarde (+15 min)`
                     : undefined
                 }
                 tabIndex={selected ? 0 : -1}
@@ -877,6 +877,7 @@ export function KitchenDashboard({
                 </span>
                 {overdue > 0 ? (
                   <span
+                    title="Tarde · más de 15 minutos"
                     className={`rounded-full px-1.5 py-0.5 text-xs font-bold tabular-nums ${
                       selected
                         ? "bg-primary-foreground/25 text-primary-foreground"
@@ -1035,8 +1036,11 @@ function StagePeekCard({
             {orders.length}
           </span>
           {overdueCount > 0 ? (
-            <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-bold tabular-nums text-destructive">
-              {overdueCount} urg
+            <span
+              title="Tarde · más de 15 minutos"
+              className="rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-bold tabular-nums text-destructive"
+            >
+              {overdueCount} tarde
             </span>
           ) : null}
         </div>
@@ -1400,10 +1404,10 @@ function KitchenStatusRail({
         >
           <div className="min-w-0 text-sm">
             <p className="font-semibold text-destructive">
-              Urgente · {orderWho(oldestOverdue)}
+              Tarde · {orderWho(oldestOverdue)}
             </p>
             <p className="mt-0.5 text-muted-foreground">
-              {orderAgeMinutes(oldestOverdue, now)} min ·{" "}
+              {orderAgeMinutes(oldestOverdue, now)} min (+15) ·{" "}
               {columnTitleFor(oldestOverdue.status)}
               {focusStatus !== oldestOverdue.status ? " · otra etapa" : ""}
             </p>
@@ -1413,7 +1417,7 @@ function KitchenStatusRail({
             onClick={onJumpUrgent}
             className="min-h-11 shrink-0 rounded-xl bg-destructive px-4 py-2 text-sm font-bold text-destructive-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            Ir al urgente
+            Ir a la tarde
           </button>
         </div>
       );

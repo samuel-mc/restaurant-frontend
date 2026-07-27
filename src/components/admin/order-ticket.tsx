@@ -182,17 +182,35 @@ export function OrderTicket({
               {order.customerName}
             </p>
           ) : null}
-          {isAddition ? (
-            <span className="mt-2 inline-flex rounded-full bg-warn px-2.5 py-0.5 text-xs font-bold text-warn-foreground">
-              Adición
-            </span>
+          {isAddition || isNew || urgent ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {isAddition ? (
+                <span className="inline-flex rounded-full bg-warn px-2.5 py-0.5 text-xs font-bold text-warn-foreground">
+                  Adición
+                </span>
+              ) : isNew ? (
+                <span className="inline-flex rounded-full bg-warn px-2.5 py-0.5 text-xs font-bold text-warn-foreground">
+                  Nuevo
+                </span>
+              ) : null}
+              {urgent ? (
+                <span
+                  className="inline-flex rounded-full bg-destructive px-2.5 py-0.5 text-xs font-bold text-destructive-foreground"
+                  title="Lleva más de 15 minutos sin cerrar esta etapa"
+                >
+                  Tarde
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </div>
         <p
           className={`shrink-0 text-2xl font-bold tabular-nums leading-none ${
             urgent ? "text-destructive" : "text-foreground"
           }`}
-          aria-label={`Tiempo ${elapsed}`}
+          aria-label={
+            urgent ? `Tiempo ${elapsed}, tarde (+15 min)` : `Tiempo ${elapsed}`
+          }
         >
           {elapsed}
         </p>

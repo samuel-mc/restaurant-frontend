@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Operate theme toggle: dark: utilities follow html.dark, not OS alone. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -39,42 +42,40 @@
   --channel-ink: #1e3a8a;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --card: #111111;
-    --card-foreground: #ededed;
-    --popover: #111111;
-    --popover-foreground: #ededed;
-    --primary: #ededed;
-    --primary-foreground: #0a0a0a;
-    --secondary: #1f1f1f;
-    --secondary-foreground: #ededed;
-    --muted: #1f1f1f;
-    --muted-foreground: #a3a3a3;
-    --accent: #ededed;
-    --accent-foreground: #0a0a0a;
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    --border: rgba(255, 255, 255, 0.15);
-    --input: transparent;
-    --input-background: #1f1f1f;
-    --ring: #ededed;
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #111111;
+  --card-foreground: #ededed;
+  --popover: #111111;
+  --popover-foreground: #ededed;
+  --primary: #ededed;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1f1f1f;
+  --secondary-foreground: #ededed;
+  --muted: #1f1f1f;
+  --muted-foreground: #a3a3a3;
+  --accent: #ededed;
+  --accent-foreground: #0a0a0a;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.15);
+  --input: transparent;
+  --input-background: #1f1f1f;
+  --ring: #ededed;
 
-    --live: #34d399;
-    --live-foreground: #022c22;
-    --live-muted: rgba(52, 211, 153, 0.15);
-    --live-ink: #6ee7b7;
-    --warn: #fbbf24;
-    --warn-foreground: #451a03;
-    --warn-muted: rgba(251, 191, 36, 0.15);
-    --warn-ink: #fcd34d;
-    --channel: #60a5fa;
-    --channel-foreground: #0f172a;
-    --channel-muted: rgba(96, 165, 250, 0.18);
-    --channel-ink: #93c5fd;
-  }
+  --live: #34d399;
+  --live-foreground: #022c22;
+  --live-muted: rgba(52, 211, 153, 0.15);
+  --live-ink: #6ee7b7;
+  --warn: #fbbf24;
+  --warn-foreground: #451a03;
+  --warn-muted: rgba(251, 191, 36, 0.15);
+  --warn-ink: #fcd34d;
+  --channel: #60a5fa;
+  --channel-foreground: #0f172a;
+  --channel-muted: rgba(96, 165, 250, 0.18);
+  --channel-ink: #93c5fd;
 }
 
 @theme inline {

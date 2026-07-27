@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { formatCurrency } from "@/lib/format";
+import { subscribeTheme } from "@/lib/theme";
 import type {
   AnalyticsSalesPoint,
   AnalyticsTopProduct,
@@ -35,31 +36,13 @@ const CHART_THEME = {
   },
 } as const;
 
-function subscribeDarkMode(onStoreChange: () => void): () => void {
-  const media = window.matchMedia("(prefers-color-scheme: dark)");
-  const onChange = () => onStoreChange();
-  media.addEventListener("change", onChange);
-
-  const root = document.documentElement;
-  const observer = new MutationObserver(onChange);
-  observer.observe(root, { attributes: true, attributeFilter: ["class"] });
-
-  return () => {
-    media.removeEventListener("change", onChange);
-    observer.disconnect();
-  };
-}
-
 function getDarkModeSnapshot(): boolean {
-  return (
-    document.documentElement.classList.contains("dark") ||
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  );
+  return document.documentElement.classList.contains("dark");
 }
 
 function useChartTheme() {
   const isDark = useSyncExternalStore(
-    subscribeDarkMode,
+    subscribeTheme,
     getDarkModeSnapshot,
     () => false,
   );

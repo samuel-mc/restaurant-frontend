@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { LoginForm } from "@/components/admin/login-form";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "Acceso · Panel",
@@ -28,7 +29,10 @@ export default async function AdminLoginPage() {
     : "Panel de administración";
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-8 px-6 py-10">
+    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-8 px-6 py-10">
+      <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+        <ThemeToggle compact />
+      </div>
       <header className="flex flex-col gap-1.5 text-center sm:text-left">
         <p className="text-xs font-semibold uppercase tracking-wider text-foreground/50">
           {tenantSlug

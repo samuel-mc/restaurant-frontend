@@ -25,6 +25,7 @@ import {
   planLabel,
 } from "@/lib/subscription-plan";
 import { hasTenantLanding } from "@/lib/tenant-landings";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface SettingsFormProps {
   tenantSlug: string;
@@ -304,10 +305,19 @@ export function SettingsForm({
         <div className="mx-auto w-full max-w-3xl">
           <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Marca, horarios, plan y módulos del restaurante.
+            Apariencia del panel, marca, horarios, plan y módulos.
           </p>
         </div>
       </header>
+
+      <div className="mx-auto w-full max-w-3xl px-4 pt-4 md:px-6 md:pt-6">
+        <Section
+          title="Apariencia"
+          description="Tema del panel en este dispositivo. No afecta el menú del comensal ni la marca del restaurante."
+        >
+          <ThemeToggle className="max-w-sm" />
+        </Section>
+      </div>
 
       <form
         onSubmit={handleSubmit}

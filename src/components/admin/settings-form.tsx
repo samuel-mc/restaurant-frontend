@@ -563,8 +563,8 @@ export function SettingsForm({
               onChange={setOrderingEnabled}
             />
             <ModuleSwitch
-              label="Delivery"
-              description="Pedidos a domicilio"
+              label="A domicilio"
+              description="Pedidos con entrega a domicilio"
               checked={hasDelivery}
               disabled={submitting || !orderingEnabled}
               onChange={setHasDelivery}

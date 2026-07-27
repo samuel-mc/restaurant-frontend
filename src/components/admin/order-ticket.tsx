@@ -49,7 +49,7 @@ function orderTypeLabel(order: Order): string {
     case "PICKUP":
       return "Para llevar";
     case "DELIVERY":
-      return "Delivery";
+      return "A domicilio";
     default:
       return order.orderType;
   }

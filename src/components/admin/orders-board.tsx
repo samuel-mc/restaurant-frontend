@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Eye, Receipt, X } from "lucide-react";
 import type { AdminOrderListFilter, Order, OrderItem, OrderPage } from "@/types/api";
 import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
@@ -14,6 +15,7 @@ import {
   type KitchenConnectionState,
 } from "@/hooks/useKitchenOrdersSubscription";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
+import { adminKitchenOrderHref } from "@/lib/admin-nav";
 import { listOrders } from "@/services/adminOrderService";
 import { ApiError } from "@/services/apiClient";
 import { formatCurrency } from "@/lib/format";
@@ -63,7 +65,7 @@ function orderTitle(order: Order): string {
       ? `${code} · Para llevar · ${who} · ${phone}`
       : `${code} · Para llevar · ${who}`;
   }
-  if (order.orderType === "DELIVERY") return `${code} · Delivery`;
+  if (order.orderType === "DELIVERY") return `${code} · A domicilio`;
   return code;
 }
 
@@ -287,8 +289,17 @@ export function OrdersBoard({
           <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Pedidos</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {restaurantName} · historial y detalle · cobro en Cocina ·{" "}
-              {connectionLabel}
+              {restaurantName} · historial y detalle · {connectionLabel}
+            </p>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Aquí solo consultas cuentas. Para avanzar o cobrar, ve a{" "}
+              <Link
+                href="/admin/dashboard/kitchen"
+                className={`font-semibold text-foreground underline-offset-2 hover:underline ${focusRing} rounded-sm`}
+              >
+                Cocina
+              </Link>
+              .
             </p>
           </div>
           <button
@@ -575,9 +586,26 @@ function OrderDetailModal({
             </span>
           </p>
           {order.status === "DELIVERED" ? (
-            <p className="mt-3 rounded-xl border border-border bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
-              Para cobrar y cerrar, usa{" "}
-              <span className="font-semibold text-foreground">Cocina</span>.
+            <p className="mt-3 rounded-xl border border-live/30 bg-live-muted px-3 py-2.5 text-sm text-live-ink">
+              Lista para cobro. Cierra la cuenta en{" "}
+              <Link
+                href={adminKitchenOrderHref(order.uuid)}
+                className={`font-bold underline-offset-2 hover:underline ${focusRing} rounded-sm`}
+              >
+                Cocina → Por cobrar
+              </Link>
+              .
+            </p>
+          ) : order.status !== "CLOSED" && order.status !== "CANCELLED" ? (
+            <p className="mt-3 rounded-xl border border-border bg-secondary/50 px-3 py-2.5 text-sm text-muted-foreground">
+              El avance de etapa y el cobro se hacen en{" "}
+              <Link
+                href={adminKitchenOrderHref(order.uuid)}
+                className={`font-semibold text-foreground underline-offset-2 hover:underline ${focusRing} rounded-sm`}
+              >
+                Cocina
+              </Link>
+              . Aquí solo revisas el historial.
             </p>
           ) : null}
           {rounds.length === 0 ? (
@@ -631,6 +659,21 @@ function OrderDetailModal({
           >
             Cerrar
           </button>
+          {order.status === "DELIVERED" ? (
+            <Link
+              href={adminKitchenOrderHref(order.uuid)}
+              className={`mt-2 flex min-h-11 w-full items-center justify-center rounded-xl bg-live px-4 text-sm font-bold text-live-foreground hover:brightness-110 ${focusRing}`}
+            >
+              Ir a Cocina a cobrar
+            </Link>
+          ) : order.status !== "CLOSED" && order.status !== "CANCELLED" ? (
+            <Link
+              href={adminKitchenOrderHref(order.uuid)}
+              className={`mt-2 flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary/90 ${focusRing}`}
+            >
+              Abrir en Cocina
+            </Link>
+          ) : null}
         </div>
       </div>
     </div>

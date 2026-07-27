@@ -78,3 +78,8 @@ export function prettifyTenantSlug(slug: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
+
+/** Deep-link a Cocina con ticket enfocado (`?order=` uuid). */
+export function adminKitchenOrderHref(orderUuid: string): string {
+  return `/admin/dashboard/kitchen?order=${encodeURIComponent(orderUuid)}`;
+}

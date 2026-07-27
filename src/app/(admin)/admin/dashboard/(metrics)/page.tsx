@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { AnalyticsOverview } from "@/components/admin/analytics-overview";
+import { prettifyTenantSlug } from "@/lib/admin-nav";
 import { getAdminAccessToken } from "@/lib/auth-server";
 import { parseAnalyticsPeriod } from "@/lib/analytics-period";
 import {
@@ -64,6 +65,7 @@ export default async function AdminAnalyticsPage({
     <AnalyticsOverview
       summary={analytics}
       period={period}
+      restaurantName={prettifyTenantSlug(tenantSlug)}
       loadError={loadError}
     />
   );

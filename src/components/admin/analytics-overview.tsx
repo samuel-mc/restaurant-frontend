@@ -12,6 +12,7 @@ import type { AnalyticsPeriod, AnalyticsSummary } from "@/types/analytics";
 interface AnalyticsOverviewProps {
   summary: AnalyticsSummary;
   period: AnalyticsPeriod;
+  restaurantName: string;
   loadError?: boolean;
 }
 
@@ -24,6 +25,7 @@ const focusRing =
 export function AnalyticsOverview({
   summary,
   period,
+  restaurantName,
   loadError = false,
 }: AnalyticsOverviewProps) {
   const meta = analyticsPeriodMeta(period);
@@ -35,7 +37,8 @@ export function AnalyticsOverview({
           <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Métricas</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Facturación, pedidos y platillos más vendidos.
+              {restaurantName} · {meta.label.toLowerCase()} · facturación y top
+              platillos
             </p>
           </div>
           <AdminRovingTablist

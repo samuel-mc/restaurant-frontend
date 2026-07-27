@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import type { Order, OrderItem, OrderItemStatus, OrderStatus } from "@/types/api";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -77,6 +78,8 @@ interface KitchenDashboardProps {
   tenantSlug: string;
   restaurantName: string;
   initialOrders: Order[];
+  /** UUID desde Pedidos (`?order=`) para enfocar carril + ticket. */
+  focusOrderUuid?: string | null;
 }
 
 const FOCUS_PRIORITY: OrderStatus[] = [
@@ -106,7 +109,7 @@ function orderWho(order: Order): string {
   if (order.orderType === "PICKUP") {
     return order.customerName?.trim() || "Para llevar";
   }
-  if (order.orderType === "DELIVERY") return "Delivery";
+  if (order.orderType === "DELIVERY") return "A domicilio";
   return `#${order.uuid.slice(0, 8).toUpperCase()}`;
 }
 
@@ -137,6 +140,16 @@ function pickOldestOverdue(orders: Order[], now: number): Order | null {
   return oldest;
 }
 
+function findActiveOrder(orders: Order[], uuid: string | null | undefined): Order | null {
+  if (!uuid) return null;
+  return (
+    orders.find(
+      (order) =>
+        order.uuid === uuid && ACTIVE_STATUSES.includes(order.status),
+    ) ?? null
+  );
+}
+
 function pickFocusStatus(orders: Order[]): OrderStatus {
   for (const status of FOCUS_PRIORITY) {
     if (orders.some((order) => order.status === status)) return status;
@@ -161,7 +174,10 @@ export function KitchenDashboard({
   tenantSlug,
   restaurantName,
   initialOrders,
+  focusOrderUuid = null,
 }: KitchenDashboardProps) {
+  const router = useRouter();
+  const deepLinkOrder = findActiveOrder(initialOrders, focusOrderUuid);
   const [orders, setOrders] = useState<Order[]>(() =>
     sortByCreatedAt(initialOrders),
   );
@@ -177,12 +193,15 @@ export function KitchenDashboard({
   const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
   const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
   const [ticketErrors, setTicketErrors] = useState<Record<string, string>>({});
-  const [focusStatus, setFocusStatus] = useState<OrderStatus>(() =>
-    pickFocusStatus(initialOrders),
+  const [focusStatus, setFocusStatus] = useState<OrderStatus>(
+    () => deepLinkOrder?.status ?? pickFocusStatus(initialOrders),
   );
-  const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  const [selectedUuid, setSelectedUuid] = useState<string | null>(
+    () => deepLinkOrder?.uuid ?? null,
+  );
   const [now, setNow] = useState(() => Date.now());
-  const focusTouchedRef = useRef(false);
+  const focusTouchedRef = useRef(Boolean(deepLinkOrder));
+  const deepLinkHandledRef = useRef(false);
   const knownUuidsRef = useRef(new Set(initialOrders.map((o) => o.uuid)));
   const batchByUuidRef = useRef(
     new Map(initialOrders.map((o) => [o.uuid, maxBatchNumber(o)])),
@@ -312,6 +331,30 @@ export function KitchenDashboard({
     const id = window.setInterval(() => setNow(Date.now()), 15_000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!focusOrderUuid || deepLinkHandledRef.current) return;
+    deepLinkHandledRef.current = true;
+
+    const order = findActiveOrder(orders, focusOrderUuid);
+    if (!order) {
+      setBanner(
+        "Esa cuenta ya no está activa en Cocina. Vuelve a Pedidos o elige otra comanda.",
+      );
+      window.setTimeout(() => setBanner(null), 5_000);
+      router.replace("/admin/dashboard/kitchen", { scroll: false });
+      return;
+    }
+
+    focusTouchedRef.current = true;
+    setFocusStatus(order.status);
+    setSelectedUuid(order.uuid);
+    setBanner(
+      `Desde Pedidos · ${orderWho(order)} · ${columnTitleFor(order.status)}`,
+    );
+    window.setTimeout(() => setBanner(null), 4_000);
+    router.replace("/admin/dashboard/kitchen", { scroll: false });
+  }, [focusOrderUuid, orders, router]);
 
   useEffect(() => {
     if (connection !== "disconnected") return;
@@ -447,7 +490,9 @@ export function KitchenDashboard({
       handleOrderEvent(updated);
       setCloseTarget(null);
       setBanner(
-        `Cuenta cobrada · ${orderWho(order)} · mesa liberada`,
+        order.orderType === "IN_TABLE"
+          ? `Cuenta cobrada · ${orderWho(order)} · mesa liberada`
+          : `Cuenta cobrada · ${orderWho(order)}`,
       );
       window.setTimeout(() => setBanner(null), 3_500);
     } catch (error) {
@@ -870,7 +915,9 @@ export function KitchenDashboard({
         title="¿Cobrar y cerrar cuenta?"
         description={
           closeTarget
-            ? `Se marcará ${orderWho(closeTarget)} (#${closeTarget.uuid.slice(0, 8).toUpperCase()}) como pagada (${closeTarget.formattedTotal}) y se cerrará la cuenta.`
+            ? closeTarget.orderType === "IN_TABLE"
+              ? `Se marcará ${orderWho(closeTarget)} (#${closeTarget.uuid.slice(0, 8).toUpperCase()}) como pagada (${closeTarget.formattedTotal}) y se liberará la mesa.`
+              : `Se marcará ${orderWho(closeTarget)} (#${closeTarget.uuid.slice(0, 8).toUpperCase()}) como pagada (${closeTarget.formattedTotal}) y se cerrará la cuenta.`
             : ""
         }
         confirmLabel="Cobrar y cerrar"

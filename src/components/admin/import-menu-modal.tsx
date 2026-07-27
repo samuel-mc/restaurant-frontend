@@ -99,6 +99,10 @@ export function ImportMenuModal({
 
   if (!open) return null;
 
+  const focusRing =
+    "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+  const locked = uploading || busy;
+
   return (
     <div
       role="dialog"
@@ -108,30 +112,30 @@ export function ImportMenuModal({
       onClick={handleClose}
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl dark:bg-neutral-900"
+        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-card shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-black/5 px-5 py-4 dark:border-white/10">
-          <div>
+        <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+          <div className="min-w-0 pr-2">
             <h2
               id={`${inputId}-title`}
-              className="text-lg font-extrabold tracking-tight"
+              className="text-lg font-bold tracking-tight"
             >
-              Cargar menú Excel
+              Importar menú
             </h2>
-            <p className="mt-0.5 text-sm text-black/50 dark:text-white/50">
-              Usa la plantilla oficial. Incluye Url_Imagen opcional; las
-              categorías se crean solas si no existen.
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Usa la plantilla oficial. Las categorías se crean solas si no
+              existen.
             </p>
           </div>
           <button
             type="button"
             aria-label="Cerrar"
-            disabled={uploading}
+            disabled={locked}
             onClick={handleClose}
-            className="rounded-full p-2 text-black/50 hover:bg-black/5 disabled:opacity-40 dark:text-white/50 dark:hover:bg-white/10"
+            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-40 ${focusRing}`}
           >
-            <X className="size-5" />
+            <X className="size-5" aria-hidden />
           </button>
         </header>
 
@@ -144,17 +148,17 @@ export function ImportMenuModal({
             }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-10 text-center transition ${
+            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
               dragging
                 ? "border-emerald-500 bg-emerald-500/10"
-                : "border-black/15 bg-black/[0.02] dark:border-white/15 dark:bg-white/[0.03]"
+                : "border-border bg-secondary/60"
             }`}
           >
-            <Upload className="size-8 text-black/35 dark:text-white/35" />
+            <Upload className="size-8 text-muted-foreground" aria-hidden />
             <span className="text-sm font-semibold">
               Arrastra tu archivo aquí o haz clic para elegir
             </span>
-            <span className="text-xs text-black/45 dark:text-white/45">
+            <span className="text-xs text-muted-foreground">
               Formatos: .xlsx · .csv
             </span>
             <input
@@ -169,11 +173,14 @@ export function ImportMenuModal({
           </label>
 
           {file ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-black/10 bg-white px-4 py-3 dark:border-white/10 dark:bg-neutral-950">
-              <FileSpreadsheet className="size-5 shrink-0 text-emerald-600" />
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3">
+              <FileSpreadsheet
+                className="size-5 shrink-0 text-emerald-600"
+                aria-hidden
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{file.name}</p>
-                <p className="text-xs text-black/45 dark:text-white/45">
+                <p className="text-xs text-muted-foreground">
                   {(file.size / 1024).toFixed(1)} KB
                 </p>
               </div>
@@ -181,7 +188,7 @@ export function ImportMenuModal({
                 type="button"
                 disabled={uploading}
                 onClick={() => pickFile(null)}
-                className="text-xs font-semibold text-black/50 hover:text-foreground disabled:opacity-40"
+                className={`text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-40 ${focusRing}`}
               >
                 Quitar
               </button>
@@ -191,7 +198,7 @@ export function ImportMenuModal({
           {uploading ? (
             <p
               role="status"
-              className="rounded-2xl bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-100"
+              className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-950 dark:text-amber-100"
             >
               Procesando platillos y categorías…
             </p>
@@ -200,30 +207,30 @@ export function ImportMenuModal({
           {error ? (
             <p
               role="alert"
-              className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-300"
+              className="rounded-xl bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive"
             >
               {error}
             </p>
           ) : null}
 
           {result ? (
-            <div className="space-y-3 rounded-2xl border border-black/10 p-4 dark:border-white/10">
+            <div className="space-y-3 rounded-xl border border-border p-4">
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-800 dark:text-emerald-200">
                   {result.creadosExitosamente} importados
                 </span>
-                <span className="inline-flex rounded-full bg-black/5 px-3 py-1 text-xs font-semibold text-black/60 dark:bg-white/10 dark:text-white/60">
+                <span className="inline-flex rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
                   {result.totalProcesados} filas procesadas
                 </span>
                 {result.errores.length > 0 ? (
-                  <span className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-900 dark:text-amber-100">
+                  <span className="inline-flex rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-950 dark:text-amber-100">
                     {result.errores.length} con error
                   </span>
                 ) : null}
               </div>
 
               {result.categoriesCreated.length > 0 ? (
-                <p className="text-xs text-black/55 dark:text-white/55">
+                <p className="text-xs text-muted-foreground">
                   Categorías nuevas:{" "}
                   {result.categoriesCreated.map((c) => c.name).join(", ")}
                 </p>
@@ -250,12 +257,12 @@ export function ImportMenuModal({
           ) : null}
         </div>
 
-        <footer className="flex gap-2 border-t border-black/5 px-5 py-4 dark:border-white/10">
+        <footer className="flex gap-2 border-t border-border px-5 py-4">
           <button
             type="button"
-            disabled={uploading}
+            disabled={locked}
             onClick={handleClose}
-            className="flex-1 rounded-2xl border border-black/10 px-4 py-3 text-sm font-bold dark:border-white/15"
+            className={`flex-1 rounded-xl border border-border px-4 py-3 text-sm font-semibold transition-colors hover:bg-secondary disabled:opacity-40 ${focusRing}`}
           >
             {result ? "Cerrar" : "Cancelar"}
           </button>
@@ -264,7 +271,7 @@ export function ImportMenuModal({
               type="button"
               disabled={!file || uploading}
               onClick={() => void handleUpload()}
-              className="flex-1 rounded-2xl bg-foreground px-4 py-3 text-sm font-bold text-background disabled:opacity-40"
+              className={`flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-40 ${focusRing}`}
             >
               {uploading ? "Importando…" : "Importar"}
             </button>

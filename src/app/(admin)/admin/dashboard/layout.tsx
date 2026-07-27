@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { getAdminAccessToken } from "@/lib/auth-server";
 import { prettifyTenantSlug } from "@/lib/admin-nav";
+import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 
 /**
  * Layout persistente del dashboard admin.
@@ -19,13 +21,28 @@ export default async function AdminDashboardLayout({
   children: React.ReactNode;
 }) {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
+  const fallbackName = tenantSlug
+    ? prettifyTenantSlug(tenantSlug)
+    : "Restaurante";
+  let restaurantName = fallbackName;
+
+  if (tenantSlug) {
+    const token = await getAdminAccessToken();
+    if (token) {
+      try {
+        const profile = await getRestaurantProfile(tenantSlug);
+        const name = profile.name?.trim();
+        if (name) restaurantName = name;
+      } catch {
+        // Sin perfil o sin red: usamos el slug embellecido.
+      }
+    }
+  }
 
   return (
     <AdminShell
       tenantSlug={tenantSlug || "restaurante"}
-      restaurantName={
-        tenantSlug ? prettifyTenantSlug(tenantSlug) : "Restaurante"
-      }
+      restaurantName={restaurantName}
     >
       {children}
     </AdminShell>

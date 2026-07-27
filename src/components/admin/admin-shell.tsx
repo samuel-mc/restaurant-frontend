@@ -2,12 +2,18 @@
 
 /**
  * Shell del panel admin: sidebar persistente + drawer móvil.
- * Navegación oficial: Dashboard, Cocina, Pedidos, QR, Menú, Configuración + logout.
+ * Navegación oficial: Métricas, Cocina, Pedidos, QR, Menú, Configuración + logout.
  */
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { LogOut, Menu, X } from "lucide-react";
 import {
   ADMIN_NAV,
@@ -22,6 +28,9 @@ interface AdminShellProps {
   children: ReactNode;
 }
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 export function AdminShell({
   restaurantName,
   tenantSlug,
@@ -32,6 +41,8 @@ export function AdminShell({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const drawerTitleId = useId();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -39,11 +50,51 @@ export function AdminShell({
 
   useEffect(() => {
     if (!mobileOpen) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const drawer = drawerRef.current;
+    const focusables = drawer
+      ? Array.from(
+          drawer.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        )
+      : [];
+
+    focusables[0]?.focus();
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || focusables.length === 0) return;
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+      if (previouslyFocused?.isConnected) {
+        previouslyFocused.focus();
+      } else {
+        menuButtonRef.current?.focus();
+      }
+    };
   }, [mobileOpen]);
 
   async function handleLogout() {
@@ -61,36 +112,45 @@ export function AdminShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-neutral-100 dark:bg-neutral-950">
-      <aside className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col border-r border-black/5 bg-white print:hidden md:flex lg:w-64 dark:border-white/10 dark:bg-neutral-900">
+    <div className="flex min-h-screen bg-muted font-jakarta-sans text-foreground">
+      <a
+        href="#admin-main"
+        className={`absolute left-4 top-4 z-50 -translate-y-[160%] rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-transform focus:translate-y-0 ${focusRing}`}
+      >
+        Saltar al contenido
+      </a>
+
+      <aside className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card print:hidden md:flex lg:w-64">
         <SidebarBrand restaurantName={restaurantName} tenantSlug={tenantSlug} />
         <nav
-          className="flex flex-1 flex-col overflow-y-auto px-3 py-4"
+          className="flex flex-1 flex-col overflow-y-auto px-3 py-3"
           aria-label="Navegación del panel"
         >
           <NavList items={ADMIN_NAV} pathname={pathname} />
         </nav>
-        <div className="border-t border-black/5 p-3 dark:border-white/10">
+        <div className="border-t border-border p-3">
           <LogoutButton busy={loggingOut} onClick={handleLogout} />
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-black/5 bg-white/95 px-4 py-3 backdrop-blur print:hidden md:hidden dark:border-white/10 dark:bg-neutral-900/95">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 print:hidden md:hidden">
           <div className="min-w-0">
-            <p className="truncate text-sm font-black tracking-tight">
+            <p className="truncate text-sm font-bold tracking-tight">
               {restaurantName}
             </p>
-            <p className="truncate text-xs font-medium text-black/45 dark:text-white/45">
+            <p className="truncate text-xs font-medium text-muted-foreground">
               Panel · {tenantSlug}
             </p>
           </div>
           <button
+            ref={menuButtonRef}
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="inline-flex size-10 items-center justify-center rounded-2xl bg-black/5 dark:bg-white/10"
+            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-foreground transition-colors hover:bg-secondary/80 ${focusRing}`}
             aria-label="Abrir menú de navegación"
             aria-expanded={mobileOpen}
+            aria-controls="admin-mobile-nav"
           >
             <Menu className="size-5" aria-hidden />
           </button>
@@ -105,46 +165,50 @@ export function AdminShell({
               onClick={() => setMobileOpen(false)}
             />
             <aside
+              ref={drawerRef}
+              id="admin-mobile-nav"
               role="dialog"
               aria-modal="true"
               aria-labelledby={drawerTitleId}
-              className="absolute inset-y-0 left-0 flex w-[min(20rem,86vw)] flex-col bg-white shadow-2xl dark:bg-neutral-900"
+              className="absolute inset-y-0 left-0 flex w-[min(20rem,86vw)] flex-col bg-card shadow-[0_16px_40px_rgba(0,0,0,0.28)] motion-safe:animate-[fade-up_0.2s_cubic-bezier(0.16,1,0.3,1)]"
             >
-              <div className="flex items-start justify-between gap-3 border-b border-black/5 px-4 py-4 dark:border-white/10">
+              <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-4">
                 <div className="min-w-0">
                   <p
                     id={drawerTitleId}
-                    className="truncate text-base font-black"
+                    className="truncate text-base font-bold tracking-tight"
                   >
                     {restaurantName}
                   </p>
-                  <p className="truncate text-xs text-black/45 dark:text-white/45">
+                  <p className="truncate text-xs text-muted-foreground">
                     {tenantSlug}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMobileOpen(false)}
-                  className="inline-flex size-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10"
+                  className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary transition-colors hover:bg-secondary/80 ${focusRing}`}
                   aria-label="Cerrar menú"
                 >
                   <X className="size-4" aria-hidden />
                 </button>
               </div>
               <nav
-                className="flex flex-1 flex-col overflow-y-auto px-3 py-4"
+                className="flex flex-1 flex-col overflow-y-auto px-3 py-3"
                 aria-label="Navegación del panel"
               >
                 <NavList items={ADMIN_NAV} pathname={pathname} />
               </nav>
-              <div className="border-t border-black/5 p-3 dark:border-white/10">
+              <div className="border-t border-border p-3">
                 <LogoutButton busy={loggingOut} onClick={handleLogout} />
               </div>
             </aside>
           </div>
         ) : null}
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main id="admin-main" className="min-w-0 flex-1" tabIndex={-1}>
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -162,18 +226,11 @@ function LogoutButton({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-neutral-700 transition-colors hover:bg-red-500/10 hover:text-red-700 disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-red-500/15 dark:hover:text-red-300"
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-60 ${focusRing}`}
     >
-      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-black/[0.04] dark:bg-white/[0.06]">
-        <LogOut className="size-4" aria-hidden />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-bold leading-tight">
-          {busy ? "Cerrando sesión…" : "Cerrar sesión"}
-        </span>
-        <span className="block truncate text-[11px] font-medium leading-tight text-black/40 dark:text-white/40">
-          Salir del panel
-        </span>
+      <LogOut className="size-4 shrink-0" aria-hidden />
+      <span className="truncate">
+        {busy ? "Cerrando sesión…" : "Cerrar sesión"}
       </span>
     </button>
   );
@@ -187,14 +244,14 @@ function SidebarBrand({
   tenantSlug: string;
 }) {
   return (
-    <div className="border-b border-black/5 px-4 py-5 dark:border-white/10">
-      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/40 dark:text-white/40">
+    <div className="border-b border-border px-4 py-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         PlatoListo
       </p>
-      <p className="mt-1 truncate text-lg font-black tracking-tight">
+      <p className="mt-1.5 truncate text-base font-bold tracking-tight">
         {restaurantName}
       </p>
-      <p className="truncate text-xs font-medium text-black/45 dark:text-white/45">
+      <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
         {tenantSlug}
       </p>
     </div>
@@ -209,7 +266,7 @@ function NavList({
   pathname: string;
 }) {
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-0.5">
       {items.map((item) => {
         const active = isAdminNavActive(pathname, item);
         const Icon = item.icon;
@@ -217,42 +274,19 @@ function NavList({
           <li key={item.href}>
             <Link
               href={item.href}
+              title={item.description}
               aria-current={active ? "page" : undefined}
-              className={`group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors ${
+              className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${focusRing} ${
                 active
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950"
-                  : "text-neutral-700 hover:bg-black/[0.04] dark:text-neutral-200 dark:hover:bg-white/[0.06]"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/80 hover:bg-secondary hover:text-foreground"
               }`}
             >
-              {active ? (
-                <span
-                  aria-hidden
-                  className="absolute inset-y-2 left-0 w-1 rounded-full bg-amber-400 dark:bg-amber-500"
-                />
-              ) : null}
-              <span
-                className={`inline-flex size-9 shrink-0 items-center justify-center rounded-xl ${
-                  active
-                    ? "bg-white/15 dark:bg-black/10"
-                    : "bg-black/[0.04] dark:bg-white/[0.06]"
-                }`}
-              >
-                <Icon className="size-4" aria-hidden />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold leading-tight">
-                  {item.label}
-                </span>
-                <span
-                  className={`block truncate text-[11px] font-medium leading-tight ${
-                    active
-                      ? "text-white/70 dark:text-neutral-600"
-                      : "text-black/40 dark:text-white/40"
-                  }`}
-                >
-                  {item.description}
-                </span>
-              </span>
+              <Icon
+                className={`size-4 shrink-0 ${active ? "opacity-100" : "opacity-70"}`}
+                aria-hidden
+              />
+              <span className="min-w-0 truncate">{item.label}</span>
             </Link>
           </li>
         );

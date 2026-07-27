@@ -16,6 +16,9 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+
 export function ConfirmDialog({
   open,
   title,
@@ -31,8 +34,8 @@ export function ConfirmDialog({
 
   const confirmClass =
     tone === "danger"
-      ? "bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-      : "bg-foreground text-background disabled:opacity-50";
+      ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+      : "bg-primary text-primary-foreground disabled:opacity-50";
 
   return (
     <div
@@ -47,17 +50,17 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-desc"
-        className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl dark:bg-neutral-900"
+        className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
       >
         <h2
           id="confirm-dialog-title"
-          className="text-lg font-extrabold tracking-tight"
+          className="text-lg font-bold tracking-tight"
         >
           {title}
         </h2>
         <p
           id="confirm-dialog-desc"
-          className="mt-2 text-sm leading-relaxed text-black/60 dark:text-white/60"
+          className="mt-2 text-sm leading-relaxed text-muted-foreground"
         >
           {description}
         </p>
@@ -66,7 +69,7 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className="rounded-2xl px-4 py-2.5 text-sm font-bold text-black/60 hover:bg-black/5 disabled:opacity-50 dark:text-white/60 dark:hover:bg-white/10"
+            className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`}
           >
             {cancelLabel}
           </button>
@@ -74,7 +77,7 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={`rounded-2xl px-4 py-2.5 text-sm font-bold ${confirmClass}`}
+            className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${confirmClass} ${focusRing}`}
           >
             {busy ? "Eliminando…" : confirmLabel}
           </button>

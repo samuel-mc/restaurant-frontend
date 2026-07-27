@@ -231,6 +231,9 @@ function ProductFormDialog({
       ? "Crear platillo"
       : "Guardar cambios";
 
+  const focusRing =
+    "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
@@ -243,22 +246,22 @@ function ProductFormDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl dark:bg-neutral-900"
+        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-card shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
       >
-        <header className="flex items-start justify-between gap-3 border-b border-black/5 px-5 py-4 dark:border-white/10">
+        <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Catálogo
-            </p>
-            <h2 id={titleId} className="text-xl font-extrabold tracking-tight">
+            <h2 id={titleId} className="text-xl font-bold tracking-tight">
               {mode === "create" ? "Agregar platillo" : "Editar platillo"}
             </h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Nombre, precio, categoría e imagen del menú digital.
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="rounded-full px-3 py-1.5 text-sm font-semibold text-black/50 hover:bg-black/5 disabled:opacity-50 dark:text-white/50 dark:hover:bg-white/10"
+            className={`rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`}
           >
             Cerrar
           </button>
@@ -345,10 +348,10 @@ function ProductFormDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-black/50 dark:text-white/50">
+            <span className="text-xs font-semibold text-muted-foreground">
               Imagen del platillo
             </span>
-            <div className="overflow-hidden rounded-2xl border border-dashed border-black/15 bg-neutral-50 dark:border-white/15 dark:bg-neutral-800/60">
+            <div className="overflow-hidden rounded-xl border border-dashed border-border bg-secondary">
               {previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -357,14 +360,14 @@ function ProductFormDialog({
                   className="aspect-[16/10] w-full object-cover"
                 />
               ) : (
-                <div className="flex aspect-[16/10] items-center justify-center px-4 text-center text-sm text-black/40 dark:text-white/40">
+                <div className="flex aspect-[16/10] items-center justify-center px-4 text-center text-sm text-muted-foreground">
                   Vista previa de la imagen
                 </div>
               )}
             </div>
             <label
               htmlFor={fileInputId}
-              className={`inline-flex cursor-pointer items-center justify-center rounded-2xl border border-black/10 bg-white px-4 py-2.5 text-sm font-bold hover:bg-black/[0.03] dark:border-white/15 dark:bg-neutral-900 dark:hover:bg-white/5 ${
+              className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-semibold transition-colors hover:bg-secondary ${focusRing} ${
                 submitting ? "pointer-events-none opacity-50" : ""
               }`}
             >
@@ -379,16 +382,16 @@ function ProductFormDialog({
               onChange={(e) => handleFileChange(e.target.files)}
             />
             {imageFile ? (
-              <p className="text-xs text-black/45 dark:text-white/45">
+              <p className="text-xs text-muted-foreground">
                 {imageFile.name} · {(imageFile.size / 1024).toFixed(0)} KB
               </p>
             ) : (
-              <p className="text-xs text-black/40 dark:text-white/40">
+              <p className="text-xs text-muted-foreground">
                 Opcional. JPG, PNG, WEBP o GIF · máx. 5 MB
               </p>
             )}
             {fieldErrors.image ? (
-              <span className="text-xs font-medium text-red-600 dark:text-red-400">
+              <span className="text-xs font-medium text-destructive">
                 {fieldErrors.image}
               </span>
             ) : null}
@@ -397,7 +400,7 @@ function ProductFormDialog({
           {error ? (
             <p
               role="alert"
-              className="rounded-xl bg-red-500/10 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300"
+              className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
             >
               {error}
             </p>
@@ -408,14 +411,14 @@ function ProductFormDialog({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="rounded-2xl px-4 py-2.5 text-sm font-bold text-black/60 hover:bg-black/5 disabled:opacity-50 dark:text-white/60 dark:hover:bg-white/10"
+              className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`}
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={submitting || categories.length === 0}
-              className="inline-flex items-center justify-center rounded-2xl bg-foreground px-5 py-2.5 text-sm font-bold text-background disabled:opacity-50"
+              className={`inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-50 ${focusRing}`}
             >
               {submitLabel}
             </button>
@@ -441,24 +444,20 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5" htmlFor={htmlFor}>
-      <span className="text-xs font-bold uppercase tracking-wide text-black/50 dark:text-white/50">
-        {label}
-      </span>
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       {children}
       {hint && !error ? (
-        <span className="text-xs text-black/40 dark:text-white/40">{hint}</span>
+        <span className="text-xs text-muted-foreground">{hint}</span>
       ) : null}
       {error ? (
-        <span className="text-xs font-medium text-red-600 dark:text-red-400">
-          {error}
-        </span>
+        <span className="text-xs font-medium text-destructive">{error}</span>
       ) : null}
     </label>
   );
 }
 
 function inputClass(hasError: boolean): string {
-  return `w-full rounded-2xl border bg-neutral-50 px-3.5 py-2.5 text-sm outline-none transition focus:border-foreground focus:ring-2 focus:ring-foreground/10 dark:bg-neutral-800 ${
-    hasError ? "border-red-400" : "border-black/10 dark:border-white/15"
+  return `w-full rounded-xl border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 ${
+    hasError ? "border-destructive" : "border-border"
   }`;
 }

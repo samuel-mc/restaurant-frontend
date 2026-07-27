@@ -42,6 +42,7 @@ export default async function AdminMenuManagementPage() {
   let categories: Category[] = [];
   let products: Product[] = [];
   let plan: SubscriptionPlan = "BASIC";
+  let restaurantName = prettifyTenantSlug(tenantSlug);
   let loadError: string | null = null;
 
   try {
@@ -52,6 +53,8 @@ export default async function AdminMenuManagementPage() {
     categories = catalog.categories;
     products = catalog.products;
     plan = profile.plan === "PRO" ? "PRO" : "BASIC";
+    const name = profile.name?.trim();
+    if (name) restaurantName = name;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       redirect("/admin/login");
@@ -65,8 +68,10 @@ export default async function AdminMenuManagementPage() {
   if (loadError) {
     return (
       <div className="mx-auto flex max-w-lg flex-col justify-center gap-3 px-6 py-16">
-        <h1 className="text-2xl font-bold">Catálogo no disponible</h1>
-        <p className="text-sm text-foreground/60">{loadError}</p>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Catálogo no disponible
+        </h1>
+        <p className="text-sm text-muted-foreground">{loadError}</p>
       </div>
     );
   }
@@ -74,7 +79,7 @@ export default async function AdminMenuManagementPage() {
   return (
     <MenuManager
       tenantSlug={tenantSlug}
-      restaurantName={prettifyTenantSlug(tenantSlug)}
+      restaurantName={restaurantName}
       initialCategories={categories}
       initialProducts={products}
       plan={plan}

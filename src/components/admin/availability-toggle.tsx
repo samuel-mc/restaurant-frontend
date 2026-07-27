@@ -14,6 +14,9 @@ interface AvailabilityToggleProps {
   productName: string;
 }
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+
 export function AvailabilityToggle({
   checked,
   disabled = false,
@@ -30,7 +33,7 @@ export function AvailabilityToggle({
       className={`inline-flex rounded-full p-0.5 ${
         isAvailable
           ? "bg-emerald-500/15 dark:bg-emerald-400/15"
-          : "bg-neutral-200/90 dark:bg-neutral-700/80"
+          : "bg-secondary"
       }`}
     >
       <button
@@ -41,10 +44,10 @@ export function AvailabilityToggle({
         onClick={() => {
           if (!isAvailable) onChange();
         }}
-        className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide transition disabled:cursor-default ${
+        className={`rounded-full px-2.5 py-1.5 text-xs font-bold tracking-wide transition disabled:cursor-default ${focusRing} ${
           isAvailable
             ? "bg-emerald-600 text-white shadow-sm dark:bg-emerald-500"
-            : "text-black/40 hover:text-black/70 disabled:opacity-100 dark:text-white/35 dark:hover:text-white/70"
+            : "text-muted-foreground hover:text-foreground disabled:opacity-100"
         } ${busy && !isAvailable ? "animate-pulse" : ""}`}
       >
         En menú
@@ -57,10 +60,10 @@ export function AvailabilityToggle({
         onClick={() => {
           if (isAvailable) onChange();
         }}
-        className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide transition disabled:cursor-default ${
+        className={`rounded-full px-2.5 py-1.5 text-xs font-bold tracking-wide transition disabled:cursor-default ${focusRing} ${
           !isAvailable
-            ? "bg-neutral-800 text-white shadow-sm dark:bg-neutral-200 dark:text-neutral-900"
-            : "text-black/40 hover:text-black/70 disabled:opacity-100 dark:text-white/35 dark:hover:text-white/70"
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground disabled:opacity-100"
         } ${busy && isAvailable ? "animate-pulse" : ""}`}
       >
         {busy ? "…" : "Agotado"}

@@ -30,6 +30,13 @@ import {
   type SubscriptionPlan,
 } from "@/lib/subscription-plan";
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+const btnPrimary = `inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 ${focusRing}`;
+
+const btnSecondary = `inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary ${focusRing}`;
+
 interface MenuManagerProps {
   tenantSlug: string;
   restaurantName: string;
@@ -62,7 +69,6 @@ type ConfirmState =
 
 export function MenuManager({
   tenantSlug,
-  restaurantName,
   initialCategories,
   initialProducts,
   plan,
@@ -111,7 +117,7 @@ export function MenuManager({
 
   function openCreateProduct() {
     if (atProductLimit) {
-      setFormError(
+      showBanner(
         `El Plan Básico permite hasta ${BASIC_MAX_PRODUCTS} platillos. Actualiza a Pro para menú ilimitado.`,
       );
       return;
@@ -438,19 +444,18 @@ export function MenuManager({
     setMobileCatsOpen(false);
   }
 
+  const canCreateProduct = categories.length > 0 && !atProductLimit;
+
   return (
-    <div className="flex flex-col pb-6">
-      <header className="border-b border-black/5 px-4 py-5 md:px-6 dark:border-white/10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-black/45 dark:text-white/45">
-              Configuración del menú
-            </p>
-            <h1 className="text-2xl font-extrabold tracking-tight md:text-3xl">
-              Categorías y platillos
+    <div className="flex flex-col pb-8 font-jakarta-sans">
+      <header className="border-b border-border px-4 py-5 md:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 max-w-xl">
+            <h1 className="text-2xl font-bold tracking-tight">
+              Menú
             </h1>
-            <p className="mt-1 text-sm font-medium text-black/50 dark:text-white/50">
-              {restaurantName}
+            <p className="mt-1 text-sm text-muted-foreground">
+              Categorías, precios y disponibilidad del menú digital.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -458,32 +463,40 @@ export function MenuManager({
               type="button"
               onClick={() => void handleDownloadTemplate()}
               disabled={templateBusy}
-              className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-white px-3.5 py-1.5 text-sm font-bold text-foreground disabled:opacity-40 dark:border-white/15 dark:bg-neutral-900"
+              className={`${btnSecondary} disabled:opacity-40`}
             >
-              <FileSpreadsheet className="size-4" />
-              {templateBusy ? "Descargando…" : "Descargar Plantilla Excel"}
+              <FileSpreadsheet className="size-4 shrink-0" aria-hidden />
+              <span className="hidden sm:inline">
+                {templateBusy ? "Descargando…" : "Plantilla Excel"}
+              </span>
+              <span className="sm:hidden">
+                {templateBusy ? "…" : "Plantilla"}
+              </span>
             </button>
             <button
               type="button"
               onClick={() => setImportOpen(true)}
               disabled={atProductLimit}
-              className="inline-flex items-center gap-1.5 rounded-full border border-foreground/25 bg-transparent px-3.5 py-1.5 text-sm font-bold text-foreground disabled:opacity-40"
+              className={`${btnSecondary} disabled:opacity-40`}
             >
-              <Upload className="size-4" />
-              Cargar Menú Excel
+              <Upload className="size-4 shrink-0" aria-hidden />
+              Importar
             </button>
             <button
               type="button"
               onClick={openCreateProduct}
-              disabled={categories.length === 0 || atProductLimit}
-              className="rounded-full bg-foreground px-4 py-1.5 text-sm font-bold text-background disabled:opacity-40"
+              disabled={!canCreateProduct}
+              className={`${btnPrimary} disabled:opacity-40`}
             >
-              + Nuevo Platillo
+              Nuevo platillo
             </button>
           </div>
         </div>
         {!isProPlan(plan) ? (
-          <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-sm text-amber-900 dark:text-amber-100">
+          <p
+            role="status"
+            className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-950 dark:text-amber-100"
+          >
             Plan Básico: {products.length}/{BASIC_MAX_PRODUCTS} platillos
             {atProductLimit
               ? " · Límite alcanzado. Pasa a Pro para continuar."
@@ -493,7 +506,7 @@ export function MenuManager({
         {banner ? (
           <p
             role="status"
-            className="mt-3 rounded-xl bg-emerald-500/15 px-4 py-2 text-center text-sm font-bold text-emerald-800 dark:text-emerald-200"
+            className="mt-3 rounded-xl bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-900 dark:text-emerald-200"
           >
             {banner}
           </p>
@@ -505,17 +518,18 @@ export function MenuManager({
           <button
             type="button"
             onClick={() => setMobileCatsOpen((o) => !o)}
-            className="flex w-full items-center justify-between rounded-2xl border border-black/10 bg-white px-4 py-3 text-left dark:border-white/10 dark:bg-neutral-900"
+            aria-expanded={mobileCatsOpen}
+            className={`flex min-h-11 w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left ${focusRing}`}
           >
-            <span>
-              <span className="block text-xs font-semibold uppercase tracking-wide text-black/45 dark:text-white/45">
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-muted-foreground">
                 Categoría
               </span>
-              <span className="font-bold">
+              <span className="block truncate font-semibold">
                 {selectedCategory?.name ?? "Selecciona una categoría"}
               </span>
             </span>
-            <span className="text-sm text-black/40 dark:text-white/40">
+            <span className="shrink-0 text-sm text-muted-foreground">
               {mobileCatsOpen ? "Cerrar" : "Cambiar"}
             </span>
           </button>
@@ -545,25 +559,23 @@ export function MenuManager({
           />
         </aside>
 
-        <section className="min-w-0 flex-1">
-          <div className="mb-4 flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-extrabold tracking-tight md:text-xl">
-                {selectedCategory?.name ?? "Productos"}
-              </h2>
-              <p className="text-sm text-black/50 dark:text-white/50">
-                {categories.length === 0
-                  ? "Crea una categoría para empezar a cargar platillos."
-                  : `${filteredProducts.length} platillo${filteredProducts.length === 1 ? "" : "s"}`}
-              </p>
-            </div>
+        <section className="min-w-0 flex-1" aria-live="polite">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold tracking-tight">
+              {selectedCategory?.name ?? "Platillos"}
+            </h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {categories.length === 0
+                ? "Crea una categoría para empezar a cargar platillos."
+                : `${filteredProducts.length} platillo${filteredProducts.length === 1 ? "" : "s"}`}
+            </p>
           </div>
 
           {categories.length === 0 ? (
             <EmptyState
               title="Sin categorías"
               description="Agrega la primera categoría del menú para organizar tus platillos."
-              actionLabel="+ Nueva categoría"
+              actionLabel="Nueva categoría"
               onAction={openCreateCategory}
             />
           ) : filteredProducts.length === 0 ? (
@@ -576,6 +588,7 @@ export function MenuManager({
               }
               actionLabel="Agregar platillo"
               onAction={openCreateProduct}
+              actionDisabled={atProductLimit}
             />
           ) : (
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -670,29 +683,43 @@ export function MenuManager({
         >
           <form
             onSubmit={handleCategorySubmit}
-            className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl dark:bg-neutral-900"
+            className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="category-dialog-title"
           >
-            <h2 className="text-lg font-extrabold">
+            <h2
+              id="category-dialog-title"
+              className="text-lg font-bold tracking-tight"
+            >
               {categoryDialog.mode === "create"
                 ? "Nueva categoría"
                 : "Editar categoría"}
             </h2>
-            <p className="mt-1 text-sm text-black/50 dark:text-white/50">
+            <p className="mt-1 text-sm text-muted-foreground">
               Aparecerá en el menú digital y en este panel.
             </p>
-            <input
-              autoFocus
-              value={categoryNameDraft}
-              onChange={(e) => {
-                setCategoryNameDraft(e.target.value);
-                setCategoryError(null);
-              }}
-              maxLength={50}
-              placeholder="Ej. Entradas"
-              className="mt-4 w-full rounded-2xl border border-black/10 bg-neutral-50 px-3.5 py-2.5 text-sm outline-none focus:border-foreground focus:ring-2 focus:ring-foreground/10 dark:border-white/15 dark:bg-neutral-800"
-            />
+            <label className="mt-4 block">
+              <span className="sr-only">Nombre de la categoría</span>
+              <input
+                autoFocus
+                value={categoryNameDraft}
+                onChange={(e) => {
+                  setCategoryNameDraft(e.target.value);
+                  setCategoryError(null);
+                }}
+                maxLength={50}
+                placeholder="Ej. Entradas"
+                aria-invalid={Boolean(categoryError)}
+                className={`w-full rounded-xl border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 ${
+                  categoryError
+                    ? "border-destructive"
+                    : "border-border"
+                }`}
+              />
+            </label>
             {categoryError ? (
-              <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-400">
+              <p className="mt-2 text-sm font-medium text-destructive" role="alert">
                 {categoryError}
               </p>
             ) : null}
@@ -701,14 +728,14 @@ export function MenuManager({
                 type="button"
                 disabled={categoryBusy}
                 onClick={closeCategoryDialog}
-                className="rounded-2xl px-4 py-2.5 text-sm font-bold text-black/60 hover:bg-black/5 dark:text-white/60 dark:hover:bg-white/10"
+                className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary ${focusRing}`}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={categoryBusy}
-                className="rounded-2xl bg-foreground px-4 py-2.5 text-sm font-bold text-background disabled:opacity-50"
+                className={`${btnPrimary} disabled:opacity-50`}
               >
                 {categoryBusy
                   ? "Guardando…"
@@ -753,39 +780,39 @@ function CategoryList({
 
   return (
     <div
-      className={`rounded-3xl border border-black/5 bg-white p-3 dark:border-white/10 dark:bg-neutral-900 ${className}`}
+      className={`rounded-2xl border border-border bg-card p-3 ${className}`}
     >
       <button
         type="button"
         onClick={onNewCategory}
-        className="mb-3 flex w-full items-center justify-center gap-1 rounded-2xl border border-dashed border-black/15 py-2.5 text-sm font-bold hover:bg-black/[0.03] dark:border-white/20 dark:hover:bg-white/5"
+        className={`mb-3 flex min-h-11 w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border text-sm font-semibold transition-colors hover:bg-secondary ${focusRing}`}
       >
-        + Nueva categoría
+        Nueva categoría
       </button>
       {categories.length === 0 ? (
-        <p className="px-2 py-6 text-center text-sm text-black/40 dark:text-white/40">
+        <p className="px-2 py-6 text-center text-sm text-muted-foreground">
           Aún no hay categorías
         </p>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col gap-0.5">
           {categories.map((category) => {
             const active = category.id === selectedCategoryId;
             const count = counts.get(category.id) ?? 0;
             return (
-              <li key={category.id} className="group flex items-stretch gap-0.5">
+              <li key={category.id} className="flex items-stretch gap-0.5">
                 <button
                   type="button"
                   onClick={() => onSelect(category.id)}
-                  className={`flex min-w-0 flex-1 items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm transition ${
+                  className={`flex min-h-11 min-w-0 flex-1 items-center justify-between rounded-xl px-3 text-left text-sm transition-colors ${focusRing} ${
                     active
-                      ? "bg-foreground font-bold text-background"
-                      : "font-semibold text-foreground hover:bg-black/[0.04] dark:hover:bg-white/5"
+                      ? "bg-primary font-semibold text-primary-foreground"
+                      : "font-medium text-foreground hover:bg-secondary"
                   }`}
                 >
                   <span className="truncate">{category.name}</span>
                   <span
                     className={`ml-2 tabular-nums ${
-                      active ? "opacity-70" : "text-black/40 dark:text-white/40"
+                      active ? "opacity-70" : "text-muted-foreground"
                     }`}
                   >
                     {count}
@@ -796,7 +823,7 @@ function CategoryList({
                   aria-label={`Editar ${category.name}`}
                   title="Editar"
                   onClick={() => onEditCategory(category)}
-                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-2xl text-black/45 hover:bg-black/[0.04] hover:text-foreground dark:text-white/45 dark:hover:bg-white/5"
+                  className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground ${focusRing}`}
                 >
                   <Pencil className="size-3.5" aria-hidden />
                 </button>
@@ -805,7 +832,7 @@ function CategoryList({
                   aria-label={`Eliminar ${category.name}`}
                   title="Eliminar"
                   onClick={() => onDeleteCategory(category)}
-                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-2xl text-red-600/80 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15"
+                  className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-destructive/80 transition-colors hover:bg-destructive/10 hover:text-destructive ${focusRing}`}
                 >
                   <Trash2 className="size-3.5" aria-hidden />
                 </button>
@@ -834,14 +861,14 @@ function ProductAdminCard({
   const available = product.isAvailable;
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-3xl border border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-neutral-900">
-      <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100 dark:bg-neutral-800">
+    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="relative aspect-[16/10] overflow-hidden bg-secondary">
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.imageUrl}
             alt=""
-            className={`size-full object-cover transition-[filter,opacity] duration-300 ${
+            className={`size-full object-cover transition-[filter,opacity] duration-200 ${
               available ? "" : "opacity-55 grayscale"
             }`}
             onError={(e) => {
@@ -850,7 +877,7 @@ function ProductAdminCard({
           />
         ) : (
           <div
-            className={`flex size-full items-center justify-center text-xs font-semibold uppercase tracking-wide text-black/30 dark:text-white/30 ${
+            className={`flex size-full items-center justify-center text-xs font-semibold text-muted-foreground ${
               available ? "" : "opacity-60"
             }`}
           >
@@ -859,7 +886,7 @@ function ProductAdminCard({
         )}
         {!available ? (
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2.5 pt-8">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-white/95">
+            <span className="text-xs font-bold uppercase tracking-wide text-white/95">
               Fuera del menú
             </span>
           </div>
@@ -869,23 +896,23 @@ function ProductAdminCard({
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="min-w-0 flex-1">
           <h3
-            className={`truncate font-extrabold tracking-tight ${
-              available ? "" : "text-black/55 dark:text-white/55"
+            className={`truncate font-bold tracking-tight ${
+              available ? "" : "text-muted-foreground"
             }`}
           >
             {product.name}
           </h3>
           {product.description ? (
-            <p className="mt-1 line-clamp-2 text-sm text-black/50 dark:text-white/50">
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
               {product.description}
             </p>
           ) : null}
-          <p className="mt-2 text-base font-black tabular-nums">
+          <p className="mt-2 text-base font-bold tabular-nums">
             {product.formattedPrice}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/5 pt-3 dark:border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
           <AvailabilityToggle
             checked={available}
             busy={toggling}
@@ -898,7 +925,7 @@ function ProductAdminCard({
               onClick={onEdit}
               aria-label={`Editar ${product.name}`}
               title="Editar"
-              className="inline-flex size-9 items-center justify-center rounded-xl bg-black/5 text-foreground hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15"
+              className={`inline-flex size-10 items-center justify-center rounded-xl bg-secondary text-foreground transition-colors hover:bg-secondary/80 ${focusRing}`}
             >
               <Pencil className="size-3.5" aria-hidden />
             </button>
@@ -907,7 +934,7 @@ function ProductAdminCard({
               onClick={onDelete}
               aria-label={`Eliminar ${product.name}`}
               title="Eliminar"
-              className="inline-flex size-9 items-center justify-center rounded-xl text-red-700 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/15"
+              className={`inline-flex size-10 items-center justify-center rounded-xl text-destructive transition-colors hover:bg-destructive/10 ${focusRing}`}
             >
               <Trash2 className="size-3.5" aria-hidden />
             </button>
@@ -923,22 +950,23 @@ function EmptyState({
   description,
   actionLabel,
   onAction,
+  actionDisabled = false,
 }: {
   title: string;
   description: string;
   actionLabel: string;
   onAction: () => void;
+  actionDisabled?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-black/15 bg-white/70 px-6 py-16 text-center dark:border-white/15 dark:bg-neutral-900/70">
-      <h3 className="text-lg font-extrabold">{title}</h3>
-      <p className="mt-2 max-w-sm text-sm text-black/50 dark:text-white/50">
-        {description}
-      </p>
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/70 px-6 py-16 text-center">
+      <h3 className="text-lg font-bold tracking-tight">{title}</h3>
+      <p className="mt-2 max-w-sm text-sm text-muted-foreground">{description}</p>
       <button
         type="button"
         onClick={onAction}
-        className="mt-5 rounded-2xl bg-foreground px-4 py-2.5 text-sm font-bold text-background"
+        disabled={actionDisabled}
+        className={`mt-5 ${btnPrimary} disabled:opacity-40`}
       >
         {actionLabel}
       </button>

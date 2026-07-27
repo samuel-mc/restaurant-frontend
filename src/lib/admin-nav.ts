@@ -19,26 +19,26 @@ export interface AdminNavItem {
 
 /**
  * Navegación oficial del panel admin.
- * Orden = flujo operativo: métricas → cocina → pedidos → QR → menú → configuración.
+ * Orden = flujo operativo: Métricas → Cocina → Pedidos → QR → Menú → Configuración.
  */
 export const ADMIN_NAV: readonly AdminNavItem[] = [
   {
     href: "/admin/dashboard",
-    label: "Dashboard",
-    description: "Métricas y facturación",
+    label: "Métricas",
+    description: "KPIs, facturación y top platillos",
     icon: BarChart3,
     exact: true,
   },
   {
     href: "/admin/dashboard/kitchen",
-    label: "Cocina en vivo",
+    label: "Cocina",
     description: "Comandas en tiempo real",
     icon: ChefHat,
   },
   {
     href: "/admin/dashboard/orders",
-    label: "Pedidos / Cuentas",
-    description: "Listado, cobro y cierre",
+    label: "Pedidos",
+    description: "Listado, cobro y cierre de cuentas",
     icon: ClipboardList,
   },
   {

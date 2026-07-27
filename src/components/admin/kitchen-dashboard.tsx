@@ -163,6 +163,11 @@ type StatusUndo = {
   expiresAt: number;
 };
 
+type UrgentReviewGate = {
+  uuid: string;
+  status: OrderStatus;
+};
+
 function sortByCreatedAt(orders: Order[]): Order[] {
   return [...orders].sort(
     (a, b) =>
@@ -199,6 +204,7 @@ export function KitchenDashboard({
   const [selectedUuid, setSelectedUuid] = useState<string | null>(
     () => deepLinkOrder?.uuid ?? null,
   );
+  const [reviewGate, setReviewGate] = useState<UrgentReviewGate | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const focusTouchedRef = useRef(Boolean(deepLinkOrder));
   const deepLinkHandledRef = useRef(false);
@@ -218,6 +224,7 @@ export function KitchenDashboard({
   const updatingUuidRef = useRef(updatingUuid);
   const connectionRef = useRef(connection);
   const closingRef = useRef(closing);
+  const reviewGateRef = useRef(reviewGate);
   focusStatusRef.current = focusStatus;
   selectedUuidRef.current = selectedUuid;
   statusUndoRef.current = statusUndo;
@@ -225,6 +232,7 @@ export function KitchenDashboard({
   updatingUuidRef.current = updatingUuid;
   connectionRef.current = connection;
   closingRef.current = closing;
+  reviewGateRef.current = reviewGate;
 
   const actionsLocked = connection === "disconnected";
   const mutationsLive = !actionsLocked;
@@ -365,6 +373,7 @@ export function KitchenDashboard({
   async function handleAdvance(order: Order) {
     const next = nextStatusFor(order.status);
     if (!next || updatingUuid || closing || !mutationsLive) return;
+    if (reviewGate && reviewGate.uuid === order.uuid) return;
 
     setUpdatingUuid(order.uuid);
     setTicketErrors((prev) => {
@@ -557,7 +566,23 @@ export function KitchenDashboard({
     focusTouchedRef.current = true;
     setFocusStatus(oldestOverdue.status);
     setSelectedUuid(oldestOverdue.uuid);
+    setReviewGate({
+      uuid: oldestOverdue.uuid,
+      status: oldestOverdue.status,
+    });
   }
+
+  const reviewGateOrder = reviewGate
+    ? (orders.find((order) => order.uuid === reviewGate.uuid) ?? null)
+    : null;
+
+  useEffect(() => {
+    if (!reviewGate) return;
+    const order = orders.find((entry) => entry.uuid === reviewGate.uuid);
+    if (!order || order.status !== reviewGate.status) {
+      setReviewGate(null);
+    }
+  }, [orders, reviewGate]);
 
   useEffect(() => {
     if (focusOrders.length === 0) {
@@ -662,6 +687,8 @@ export function KitchenDashboard({
           lane.find((order) => order.uuid === selectedUuidRef.current) ??
           lane[0];
         if (!selected) return;
+        const gate = reviewGateRef.current;
+        if (gate && gate.uuid === selected.uuid) return;
         event.preventDefault();
         if (selected.status === "DELIVERED") {
           setCloseTarget(selected);
@@ -715,6 +742,7 @@ export function KitchenDashboard({
                 }
                 errorMessage={ticketErrors[order.uuid] ?? null}
                 actionsLocked={actionsLocked}
+                advanceLocked={reviewGate?.uuid === order.uuid}
                 onAdvance={handleAdvance}
                 onCloseAccount={(order) => {
                   if (!actionsLocked) setCloseTarget(order);
@@ -843,6 +871,32 @@ export function KitchenDashboard({
               className="min-h-11 shrink-0 rounded-xl bg-destructive px-4 py-2 text-sm font-bold text-destructive-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               Ir al urgente
+            </button>
+          </div>
+        ) : null}
+
+        {reviewGate && reviewGateOrder ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/40 bg-warn-muted px-4 py-3"
+          >
+            <div className="min-w-0 text-sm">
+              <p className="font-semibold text-warn-ink">
+                Revisa antes de avanzar
+              </p>
+              <p className="mt-0.5 text-muted-foreground">
+                {orderWho(reviewGateOrder)} ·{" "}
+                {columnTitleFor(reviewGateOrder.status)} · confirma y luego usa
+                la acción del ticket
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReviewGate(null)}
+              className="min-h-11 shrink-0 rounded-xl bg-warn px-4 py-2 text-sm font-bold text-warn-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              Revisado
             </button>
           </div>
         ) : null}

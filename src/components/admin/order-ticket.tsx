@@ -19,6 +19,8 @@ interface OrderTicketProps {
   errorMessage?: string | null;
   /** Bloquea mutaciones (p. ej. sin conexión). */
   actionsLocked?: boolean;
+  /** Bloquea solo avance/cobro (p. ej. pendiente de revisión urgente). */
+  advanceLocked?: boolean;
   onAdvance: (order: Order) => void;
   onCloseAccount: (order: Order) => void;
   onItemStatus: (order: Order, item: OrderItem, status: OrderItemStatus) => void;
@@ -104,6 +106,7 @@ export function OrderTicket({
   updatingItemId = null,
   errorMessage = null,
   actionsLocked = false,
+  advanceLocked = false,
   onAdvance,
   onCloseAccount,
   onItemStatus,
@@ -116,6 +119,7 @@ export function OrderTicket({
   const showItemDeliver = order.status === "IN_KITCHEN";
   const showTotal = order.status === "DELIVERED";
   const controlsDisabled = isUpdating || actionsLocked;
+  const stageDisabled = controlsDisabled || advanceLocked;
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -317,18 +321,22 @@ export function OrderTicket({
 
       {showItemDeliver ? (
         <p className="mb-2 text-xs text-muted-foreground">
-          Listo cierra la comanda · ✓ es opcional por platillo
+          {advanceLocked
+            ? "Confirma Revisado arriba antes de marcar Listo"
+            : "Listo cierra la comanda · ✓ es opcional por platillo"}
         </p>
       ) : null}
 
       {action ? (
         <button
           type="button"
-          disabled={controlsDisabled}
+          disabled={stageDisabled}
           title={
             actionsLocked
               ? "Sin conexión · espera a reconectar"
-              : undefined
+              : advanceLocked
+                ? "Revisa la comanda y pulsa Revisado"
+                : undefined
           }
           onClick={(event) => {
             event.stopPropagation();
@@ -345,11 +353,13 @@ export function OrderTicket({
       {order.status === "DELIVERED" ? (
         <button
           type="button"
-          disabled={controlsDisabled}
+          disabled={stageDisabled}
           title={
             actionsLocked
               ? "Sin conexión · no se puede cobrar"
-              : undefined
+              : advanceLocked
+                ? "Revisa la comanda y pulsa Revisado"
+                : undefined
           }
           onClick={(event) => {
             event.stopPropagation();

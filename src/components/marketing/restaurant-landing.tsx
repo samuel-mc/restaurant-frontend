@@ -713,6 +713,13 @@ function DigitalMenu() {
   const [categoryId, setCategoryId] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(MENU_INITIAL_VISIBLE);
+  const [filterKey, setFilterKey] = useState(() => `${categoryId}\0${search}`);
+  const nextFilterKey = `${categoryId}\0${search}`;
+  // Al cambiar filtros, volver a la primera página visual (durante render, no en effect).
+  if (filterKey !== nextFilterKey) {
+    setFilterKey(nextFilterKey);
+    setVisibleCount(MENU_INITIAL_VISIBLE);
+  }
 
   const categories = useMemo(() => {
     const seen = new Map<number, string>();
@@ -736,11 +743,6 @@ function DigitalMenu() {
       return catOk && searchOk;
     });
   }, [products, categoryId, search]);
-
-  // Al cambiar filtros, volver a la primera página visual.
-  useEffect(() => {
-    setVisibleCount(MENU_INITIAL_VISIBLE);
-  }, [categoryId, search]);
 
   const visible = filtered.slice(0, visibleCount);
   const remaining = Math.max(0, filtered.length - visible.length);
@@ -976,28 +978,23 @@ function Destacados() {
 
 /** Live status line for recurring promos; refreshes once a minute while mounted. */
 function usePromoStatus(statusFn?: () => string) {
-  const [label, setLabel] = useState(() => statusFn?.() ?? null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if (!statusFn) {
-      setLabel(null);
-      return;
-    }
-    setLabel(statusFn());
-    const id = window.setInterval(() => setLabel(statusFn()), 60_000);
+    if (!statusFn) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 60_000);
     return () => window.clearInterval(id);
   }, [statusFn]);
 
-  return label;
+  return useMemo(() => statusFn?.() ?? null, [statusFn, tick]);
 }
 
 function PromoCard({ promo }: { promo: Promo }) {
   const [ref, inView] = useInView<HTMLDivElement>("80px");
   const deadline = promo.endsIn ?? null;
-  const showCountdown = Boolean(
-    deadline && deadline.getTime() > Date.now(),
-  );
-  const time = useCountdown(deadline, inView && showCountdown);
+  const time = useCountdown(deadline, Boolean(deadline) && inView);
+  const showCountdown =
+    Boolean(deadline) && (time.h > 0 || time.m > 0 || time.s > 0);
   const status = usePromoStatus(
     !showCountdown && promo.status ? promo.status : undefined,
   );
@@ -1139,7 +1136,7 @@ function ComoPedir() {
           },
         ]
       : []),
-    ...(brand.hasPickup
+    ...(brand.hasPickup && canOrder
       ? [
           {
             name: "Pick up",
@@ -1147,7 +1144,7 @@ function ComoPedir() {
             color: "bg-white/5 border border-white/15",
             hov: "hover:bg-white/10",
             icon: <Package size={24} />,
-            scrollId: "ubicacion" as const,
+            link: "/menu",
             external: false,
             primary: false,
           },

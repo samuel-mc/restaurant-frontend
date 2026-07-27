@@ -14,7 +14,7 @@ import {
 import { Download, Printer, QrCode } from "lucide-react";
 import { toPng } from "html-to-image";
 import { QrCard } from "@/components/admin/qr-card";
-import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
+import { AdminOptionGroup } from "@/components/admin/admin-option-group";
 import {
   buildPublicMenuUrl,
   getPublicRootDomain,
@@ -196,7 +196,7 @@ export function QrGenerator({
       <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-5 print:hidden md:gap-8 md:px-6 md:py-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <section className="rounded-2xl border border-border bg-card p-5">
           <h2 className="text-sm font-bold tracking-tight">Tipo de QR</h2>
-          <AdminRovingTablist
+          <AdminOptionGroup
             aria-label="Tipo de código QR"
             orientation="vertical"
             className="mt-3 flex flex-col gap-2"
@@ -207,8 +207,8 @@ export function QrGenerator({
                 <button
                   key={item.id}
                   type="button"
-                  role="tab"
-                  aria-selected={active}
+                  data-roving-item
+                  aria-pressed={active}
                   tabIndex={active ? 0 : -1}
                   onClick={() => setMode(item.id)}
                   className={`min-h-11 rounded-xl px-4 py-3 text-left transition-colors ${focusRing} ${
@@ -232,7 +232,7 @@ export function QrGenerator({
                 </button>
               );
             })}
-          </AdminRovingTablist>
+          </AdminOptionGroup>
 
           {mode === "table" ? (
             <div className="mt-5">

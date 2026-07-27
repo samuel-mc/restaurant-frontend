@@ -759,15 +759,15 @@ export function KitchenDashboard({
 
   return (
     <div className="flex flex-col pb-8 font-jakarta-sans">
-      <header className="border-b border-border px-4 py-5 md:px-6">
+      <header className="border-b border-border px-4 py-4 md:px-6 md:py-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Cocina</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {restaurantName} · un carril a la vez
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">
+              {restaurantName}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <ConnectionBadge state={connection} />
             <span className="rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold tabular-nums">
               {orders.length} activas
@@ -775,11 +775,9 @@ export function KitchenDashboard({
           </div>
         </div>
 
-        <KitchenShortcutCheatsheet />
-
         <AdminRovingTablist
           aria-label="Etapas de cocina"
-          className="mt-4 flex gap-2 overflow-x-auto pb-1"
+          className="mt-3 flex gap-2 overflow-x-auto pb-1"
         >
           {COLUMNS.map((column, index) => {
             const count = grouped[column.status]?.length ?? 0;
@@ -847,110 +845,35 @@ export function KitchenDashboard({
           })}
         </AdminRovingTablist>
 
-        {showUrgentJump && oldestOverdue ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3"
-          >
-            <div className="min-w-0 text-sm">
-              <p className="font-semibold text-destructive">
-                Urgente · {orderWho(oldestOverdue)}
-              </p>
-              <p className="mt-0.5 text-muted-foreground">
-                {orderAgeMinutes(oldestOverdue, now)} min en{" "}
-                {columnTitleFor(oldestOverdue.status)}
-                {focusStatus !== oldestOverdue.status
-                  ? " · otra etapa"
-                  : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={jumpToUrgent}
-              className="min-h-11 shrink-0 rounded-xl bg-destructive px-4 py-2 text-sm font-bold text-destructive-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              Ir al urgente
-            </button>
-          </div>
-        ) : null}
+        <KitchenShortcutCheatsheet />
 
-        {reviewGate && reviewGateOrder ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/40 bg-warn-muted px-4 py-3"
-          >
-            <div className="min-w-0 text-sm">
-              <p className="font-semibold text-warn-ink">
-                Revisa antes de avanzar
-              </p>
-              <p className="mt-0.5 text-muted-foreground">
-                {orderWho(reviewGateOrder)} ·{" "}
-                {columnTitleFor(reviewGateOrder.status)} · confirma y luego usa
-                la acción del ticket
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReviewGate(null)}
-              className="min-h-11 shrink-0 rounded-xl bg-warn px-4 py-2 text-sm font-bold text-warn-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              Revisado
-            </button>
-          </div>
-        ) : null}
-
-        {actionsLocked || banner || statusUndo ? (
-          <div className="mt-3 space-y-2">
-            {actionsLocked ? (
-              <p
-                role="alert"
-                aria-live="assertive"
-                className="rounded-xl border border-warn/40 bg-warn-muted px-4 py-3 text-center text-sm font-semibold text-warn-ink"
-              >
-                Sin conexión · no se pueden avanzar ni cobrar comandas hasta
-                reconectar
-              </p>
-            ) : null}
-            {banner ? (
-              <p
-                role="status"
-                className="rounded-xl border border-warn/30 bg-warn-muted px-4 py-3 text-center text-sm font-semibold text-warn-ink"
-              >
-                {banner}
-              </p>
-            ) : null}
-            {statusUndo ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex flex-wrap items-center justify-center gap-3 rounded-xl border border-border bg-secondary/60 px-4 py-3 text-sm"
-              >
-                <div className="min-w-0 text-center sm:text-left">
-                  <p className="font-semibold">
-                    {orderWho(statusUndo.previous)} pasó a{" "}
-                    {columnTitleFor(statusUndo.toStatus)}
-                  </p>
-                  <p className="mt-0.5 text-muted-foreground">
-                    Deshacer disponible ·{" "}
-                    <span className="font-bold tabular-nums text-foreground">
-                      {undoSecondsLeft}s
-                    </span>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={Boolean(updatingUuid) || closing || actionsLocked}
-                  onClick={() => void handleUndoAdvance()}
-                  className="min-h-11 rounded-xl bg-card px-4 py-2 text-sm font-bold shadow-sm outline-none ring-1 ring-border transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
-                >
-                  Deshacer
-                </button>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        <KitchenStatusRail
+          slot={
+            actionsLocked
+              ? "offline"
+              : reviewGate && reviewGateOrder
+                ? "review"
+                : showUrgentJump && oldestOverdue
+                  ? "urgent"
+                  : statusUndo
+                    ? "undo"
+                    : banner
+                      ? "banner"
+                      : null
+          }
+          offlineMessage="Sin conexión · no se pueden avanzar ni cobrar hasta reconectar"
+          banner={banner}
+          reviewOrder={reviewGateOrder}
+          oldestOverdue={oldestOverdue}
+          focusStatus={focusStatus}
+          now={now}
+          statusUndo={statusUndo}
+          undoSecondsLeft={undoSecondsLeft}
+          undoDisabled={Boolean(updatingUuid) || closing || actionsLocked}
+          onJumpUrgent={jumpToUrgent}
+          onReviewed={() => setReviewGate(null)}
+          onUndo={() => void handleUndoAdvance()}
+        />
       </header>
 
       <div className="flex-1 p-4 md:p-6">
@@ -1090,45 +1013,35 @@ function useTouchFirstLayout(): boolean {
 }
 
 /**
- * Desktop (hover/fine pointer): leyenda siempre expandida.
- * Tablet/touch: colapsada por defecto tras un toggle “Atajos”.
+ * Atajos siempre colapsados por defecto (desktop y touch);
+ * se expanden solo cuando el operador los pide.
  */
 function KitchenShortcutCheatsheet() {
   const touchFirst = useTouchFirstLayout();
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    setExpanded(!touchFirst);
-  }, [touchFirst]);
-
-  if (!touchFirst) {
-    return (
-      <div className="mt-3 rounded-xl border border-border/80 bg-secondary/40 px-3 py-2.5">
-        <ShortcutList />
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-3 overflow-hidden rounded-xl border border-border/80 bg-secondary/40">
+    <div className="mt-2 overflow-hidden rounded-xl border border-border/70 bg-secondary/30">
       <button
         type="button"
         aria-expanded={expanded}
         aria-controls="kitchen-shortcuts-panel"
         onClick={() => setExpanded((open) => !open)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        className="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         <span className="min-w-0">
-          <span className="block text-sm font-bold tracking-tight">Atajos</span>
+          <span className="text-xs font-bold tracking-tight text-muted-foreground">
+            Atajos
+          </span>
           {!expanded ? (
-            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-              1–4 · ↑↓ / j k · Enter · U
+            <span className="ml-2 text-xs text-muted-foreground/80">
+              {touchFirst ? "1–4 · j k · Enter · U" : "teclado"}
             </span>
           ) : null}
         </span>
         <ChevronDown
           aria-hidden
-          className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+          className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
             expanded ? "rotate-180" : ""
           }`}
         />
@@ -1136,11 +1049,156 @@ function KitchenShortcutCheatsheet() {
       {expanded ? (
         <div
           id="kitchen-shortcuts-panel"
-          className="border-t border-border/80 px-3 py-2.5"
+          className="border-t border-border/70 px-3 py-2"
         >
           <ShortcutList />
         </div>
       ) : null}
     </div>
   );
+}
+
+type StatusSlot = "offline" | "review" | "urgent" | "undo" | "banner" | null;
+
+/**
+ * Una sola franja de estado: prioridad offline → revisión → urgente → undo → banner.
+ */
+function KitchenStatusRail({
+  slot,
+  offlineMessage,
+  banner,
+  reviewOrder,
+  oldestOverdue,
+  focusStatus,
+  now,
+  statusUndo,
+  undoSecondsLeft,
+  undoDisabled,
+  onJumpUrgent,
+  onReviewed,
+  onUndo,
+}: {
+  slot: StatusSlot;
+  offlineMessage: string;
+  banner: string | null;
+  reviewOrder: Order | null;
+  oldestOverdue: Order | null;
+  focusStatus: OrderStatus;
+  now: number;
+  statusUndo: StatusUndo | null;
+  undoSecondsLeft: number;
+  undoDisabled: boolean;
+  onJumpUrgent: () => void;
+  onReviewed: () => void;
+  onUndo: () => void;
+}) {
+  if (!slot) return null;
+
+  if (slot === "offline") {
+    return (
+      <p
+        role="alert"
+        aria-live="assertive"
+        className="mt-2 rounded-xl border border-warn/40 bg-warn-muted px-4 py-2.5 text-center text-sm font-semibold text-warn-ink"
+      >
+        {offlineMessage}
+      </p>
+    );
+  }
+
+  if (slot === "review" && reviewOrder) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/40 bg-warn-muted px-4 py-2.5"
+      >
+        <div className="min-w-0 text-sm">
+          <p className="font-semibold text-warn-ink">Revisa antes de avanzar</p>
+          <p className="mt-0.5 text-muted-foreground">
+            {orderWho(reviewOrder)} · {columnTitleFor(reviewOrder.status)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onReviewed}
+          className="min-h-11 shrink-0 rounded-xl bg-warn px-4 py-2 text-sm font-bold text-warn-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Revisado
+        </button>
+      </div>
+    );
+  }
+
+  if (slot === "urgent" && oldestOverdue) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5"
+      >
+        <div className="min-w-0 text-sm">
+          <p className="font-semibold text-destructive">
+            Urgente · {orderWho(oldestOverdue)}
+          </p>
+          <p className="mt-0.5 text-muted-foreground">
+            {orderAgeMinutes(oldestOverdue, now)} min ·{" "}
+            {columnTitleFor(oldestOverdue.status)}
+            {focusStatus !== oldestOverdue.status ? " · otra etapa" : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onJumpUrgent}
+          className="min-h-11 shrink-0 rounded-xl bg-destructive px-4 py-2 text-sm font-bold text-destructive-foreground outline-none transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Ir al urgente
+        </button>
+      </div>
+    );
+  }
+
+  if (slot === "undo" && statusUndo) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm"
+      >
+        <div className="min-w-0">
+          <p className="font-semibold">
+            {orderWho(statusUndo.previous)} →{" "}
+            {columnTitleFor(statusUndo.toStatus)}
+          </p>
+          <p className="mt-0.5 text-muted-foreground">
+            Deshacer ·{" "}
+            <span className="font-bold tabular-nums text-foreground">
+              {undoSecondsLeft}s
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={undoDisabled}
+          onClick={onUndo}
+          className="min-h-11 shrink-0 rounded-xl bg-card px-4 py-2 text-sm font-bold shadow-sm outline-none ring-1 ring-border transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
+        >
+          Deshacer
+        </button>
+      </div>
+    );
+  }
+
+  if (slot === "banner" && banner) {
+    return (
+      <p
+        role="status"
+        className="mt-2 rounded-xl border border-border bg-secondary/50 px-4 py-2.5 text-center text-sm font-semibold text-foreground"
+      >
+        {banner}
+      </p>
+    );
+  }
+
+  return null;
 }

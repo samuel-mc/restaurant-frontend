@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
-import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
+import { AdminOptionGroup } from "@/components/admin/admin-option-group";
 import { AnalyticsCharts } from "@/components/admin/analytics-charts";
 import { AnalyticsKpiGrid } from "@/components/admin/analytics-kpi-grid";
 import {
@@ -41,7 +41,7 @@ export function AnalyticsOverview({
               platillos
             </p>
           </div>
-          <AdminRovingTablist
+          <AdminOptionGroup
             aria-label="Periodo de métricas"
             className="flex flex-wrap gap-2"
           >
@@ -51,8 +51,8 @@ export function AnalyticsOverview({
                 <Link
                   key={entry.id}
                   href={`/admin/dashboard?period=${entry.id}`}
-                  role="tab"
-                  aria-selected={selected}
+                  data-roving-item
+                  aria-current={selected ? "page" : undefined}
                   tabIndex={selected ? 0 : -1}
                   scroll={false}
                   className={`inline-flex min-h-11 items-center rounded-xl px-3.5 text-sm font-bold transition-colors ${focusRing} ${
@@ -65,7 +65,7 @@ export function AnalyticsOverview({
                 </Link>
               );
             })}
-          </AdminRovingTablist>
+          </AdminOptionGroup>
         </div>
       </header>
 

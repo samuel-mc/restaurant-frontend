@@ -9,7 +9,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import Link from "next/link";
 import { Eye, Receipt, X } from "lucide-react";
 import type { AdminOrderListFilter, Order, OrderItem, OrderPage } from "@/types/api";
-import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
+import { AdminOptionGroup } from "@/components/admin/admin-option-group";
 import {
   useKitchenOrdersSubscription,
   type KitchenConnectionState,
@@ -314,7 +314,7 @@ export function OrdersBoard({
       </header>
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 md:gap-6 md:px-6 md:py-6">
-        <AdminRovingTablist
+        <AdminOptionGroup
           aria-label="Filtros de pedidos"
           className="flex flex-wrap gap-2"
         >
@@ -324,8 +324,8 @@ export function OrdersBoard({
               <button
                 key={item.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
+                data-roving-item
+                aria-pressed={active}
                 tabIndex={active ? 0 : -1}
                 onClick={() => {
                   setFilter(item.id);
@@ -341,7 +341,7 @@ export function OrdersBoard({
               </button>
             );
           })}
-        </AdminRovingTablist>
+        </AdminOptionGroup>
 
         {error ? (
           <div

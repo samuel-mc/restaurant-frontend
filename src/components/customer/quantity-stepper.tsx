@@ -13,6 +13,9 @@ interface QuantityStepperProps {
   label: string;
 }
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 export function QuantityStepper({
   quantity,
   onIncrement,
@@ -20,18 +23,18 @@ export function QuantityStepper({
   label,
 }: QuantityStepperProps) {
   return (
-    <div className="flex items-center gap-1 rounded-full bg-amber-500/10 p-1">
+    <div className="flex items-center gap-0.5 rounded-xl bg-[var(--menu-accent-muted)] p-1">
       <button
         type="button"
         onClick={onDecrement}
         aria-label={`Quitar uno de ${label}`}
-        className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-lg font-semibold text-amber-700 shadow-sm transition-transform active:scale-90 dark:bg-neutral-800 dark:text-amber-400"
+        className={`${focusRing} flex size-8 items-center justify-center rounded-lg bg-card text-lg font-semibold text-foreground transition-transform active:scale-90`}
       >
         −
       </button>
       <span
         aria-live="polite"
-        className="min-w-6 text-center text-sm font-bold tabular-nums"
+        className="min-w-7 text-center text-sm font-bold tabular-nums"
       >
         {quantity}
       </span>
@@ -39,7 +42,7 @@ export function QuantityStepper({
         type="button"
         onClick={onIncrement}
         aria-label={`Agregar uno de ${label}`}
-        className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-lg font-semibold text-white shadow-sm transition-transform active:scale-90"
+        className={`${focusRing} flex size-8 items-center justify-center rounded-lg bg-[var(--menu-accent)] text-lg font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-90`}
       >
         +
       </button>

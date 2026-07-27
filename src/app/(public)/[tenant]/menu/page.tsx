@@ -13,6 +13,8 @@ type TenantMenuPageProps = {
   searchParams: Promise<{ m?: string | string[] }>;
 };
 
+const HEX = /^#[0-9A-Fa-f]{6}$/;
+
 function prettifyTenant(slug: string): string {
   return slug
     .split("-")
@@ -65,8 +67,8 @@ async function loadMenu(tenant: string): Promise<MenuLoadResult> {
 }
 
 /**
- * Menú digital interactivo + carrito.
- * Cabecera y modalidades de pedido según perfil público.
+ * Menú digital interactivo + carrito (flujo pedir unificado).
+ * Cabecera y modalidades según perfil público.
  */
 export default async function TenantMenuPage({
   params,
@@ -88,69 +90,138 @@ export default async function TenantMenuPage({
   ]);
 
   const restaurantName = profile?.name ?? prettifyTenant(tenant);
-  const headerStyle = headerStyleFromProfile(profile);
+  const brand = brandFromProfile(profile);
+  const hasBrandFill = Boolean(brand.accent);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-neutral-50 px-4 dark:bg-neutral-950">
+    <main
+      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background font-jakarta-sans text-foreground"
+      style={brand.style}
+    >
       <header
-        className="-mx-4 mb-1 px-6 pb-8 pt-10 text-white shadow-sm"
-        style={headerStyle}
+        className={
+          hasBrandFill
+            ? "relative -mx-0 overflow-hidden px-5 pb-7 pt-9 text-[var(--menu-accent-fg)]"
+            : "border-b border-border bg-card px-5 pb-6 pt-9"
+        }
+        style={
+          hasBrandFill
+            ? {
+                backgroundColor: "var(--menu-accent)",
+              }
+            : undefined
+        }
       >
-        <div className="flex items-center gap-3">
+        {hasBrandFill ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                "radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--menu-accent-soft) 55%, transparent), transparent 55%)",
+            }}
+          />
+        ) : null}
+
+        <div className="relative flex items-center gap-3.5">
           {profile?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={profile.logoUrl}
               alt=""
-              className="size-12 rounded-2xl object-cover ring-2 ring-white/30"
+              className={
+                hasBrandFill
+                  ? "size-14 rounded-2xl object-cover ring-2 ring-[var(--menu-accent-fg)]/25"
+                  : "size-14 rounded-2xl object-cover ring-1 ring-border"
+              }
             />
-          ) : null}
+          ) : (
+            <div
+              aria-hidden
+              className={
+                hasBrandFill
+                  ? "flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--menu-accent-fg)]/15 text-lg font-black tracking-tight"
+                  : "flex size-14 shrink-0 items-center justify-center rounded-2xl bg-secondary text-lg font-black tracking-tight text-foreground"
+              }
+            >
+              {restaurantName.slice(0, 1).toUpperCase()}
+            </div>
+          )}
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-widest text-white/80">
-              Menú digital
-            </p>
-            <h1 className="mt-1 truncate text-3xl font-extrabold tracking-tight">
+            <h1 className="truncate text-[1.75rem] font-extrabold leading-tight tracking-tight">
               {restaurantName}
             </h1>
+            <p
+              className={
+                hasBrandFill
+                  ? "mt-1 text-sm leading-snug text-[var(--menu-accent-fg)]/85"
+                  : "mt-1 text-sm leading-snug text-muted-foreground"
+              }
+            >
+              {menuSubtitle(profile)}
+            </p>
           </div>
         </div>
-        <p className="mt-2 text-sm text-white/85">
-          {menuSubtitle(profile)}
-        </p>
       </header>
 
-      {menu.status === "ok" ? (
-        <MenuView
-          products={menu.products}
-          tenantSlug={tenant}
-          tableFromQuery={tableFromQuery}
-          orderingEnabled={profile?.orderingEnabled !== false}
-          modules={{
-            hasDelivery: profile?.hasDelivery ?? false,
-            hasPickup: profile?.hasPickup ?? true,
-          }}
-        />
-      ) : (
-        <MenuUnavailableState
-          title="Menú no disponible"
-          description={
-            menu.status === "empty"
-              ? "Este restaurante aún no tiene platillos publicados. Vuelve pronto."
-              : menu.message
-          }
-        />
-      )}
+      <div className="flex flex-1 flex-col px-4">
+        {menu.status === "ok" ? (
+          <MenuView
+            products={menu.products}
+            tenantSlug={tenant}
+            tableFromQuery={tableFromQuery}
+            orderingEnabled={profile?.orderingEnabled !== false}
+            modules={{
+              hasDelivery: profile?.hasDelivery ?? false,
+              hasPickup: profile?.hasPickup ?? true,
+            }}
+          />
+        ) : (
+          <MenuUnavailableState
+            title="Menú no disponible"
+            description={
+              menu.status === "empty"
+                ? "Este restaurante aún no tiene platillos publicados. Vuelve pronto."
+                : menu.message
+            }
+          />
+        )}
+      </div>
     </main>
   );
 }
 
-function headerStyleFromProfile(
-  profile: RestaurantProfile | null,
-): CSSProperties {
-  const from = profile?.primaryColor || "#f59e0b";
-  const to = profile?.secondaryColor || "#ea580c";
+function brandFromProfile(profile: RestaurantProfile | null): {
+  accent: string | null;
+  style: CSSProperties;
+} {
+  const primary = profile?.primaryColor?.trim() ?? "";
+  const secondary = profile?.secondaryColor?.trim() ?? "";
+  const accent = HEX.test(primary) ? primary : null;
+  const soft = HEX.test(secondary) ? secondary : accent;
+
+  if (!accent) {
+    return {
+      accent: null,
+      style: {
+        ["--menu-accent" as string]: "var(--foreground)",
+        ["--menu-accent-fg" as string]: "var(--background)",
+        ["--menu-accent-muted" as string]:
+          "color-mix(in srgb, var(--foreground) 12%, transparent)",
+        ["--menu-accent-soft" as string]: "var(--muted)",
+      },
+    };
+  }
+
   return {
-    backgroundImage: `linear-gradient(135deg, ${from}, ${to})`,
+    accent,
+    style: {
+      ["--menu-accent" as string]: accent,
+      ["--menu-accent-fg" as string]: "#ffffff",
+      ["--menu-accent-muted" as string]:
+        `color-mix(in srgb, ${accent} 14%, transparent)`,
+      ["--menu-accent-soft" as string]: soft ?? accent,
+    },
   };
 }
 
@@ -161,8 +232,8 @@ function menuSubtitle(profile: RestaurantProfile | null): string {
   const bits: string[] = [];
   if (profile?.hasPickup) bits.push("para llevar");
   if (profile?.hasDelivery) bits.push("delivery");
-  if (bits.length === 0) return "Arma tu pedido desde tu mesa (escanea el QR).";
-  return `Sin mesa: ${bits.join(" o ")}. En el local, escanea el QR de tu mesa.`;
+  if (bits.length === 0) return "Arma tu pedido desde tu mesa.";
+  return `Sin mesa: ${bits.join(" o ")}. Con QR de mesa, pedís al instante.`;
 }
 
 function MenuUnavailableState({
@@ -175,16 +246,16 @@ function MenuUnavailableState({
   return (
     <section
       aria-live="polite"
-      className="my-8 flex flex-col items-center gap-3 rounded-3xl bg-white px-6 py-12 text-center shadow-sm ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10"
+      className="my-10 flex flex-col items-center gap-3 px-2 py-12 text-center"
     >
       <div
         aria-hidden
-        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400"
+        className="flex size-14 items-center justify-center rounded-2xl bg-secondary text-muted-foreground"
       >
         <ClipboardList className="size-7 stroke-[1.5]" />
       </div>
-      <h2 className="text-lg font-bold text-foreground">{title}</h2>
-      <p className="max-w-xs text-sm leading-relaxed text-black/55 dark:text-white/55">
+      <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+      <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
     </section>

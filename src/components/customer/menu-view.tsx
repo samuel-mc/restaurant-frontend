@@ -218,7 +218,7 @@ export function MenuView({
 
       <div
         aria-label="Platillos del menú"
-        className="flex flex-col gap-8 pb-28 pt-4"
+        className="flex flex-col gap-9 pb-32 pt-5"
       >
         {sections.map((section) => (
           <section
@@ -228,16 +228,16 @@ export function MenuView({
               if (node) sectionRefs.current.set(section.id, node);
               else sectionRefs.current.delete(section.id);
             }}
-            className="scroll-mt-20"
+            className="scroll-mt-24"
             aria-labelledby={`heading-${section.id}`}
           >
             <h2
               id={`heading-${section.id}`}
-              className="mb-3 px-0.5 text-sm font-bold uppercase tracking-wider text-black/45 dark:text-white/45"
+              className="mb-3 text-base font-bold tracking-tight text-foreground"
             >
               {section.name}
             </h2>
-            <ul className="flex flex-col gap-3">
+            <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
               {section.products.map((product) => (
                 <li key={product.uuid}>
                   <ProductCard
@@ -259,9 +259,9 @@ export function MenuView({
           onChangeTable={handleChangeTable}
         />
       ) : (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-black/5 bg-white/95 px-4 py-3 text-center backdrop-blur dark:border-white/10 dark:bg-neutral-950/95">
-          <p className="text-xs font-medium text-black/55 dark:text-white/55">
-            Consulta de menú
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 text-center backdrop-blur-sm">
+          <p className="text-xs font-medium text-muted-foreground">
+            Solo consulta · pedidos desactivados
           </p>
         </div>
       )}
@@ -280,7 +280,7 @@ function ActiveSessionBanner({
 }) {
   if (loading && !order) {
     return (
-      <div className="sticky top-14 z-20 -mx-4 mb-3 border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-center text-xs font-medium text-emerald-900 dark:text-emerald-100">
+      <div className="sticky top-0 z-20 -mx-4 mb-1 border-b border-live/20 bg-live-muted px-4 py-2.5 text-center text-xs font-medium text-live-ink">
         Consultando cuenta de la mesa…
       </div>
     );
@@ -288,18 +288,16 @@ function ActiveSessionBanner({
   if (!order || !tableNumber) return null;
 
   return (
-    <div className="sticky top-14 z-20 -mx-4 mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/25 bg-emerald-500/15 px-4 py-2.5 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-50">
-      <p className="text-xs font-semibold leading-snug">
-        <span aria-hidden>🟢 </span>
-        {formatTableLabel(tableNumber)} — Cuenta abierta (#
-        {order.uuid.slice(0, 8).toUpperCase()}) · Total:{" "}
+    <div className="sticky top-0 z-20 -mx-4 mb-1 flex flex-wrap items-center justify-between gap-2 border-b border-live/25 bg-live-muted px-4 py-2.5 text-live-ink">
+      <p className="min-w-0 text-xs font-semibold leading-snug">
+        {formatTableLabel(tableNumber)} · cuenta abierta ·{" "}
         {order.formattedTotal || formatCurrency(order.totalAmount)}
       </p>
       <Link
         href={`/orders/${order.uuid}`}
-        className="shrink-0 rounded-full bg-emerald-700 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white"
+        className="inline-flex min-h-9 shrink-0 items-center rounded-xl bg-foreground px-3 text-xs font-bold text-background transition-opacity hover:opacity-90"
       >
-        Ver mi Ticket
+        Ver ticket
       </Link>
     </div>
   );

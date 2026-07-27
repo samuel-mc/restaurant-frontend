@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * Tarjeta de producto del menú del comensal (mobile-first).
- * Imagen con placeholder si falta o falla la carga, descripción corta,
- * precio formateado y CTA "+ Agregar" o stepper (+ / −) si ya está en el carrito.
+ * Fila de producto del menú del comensal (mobile-first).
+ * Imagen con placeholder si falta, descripción corta, precio y CTA / stepper.
  */
 
 import { useState } from "react";
@@ -18,6 +17,9 @@ interface ProductCardProps {
   orderingEnabled?: boolean;
 }
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+
 function ProductImage({
   src,
   alt,
@@ -29,7 +31,7 @@ function ProductImage({
   const showImage = Boolean(src) && !failed;
 
   return (
-    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-linear-to-br from-amber-100 to-orange-100 dark:from-neutral-800 dark:to-neutral-700">
+    <div className="relative size-[4.75rem] shrink-0 overflow-hidden rounded-xl bg-secondary sm:size-24">
       {showImage ? (
         // Host remoto arbitrario del tenant; evitamos forzar config de next/image.
         // eslint-disable-next-line @next/next/no-img-element
@@ -43,12 +45,10 @@ function ProductImage({
       ) : (
         <div
           aria-hidden
-          className="flex h-full w-full flex-col items-center justify-center gap-1 text-amber-700/60 dark:text-amber-300/60"
+          className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-muted-foreground"
         >
-          <UtensilsCrossed className="size-6 stroke-[1.5]" />
-          <span className="text-[9px] font-medium uppercase tracking-wider">
-            Sin foto
-          </span>
+          <UtensilsCrossed className="size-5 stroke-[1.5]" />
+          <span className="text-xs font-semibold tracking-wide">Sin foto</span>
         </div>
       )}
     </div>
@@ -66,32 +66,32 @@ export function ProductCard({
 
   return (
     <article
-      className={`flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-black/5 transition-opacity dark:bg-neutral-900 dark:ring-white/10 ${
-        unavailable ? "opacity-60" : ""
+      className={`flex gap-3 p-3.5 transition-opacity ${
+        unavailable ? "opacity-55" : ""
       }`}
     >
       <ProductImage src={product.imageUrl} alt={product.name} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="truncate text-sm font-semibold leading-snug">
+          <h3 className="text-sm font-semibold leading-snug tracking-tight">
             {product.name}
           </h3>
           {unavailable ? (
-            <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-black/50 dark:bg-white/10 dark:text-white/50">
+            <span className="shrink-0 rounded-lg bg-secondary px-2 py-0.5 text-xs font-bold text-muted-foreground">
               Agotado
             </span>
           ) : null}
         </div>
 
         {product.description ? (
-          <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-black/50 dark:text-white/50">
+          <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
             {product.description}
           </p>
         ) : null}
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-          <span className="text-base font-bold tabular-nums text-amber-600 dark:text-amber-400">
+        <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
+          <span className="text-base font-bold tabular-nums tracking-tight">
             {product.formattedPrice}
           </span>
 
@@ -106,7 +106,7 @@ export function ProductCard({
             <button
               type="button"
               onClick={() => addItem(product)}
-              className="flex items-center gap-1 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-amber-500/20 transition-transform active:scale-95"
+              className={`${focusRing} inline-flex min-h-10 items-center gap-1 rounded-xl bg-[var(--menu-accent)] px-3.5 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.97]`}
             >
               <span className="text-base leading-none" aria-hidden>
                 +

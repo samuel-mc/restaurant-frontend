@@ -67,7 +67,7 @@ export async function login(
   const token = response?.token?.trim();
   if (!token) {
     throw new ApiError({
-      message: "El servidor no devolvió un token de acceso.",
+      message: "No pudimos completar el acceso.",
       status: 0,
       statusText: "Invalid Response",
       url: LOGIN_PATH,
@@ -109,32 +109,68 @@ export async function clearToken(): Promise<void> {
   });
 }
 
-/** Mensaje amigable ante fallos de login (credenciales / tenant / red). */
+const isDev = process.env.NODE_ENV === "development";
+
+/**
+ * Mensaje para el gerente en servicio (credenciales / tenant / red).
+ * Detalle técnico solo en desarrollo.
+ */
 export function getLoginErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.statusText === "Configuration Error") {
-      return error.message;
+      return isDev
+        ? "El acceso no está configurado. Falta NEXT_PUBLIC_API_URL en el entorno."
+        : "El acceso no está disponible por ahora. Intenta más tarde o contacta a soporte PlatoListo.";
     }
     if (error.isNetworkError) {
-      return "No pudimos conectar con el servidor. Verifica que el backend esté en http://localhost:8080 y que CORS permita tu subdominio (*.localhost).";
+      return isDev
+        ? "No hay conexión con el servicio. ¿Backend en localhost:8080 y CORS para *.localhost?"
+        : "No hay conexión con el servicio. Revisa tu red e intenta de nuevo en unos segundos.";
+    }
+    if (error.statusText === "Invalid Response") {
+      return "No pudimos completar el acceso. Intenta de nuevo en unos segundos.";
     }
     if (error.status === 401) {
-      return "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.";
+      return "Correo o contraseña incorrectos. Revisa tus datos e intenta de nuevo.";
+    }
+    if (error.status === 403) {
+      return "No tienes permiso para entrar a este panel.";
     }
     if (error.status === 404) {
-      return "No encontramos este restaurante. Abre el panel desde el enlace correcto del local.";
+      return "No encontramos este restaurante. Abre el panel desde el enlace de tu local.";
+    }
+    if (error.status === 429) {
+      return "Demasiados intentos. Espera un momento e intenta de nuevo.";
+    }
+    if (error.status >= 500) {
+      return "El servicio no responde ahora. Intenta de nuevo en unos segundos.";
     }
     if (error.status === 400) {
+      const staffSafe =
+        error.message &&
+        !/localhost|NEXT_PUBLIC|CORS|API_URL/i.test(error.message)
+          ? error.message
+          : null;
       return (
-        error.message ||
-        "No pudimos validar el acceso a este restaurante. Si el problema continúa, contacta al administrador."
+        staffSafe ||
+        "No pudimos validar el acceso a este restaurante. Si continúa, pide ayuda a quien administra el local."
       );
     }
+    const staffSafe =
+      error.message &&
+      !/localhost|NEXT_PUBLIC|CORS|API_URL|token/i.test(error.message)
+        ? error.message
+        : null;
     return (
-      error.message ||
+      staffSafe ||
       "No pudimos iniciar sesión en este momento. Intenta de nuevo en unos segundos."
     );
   }
-  if (error instanceof Error && error.message) return error.message;
-  return "Ocurrió un error inesperado al iniciar sesión.";
+  if (error instanceof Error && error.message) {
+    if (/localhost|NEXT_PUBLIC|CORS|API_URL/i.test(error.message)) {
+      return "No pudimos iniciar sesión en este momento. Intenta de nuevo en unos segundos.";
+    }
+    return error.message;
+  }
+  return "No pudimos iniciar sesión. Intenta de nuevo.";
 }

@@ -169,8 +169,43 @@ body {
   }
 }
 
+@keyframes count-bump {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.cart-count-bump {
+  animation: count-bump 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stepper-enter {
+  animation: pop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cart-bar-enter {
+  animation: fade-up 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.more-nudge {
+  animation: count-bump 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sheet-enter {
+    animation: none;
+  }
+
+  .cart-count-bump,
+  .stepper-enter,
+  .cart-bar-enter,
+  .more-nudge {
     animation: none;
   }
 }

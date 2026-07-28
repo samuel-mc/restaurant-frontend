@@ -2,7 +2,7 @@
 
 /**
  * Barra sticky de categorías.
- * ≤4: chips en fila. ≥5: fila scrolleable + «Más» como salto (cerca → resto).
+ * ≤4: todas en fila. ≥5: un solo control (activa · N de M ▾) abre la lista completa.
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -19,24 +19,15 @@ interface CategoryBarProps {
   onSelect: (id: string) => void;
 }
 
-/** Por encima de esto, «Más» evita el muro de chips iguales. */
+/** Por encima de esto, un picker reemplaza la fila de chips. */
 const OVERFLOW_AT = 5;
 
 const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-/** Activa ± vecinos para saltos cortos en «Más». */
-function nearbyCategories(
-  categories: CategoryTab[],
-  activeId: string,
-  radius = 1,
-): CategoryTab[] {
-  if (categories.length === 0) return [];
-  const idx = categories.findIndex((category) => category.id === activeId);
-  if (idx < 0) return categories.slice(0, Math.min(3, categories.length));
-  const start = Math.max(0, idx - radius);
-  const end = Math.min(categories.length, idx + radius + 1);
-  return categories.slice(start, end);
+function categoryIndex(categories: CategoryTab[], id: string): number {
+  const idx = categories.findIndex((category) => category.id === id);
+  return idx >= 0 ? idx : 0;
 }
 
 export function CategoryBar({
@@ -45,40 +36,38 @@ export function CategoryBar({
   onSelect,
 }: CategoryBarProps) {
   const navRef = useRef<HTMLElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
-  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [pickerNudge, setPickerNudge] = useState(false);
   const hasOverflow = categories.length >= OVERFLOW_AT;
+  const nudgedForOverflowRef = useRef(false);
 
-  const nearby = useMemo(
-    () => nearbyCategories(categories, activeId),
+  const activeCategory = useMemo(
+    () =>
+      categories.find((category) => category.id === activeId) ??
+      categories[0],
     [categories, activeId],
   );
-  const nearbyIds = useMemo(
-    () => new Set(nearby.map((category) => category.id)),
-    [nearby],
-  );
-  const rest = useMemo(
-    () => categories.filter((category) => !nearbyIds.has(category.id)),
-    [categories, nearbyIds],
+
+  const activePosition = useMemo(
+    () => categoryIndex(categories, activeId) + 1,
+    [categories, activeId],
   );
 
+  // Nudge solo al descubrir el picker (≥5), no en cada scroll de categoría.
   useEffect(() => {
-    const tab = tabRefs.current.get(activeId);
-    const list = listRef.current;
-    if (!tab || !list) return;
-
-    const listRect = list.getBoundingClientRect();
-    const tabRect = tab.getBoundingClientRect();
-    const offset =
-      tabRect.left -
-      listRect.left -
-      listRect.width / 2 +
-      tabRect.width / 2;
-
-    list.scrollBy({ left: offset, behavior: "smooth" });
-  }, [activeId]);
+    if (!hasOverflow) {
+      setMoreOpen(false);
+      nudgedForOverflowRef.current = false;
+      setPickerNudge(false);
+      return;
+    }
+    if (nudgedForOverflowRef.current) return;
+    nudgedForOverflowRef.current = true;
+    setPickerNudge(true);
+    const id = window.setTimeout(() => setPickerNudge(false), 480);
+    return () => window.clearTimeout(id);
+  }, [hasOverflow]);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -110,110 +99,101 @@ export function CategoryBar({
     <nav
       ref={navRef}
       aria-label="Categorías del menú"
-      className="sticky top-0 z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 py-2 backdrop-blur-sm"
+      className="sticky top-0 z-20 -mx-4 border-b border-[color-mix(in_srgb,var(--menu-accent)_18%,var(--border))] bg-[color-mix(in_srgb,var(--menu-accent-wash)_92%,transparent)] px-4 py-2 backdrop-blur-sm"
     >
-      <div className="flex items-center gap-1">
-        <ul
-          ref={listRef}
-          className="no-scrollbar flex min-w-0 flex-1 gap-0.5 overflow-x-auto overscroll-x-contain scroll-smooth"
-        >
+      {hasOverflow && activeCategory ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            aria-expanded={moreOpen}
+            aria-controls={moreOpen ? moreId : undefined}
+            aria-haspopup="listbox"
+            className={`${focusRing} flex w-full min-h-11 items-center justify-between gap-2 rounded-xl border border-[color-mix(in_srgb,var(--menu-accent)_22%,var(--border))] bg-card px-3 py-1.5 text-left active:scale-[0.99] ${
+              pickerNudge && !moreOpen ? "more-nudge" : ""
+            }`}
+          >
+            <span className="min-w-0 truncate text-sm">
+              <span className="font-semibold text-foreground">
+                {activeCategory.name}
+              </span>
+              <span className="text-muted-foreground">
+                {" · "}
+                {activePosition} de {categories.length}
+              </span>
+            </span>
+            <span
+              aria-hidden
+              className={`shrink-0 text-xs font-medium text-muted-foreground ${
+                moreOpen ? "rotate-180" : ""
+              }`}
+            >
+              ▾
+            </span>
+            <span className="sr-only">Ver todas las categorías</span>
+          </button>
+
+          {moreOpen ? (
+            <div
+              id={moreId}
+              role="listbox"
+              aria-label="Categorías del menú"
+              className="mt-2 max-h-[40vh] overflow-y-auto rounded-xl border border-border bg-card p-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+            >
+              <ul className="flex flex-col">
+                {categories.map((category) => {
+                  const isActive = category.id === activeId;
+                  return (
+                    <li key={category.id} role="option" aria-selected={isActive}>
+                      <button
+                        type="button"
+                        onClick={() => selectCategory(category.id)}
+                        aria-controls={`cat-${category.id}`}
+                        className={`${focusRing} flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-sm ${
+                          isActive
+                            ? "bg-[var(--menu-accent-muted)] font-semibold text-foreground"
+                            : "font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        }`}
+                      >
+                        <span className="min-w-0 truncate">{category.name}</span>
+                        {isActive ? (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            Actual
+                          </span>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <ul className="flex flex-wrap items-center gap-0.5">
           {categories.map((category) => {
             const isActive = category.id === activeId;
             return (
               <li key={category.id} className="shrink-0">
                 <button
                   type="button"
-                  ref={(node) => {
-                    if (node) tabRefs.current.set(category.id, node);
-                    else tabRefs.current.delete(category.id);
-                  }}
                   onClick={() => selectCategory(category.id)}
                   aria-pressed={isActive}
-                  className={`${focusRing} inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm transition-colors active:scale-[0.98] ${
+                  aria-controls={`cat-${category.id}`}
+                  className={`${focusRing} inline-flex min-h-11 max-w-[9.5rem] items-center rounded-lg px-3 text-sm transition-colors active:scale-[0.98] ${
                     isActive
                       ? "bg-[var(--menu-accent-muted)] font-semibold text-foreground"
                       : "font-medium text-muted-foreground hover:text-foreground"
                   }`}
+                  title={category.name}
                 >
-                  {category.name}
+                  <span className="truncate">{category.name}</span>
                 </button>
               </li>
             );
           })}
         </ul>
-
-        {hasOverflow ? (
-          <button
-            type="button"
-            aria-expanded={moreOpen}
-            aria-controls={moreId}
-            onClick={() => setMoreOpen((open) => !open)}
-            className={`${focusRing} inline-flex min-h-11 shrink-0 items-center rounded-lg px-2.5 text-sm font-semibold text-foreground`}
-          >
-            Más
-            <span className="sr-only"> categorías</span>
-          </button>
-        ) : null}
-      </div>
-
-      {moreOpen && hasOverflow ? (
-        <div
-          id={moreId}
-          className="mt-2 max-h-[40vh] overflow-y-auto rounded-xl border border-border bg-card p-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
-        >
-          <p className="px-2 pb-1.5 text-xs font-medium text-muted-foreground">
-            Cerca
-          </p>
-          <ul className="flex flex-col gap-0.5">
-            {nearby.map((category) => {
-              const isActive = category.id === activeId;
-              return (
-                <li key={category.id}>
-                  <button
-                    type="button"
-                    onClick={() => selectCategory(category.id)}
-                    aria-pressed={isActive}
-                    className={`${focusRing} flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-sm ${
-                      isActive
-                        ? "bg-[var(--menu-accent-muted)] font-semibold text-foreground"
-                        : "font-medium text-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    <span className="min-w-0 truncate">{category.name}</span>
-                    {isActive ? (
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        Actual
-                      </span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-
-          {rest.length > 0 ? (
-            <>
-              <p className="mt-3 px-2 pb-1.5 text-xs font-medium text-muted-foreground">
-                Todas
-              </p>
-              <ul className="flex flex-col">
-                {rest.map((category) => (
-                  <li key={category.id}>
-                    <button
-                      type="button"
-                      onClick={() => selectCategory(category.id)}
-                      aria-pressed={false}
-                      className={`${focusRing} flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground`}
-                    >
-                      <span className="min-w-0 truncate">{category.name}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-        </div>
-      ) : null}
+      )}
     </nav>
   );
 }

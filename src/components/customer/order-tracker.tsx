@@ -29,6 +29,7 @@ import {
 interface OrderTrackerProps {
   initialOrder: Order;
   restaurantName: string;
+  tenantSlug: string;
 }
 
 function groupByBatch(items: OrderItem[]): Array<{
@@ -49,10 +50,15 @@ function groupByBatch(items: OrderItem[]): Array<{
 export function OrderTracker({
   initialOrder,
   restaurantName,
+  tenantSlug,
 }: OrderTrackerProps) {
   const [order, setOrder] = useState(initialOrder);
   const [connection, setConnection] =
     useState<OrderConnectionState>("connecting");
+  const [cartHydrated, setCartHydrated] = useState(() =>
+    useCartStore.persist.hasHydrated(),
+  );
+  const ensureTenant = useCartStore((state) => state.ensureTenant);
   const clearActiveOrderSession = useCartStore(
     (state) => state.clearActiveOrderSession,
   );
@@ -66,6 +72,22 @@ export function OrderTracker({
     order.status === "CANCELLED";
 
   useEffect(() => {
+    const unsub = useCartStore.persist.onFinishHydration(() => {
+      setCartHydrated(true);
+    });
+    if (useCartStore.persist.hasHydrated()) {
+      setCartHydrated(true);
+    }
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!cartHydrated) return;
+    ensureTenant(tenantSlug);
+  }, [cartHydrated, ensureTenant, tenantSlug]);
+
+  useEffect(() => {
+    if (!cartHydrated) return;
     if (isTerminal) {
       clearActiveOrderSession();
       return;
@@ -78,6 +100,7 @@ export function OrderTracker({
       });
     }
   }, [
+    cartHydrated,
     clearActiveOrderSession,
     isTerminal,
     order.customerName,

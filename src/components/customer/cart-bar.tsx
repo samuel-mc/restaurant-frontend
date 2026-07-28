@@ -5,9 +5,12 @@
  *
  * - Con ?m= (QR): modo IN_TABLE, mesa bloqueada.
  * - Sin ?m=: exploración → PICKUP / Delivery.
+ * - Líneas compactas (×N) por defecto; steppers y Vaciar bajo demanda.
+ * - Pickup/delivery: contacto visible tras las líneas; CTA sticky.
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
 import { formatTableLabel } from "@/lib/table-session";
@@ -37,10 +40,18 @@ interface CartBarProps {
   isEditingTable?: boolean;
   draftTable?: string;
   tableEditError?: string | null;
-  /** Mesa elegida pendiente de confirmar (cuenta abierta). */
+  /** Mesa elegida pendiente de confirmar (pedido de la mesa). */
   pendingTableChange?: string | null;
+  /** Pedido ya enviado a cocina en la mesa actual (para explicar el desligue). */
+  openOrderId?: string | null;
   onDraftTableChange?: (value: string) => void;
   onChangeTable?: () => void;
+  /** Liberar QR y seguir con el carrito (pickup / explore). */
+  onLeaveWrongTable?: () => void;
+  /** Unirse al pedido de la mesa sin cerrar el sheet. */
+  onJoinSharedOrder?: () => void;
+  /** Deshacer Sumarme sin salir del QR. */
+  onUnjoinSharedOrder?: () => void;
   onConfirmTableEdit?: () => void;
   onCancelTableEdit?: () => void;
   onCancelPendingTableChange?: () => void;
@@ -136,8 +147,12 @@ export function CartBar({
   draftTable = "",
   tableEditError = null,
   pendingTableChange = null,
+  openOrderId = null,
   onDraftTableChange,
   onChangeTable,
+  onLeaveWrongTable,
+  onJoinSharedOrder,
+  onUnjoinSharedOrder,
   onConfirmTableEdit,
   onCancelTableEdit,
   onCancelPendingTableChange,
@@ -147,6 +162,7 @@ export function CartBar({
   const titleRef = useRef<HTMLHeadingElement>(null);
   const tableInputRef = useRef<HTMLInputElement>(null);
   const mesaConfirmRef = useRef<HTMLButtonElement>(null);
+  const mesaExtrasRef = useRef<HTMLDetailsElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -173,6 +189,9 @@ export function CartBar({
   );
 
   const isAddition = Boolean(activeOrderId);
+  /** Mesa con pedido ajeno: hay que Sumarme antes de confirmar (evita ticket paralelo). */
+  const needsSharedJoin =
+    tableLockedFromQr && Boolean(openOrderId) && !isAddition;
   const orderTypes = useMemo(
     () => resolveOrderTypes(modules, tableLockedFromQr, isAddition),
     [modules, tableLockedFromQr, isAddition],
@@ -187,16 +206,43 @@ export function CartBar({
     !tableLockedFromQr &&
     !ordersUnavailable &&
     orderType === "PICKUP";
+  const isDeliveryFlow =
+    !isAddition &&
+    !tableLockedFromQr &&
+    !ordersUnavailable &&
+    orderType === "DELIVERY";
   const isInTableFlow =
     isAddition || tableLockedFromQr || orderType === "IN_TABLE";
-  /** En mesa: nombre/teléfono opcionales se colapsan para no competir con confirmar. */
+  /** Pickup/delivery: contacto visible (no colapsado). */
   const showGuestFieldsUpFront = !isInTableFlow && !ordersUnavailable;
+  /** Líneas compactas por defecto en todos los modos; steppers solo al editar. */
+  const showLineSteppers = linesExpanded;
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+
+  const prevCountRef = useRef(count);
+  const [countBump, setCountBump] = useState(false);
+
+  useEffect(() => {
+    if (count > prevCountRef.current) {
+      setCountBump(true);
+      const id = window.setTimeout(() => setCountBump(false), 280);
+      prevCountRef.current = count;
+      return () => window.clearTimeout(id);
+    }
+    prevCountRef.current = count;
+  }, [count]);
 
   useEffect(() => {
     if (!orderTypes.some((opt) => opt.value === orderType)) {
       setOrderType(orderTypes[0]?.value ?? "PICKUP");
     }
   }, [orderTypes, orderType]);
+
+  useEffect(() => {
+    setErrorMessage(null);
+  }, [orderType]);
 
   useEffect(() => {
     if (isAddition || tableLockedFromQr) {
@@ -240,6 +286,12 @@ export function CartBar({
     setIsOpen(false);
     setErrorMessage(null);
   }
+
+  useEffect(() => {
+    if (!isOpen && mesaExtrasRef.current) {
+      mesaExtrasRef.current.open = false;
+    }
+  }, [isOpen]);
 
   const sheetPanelRef = useModalFocusTrap({
     open: isOpen,
@@ -302,6 +354,17 @@ export function CartBar({
       return;
     }
 
+    if (needsSharedJoin) {
+      if (onJoinSharedOrder) {
+        onJoinSharedOrder();
+        return;
+      }
+      setErrorMessage(
+        "Súmate primero al pedido de la mesa para enviar estos platillos.",
+      );
+      return;
+    }
+
     const effectiveType = isAddition ? "IN_TABLE" : orderType;
     const effectiveTable = tableNumber.trim();
     const name = customerName.trim() || sessionName || "";
@@ -323,21 +386,24 @@ export function CartBar({
       return;
     }
     if (isAddition && !activeOrderId) {
-      setErrorMessage("No hay una cuenta abierta para sumar platillos.");
+      setErrorMessage("No hay un pedido de la mesa para sumar platillos.");
       return;
     }
     if (effectiveType === "PICKUP") {
       if (!name) {
         setErrorMessage("Escribe tu nombre para el pedido para llevar.");
+        window.requestAnimationFrame(() => nameInputRef.current?.focus());
         return;
       }
       if (!phone) {
         setErrorMessage("Escribe tu teléfono para avisarte cuando esté listo.");
+        window.requestAnimationFrame(() => phoneInputRef.current?.focus());
         return;
       }
     }
     if (effectiveType === "DELIVERY" && !deliveryAddress.trim()) {
       setErrorMessage("Escribe la dirección de entrega.");
+      window.requestAnimationFrame(() => addressInputRef.current?.focus());
       return;
     }
 
@@ -388,12 +454,12 @@ export function CartBar({
 
   const sheetTitle = isMesaEditView
     ? pendingTableChange
-      ? "Confirmar cambio"
+      ? "Confirmar cambio de mesa"
       : "Cambiar mesa"
     : ordersUnavailable
       ? "Pedidos no disponibles"
       : isAddition
-        ? "Sumar a tu cuenta"
+        ? "Sumar a tu pedido"
         : isPickupFlow
           ? "Pedido para llevar"
           : orderType === "DELIVERY"
@@ -402,45 +468,64 @@ export function CartBar({
 
   const sheetHint = isMesaEditView
     ? currentMesaLabel
-      ? `Ahora: ${currentMesaLabel} · tu pedido se mantiene`
-      : "Escribe el número correcto de mesa"
+      ? openOrderId
+        ? `Ahora: ${currentMesaLabel} · hay un pedido de la mesa`
+        : `Ahora: ${currentMesaLabel}`
+      : "Escribe el número correcto de tu mesa"
     : ordersUnavailable
       ? "Para llevar y domicilio están apagados en este local"
       : isAddition && sessionTable
-        ? `Se suma a ${formatTableLabel(sessionTable)}`
-        : isPickupFlow
-          ? "Recoges en el local · te avisamos por teléfono"
-          : tableLockedFromQr
-            ? `${formatTableLabel(tableNumber || sessionTable || "")} · pedido en esta mesa`
-            : orderType === "DELIVERY"
-              ? "Entrega a la dirección que indiques"
-              : null;
+        ? `Unido a ${formatTableLabel(sessionTable)} · listo para enviar`
+        : needsSharedJoin
+          ? `${formatTableLabel(tableNumber || sessionTable || "")} · hay un pedido de la mesa`
+          : isPickupFlow
+            ? "Recoges en el local · te avisamos por teléfono"
+            : tableLockedFromQr
+              ? openOrderId
+                ? `${formatTableLabel(tableNumber || sessionTable || "")} · hay un pedido de la mesa`
+                : `${formatTableLabel(tableNumber || sessionTable || "")} · listo para pedir`
+              : orderType === "DELIVERY"
+                ? "Entrega a la dirección que indiques"
+                : null;
 
   const confirmLabel = isSubmitting
     ? isAddition
       ? "Enviando a cocina…"
       : "Enviando pedido…"
-    : isAddition
-      ? "Sumar a la cuenta"
-      : isPickupFlow
-        ? "Confirmar para llevar"
-        : orderType === "DELIVERY"
-          ? "Confirmar a domicilio"
-          : "Confirmar pedido";
+    : needsSharedJoin
+      ? "Sumarme y continuar"
+      : isAddition
+        ? "Sumar al pedido"
+        : isPickupFlow
+          ? "Confirmar para llevar"
+          : orderType === "DELIVERY"
+            ? "Confirmar a domicilio"
+            : "Confirmar pedido";
 
   const barLabel = ordersUnavailable
     ? `No disponible · ${itemLabel}`
-    : isAddition
-      ? `Sumar · ${itemLabel}`
-      : isPickupFlow
-        ? `Para llevar · ${itemLabel}`
-        : orderType === "DELIVERY"
-          ? `A domicilio · ${itemLabel}`
-          : `Tu pedido · ${itemLabel}`;
+    : needsSharedJoin
+      ? `Sumarme · ${itemLabel}`
+      : isAddition
+        ? `Sumar · ${itemLabel}`
+        : isPickupFlow
+          ? `Para llevar · ${itemLabel}`
+          : orderType === "DELIVERY"
+            ? `A domicilio · ${itemLabel}`
+            : `Tu pedido · ${itemLabel}`;
+
+  const showChangeMesa =
+    tableLockedFromQr && !isAddition && Boolean(onChangeTable);
+  const showLeaveMesa = tableLockedFromQr && Boolean(onLeaveWrongTable);
+  const showUnjoin = isAddition && Boolean(onUnjoinSharedOrder);
+  const showMesaExtras = showChangeMesa || showLeaveMesa || showUnjoin;
+
+  const mesaExtrasLink =
+    `${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground underline underline-offset-2`;
 
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md cart-bar-enter p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <button
           type="button"
           onClick={openSheet}
@@ -453,12 +538,17 @@ export function CartBar({
         >
           <span className="flex min-w-0 items-center gap-2.5">
             <span
+              aria-live="polite"
+              aria-atomic="true"
               className={`flex h-7 min-w-7 items-center justify-center rounded-lg px-2 text-sm tabular-nums ${
+                countBump ? "cart-count-bump" : ""
+              } ${
                 ordersUnavailable
                   ? "bg-secondary text-foreground"
                   : "bg-[var(--menu-accent-fg)]/20"
               }`}
             >
+              <span className="sr-only">Platillos en el pedido: </span>
               {count}
             </span>
             <span className="truncate">{barLabel}</span>
@@ -490,10 +580,10 @@ export function CartBar({
           >
             <div
               aria-hidden
-              className="mx-auto mt-3 h-1 w-10 rounded-full bg-border"
+              className="mx-auto mt-3 h-1 w-10 rounded-full bg-[var(--menu-accent)]/40"
             />
 
-            <div className="flex items-start justify-between gap-3 px-5 pb-2 pt-3">
+            <div className="flex items-start justify-between gap-3 border-t border-[var(--menu-accent-muted)] px-5 pb-2 pt-3">
               <div className="min-w-0 flex-1">
                 <h2
                   id={titleId}
@@ -503,28 +593,10 @@ export function CartBar({
                 >
                   {sheetTitle}
                 </h2>
-                {sheetHint ||
-                (!isMesaEditView &&
-                  tableLockedFromQr &&
-                  onChangeTable) ? (
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {sheetHint ? (
-                      <p className="text-xs text-muted-foreground">{sheetHint}</p>
-                    ) : null}
-                    {!isMesaEditView &&
-                    tableLockedFromQr &&
-                    !isAddition &&
-                    onChangeTable ? (
-                      <button
-                        type="button"
-                        disabled={isSubmitting}
-                        onClick={onChangeTable}
-                        className={`${focusRing} text-xs font-medium text-muted-foreground underline underline-offset-2`}
-                      >
-                        Cambiar mesa
-                      </button>
-                    ) : null}
-                  </div>
+                {sheetHint ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {sheetHint}
+                  </p>
                 ) : null}
               </div>
               <button
@@ -577,9 +649,18 @@ export function CartBar({
                       id="table-change-desc"
                       className="text-xs leading-snug text-muted-foreground"
                     >
-                      Se desliga la cuenta abierta de esta mesa. Tu carrito se
-                      conserva.
+                      El pedido que ya enviaste a cocina se queda en la mesa
+                      actual; no se cancela. Los platillos de este carrito pasan
+                      a la mesa nueva.
                     </p>
+                    {openOrderId ? (
+                      <Link
+                        href={`/orders/${openOrderId}`}
+                        className={`${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-foreground underline underline-offset-2`}
+                      >
+                        Ver pedido de la mesa actual
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
                 <div className="shrink-0 space-y-2 border-t border-border bg-card px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
@@ -647,7 +728,9 @@ export function CartBar({
                     id="table-edit-hint"
                     className="text-xs leading-snug text-muted-foreground"
                   >
-                    El pedido que armaste se mantiene; solo cambia la mesa.
+                    {openOrderId
+                      ? "Si cambias de mesa, el pedido ya enviado a cocina se queda en la mesa actual. El carrito pasa contigo."
+                      : "Tu carrito se mantiene; solo cambias el número de mesa."}
                   </p>
                 )}
               </div>
@@ -707,106 +790,32 @@ export function CartBar({
                   </div>
                 ) : (
                   <>
-                {showGuestFieldsUpFront ? (
-                  <div className="space-y-3 border-b border-border/80 px-5 py-3">
-                    {!isAddition && !tableLockedFromQr && orderTypes.length > 1 ? (
-                      <div className="space-y-1.5">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          ¿Cómo lo quieres?
-                        </p>
-                        <div
-                          role="group"
-                          aria-label="Para llevar o a domicilio"
-                          className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/80 p-1"
-                        >
-                          {orderTypes.map((opt) => {
-                            const active = orderType === opt.value;
-                            return (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                disabled={isSubmitting}
-                                aria-pressed={active}
-                                onClick={() => setOrderType(opt.value)}
-                                className={`${focusRing} min-h-11 rounded-lg px-3 text-xs font-semibold transition-colors ${
-                                  active
-                                    ? "bg-card text-foreground"
-                                    : "text-muted-foreground hover:text-foreground"
-                                }`}
-                              >
-                                {opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className="space-y-2.5">
-                      <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Nombre{isPickupFlow ? " *" : ""}
-                        </span>
-                        <input
-                          type="text"
-                          name="customerName"
-                          autoComplete="name"
-                          maxLength={100}
-                          required={isPickupFlow}
-                          placeholder={isPickupFlow ? "Tu nombre" : "Opcional"}
-                          value={customerName}
-                          disabled={isSubmitting}
-                          onChange={(event) =>
-                            setCustomerName(event.target.value)
-                          }
-                          className={fieldClass}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Teléfono{isPickupFlow ? " *" : ""}
-                        </span>
-                        <input
-                          type="tel"
-                          name="customerPhone"
-                          autoComplete="tel"
-                          maxLength={20}
-                          required={isPickupFlow}
-                          placeholder={
-                            isPickupFlow
-                              ? "Para avisarte"
-                              : orderType === "DELIVERY"
-                                ? "Recomendado"
-                                : "Opcional"
-                          }
-                          value={customerPhone}
-                          disabled={isSubmitting}
-                          onChange={(event) =>
-                            setCustomerPhone(event.target.value)
-                          }
-                          className={fieldClass}
-                        />
-                      </label>
-                      {!isAddition && orderType === "DELIVERY" ? (
-                        <label className="flex flex-col gap-1.5">
-                          <span className="text-xs font-medium text-muted-foreground">
-                            Dirección de entrega *
-                          </span>
-                          <input
-                            type="text"
-                            name="deliveryAddress"
-                            autoComplete="street-address"
-                            maxLength={255}
-                            placeholder="Calle, número, colonia…"
-                            value={deliveryAddress}
+                {!isAddition && !tableLockedFromQr && showGuestFieldsUpFront && orderTypes.length > 1 ? (
+                  <div className="border-b border-border/80 px-5 py-2.5">
+                    <div
+                      role="group"
+                      aria-label="Para llevar o a domicilio"
+                      className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/60 p-1"
+                    >
+                      {orderTypes.map((opt) => {
+                        const active = orderType === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
                             disabled={isSubmitting}
-                            onChange={(event) =>
-                              setDeliveryAddress(event.target.value)
-                            }
-                            className={fieldClass}
-                          />
-                        </label>
-                      ) : null}
+                            aria-pressed={active}
+                            onClick={() => setOrderType(opt.value)}
+                            className={`${focusRing} min-h-11 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                              active
+                                ? "bg-card text-foreground"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : null}
@@ -816,24 +825,22 @@ export function CartBar({
                     <p className="text-xs font-medium text-muted-foreground">
                       {itemLabel}
                     </p>
-                    {showGuestFieldsUpFront ? (
-                      <button
-                        type="button"
-                        disabled={isSubmitting}
-                        aria-expanded={linesExpanded}
-                        onClick={() => setLinesExpanded((open) => !open)}
-                        className={`${focusRing} text-xs font-medium text-muted-foreground underline underline-offset-2`}
-                      >
-                        {linesExpanded ? "Listo" : "Editar cantidades"}
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      aria-expanded={linesExpanded}
+                      onClick={() => setLinesExpanded((open) => !open)}
+                      className={`${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground underline underline-offset-2`}
+                    >
+                      {linesExpanded ? "Listo" : "Editar cantidades"}
+                    </button>
                   </div>
 
                   <ul className="divide-y divide-border/60">
                     {orderedLines.map(({ product, quantity }) => (
                       <li
                         key={product.uuid}
-                        className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
+                        className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
                       >
                         <div className="min-w-0 flex-1">
                           <p
@@ -846,15 +853,12 @@ export function CartBar({
                             {formatCurrency(product.price * quantity)}
                           </p>
                         </div>
-                        {linesExpanded || !showGuestFieldsUpFront ? (
+                        {showLineSteppers ? (
                           <QuantityStepper
                             quantity={quantity}
                             label={product.name}
                             onIncrement={() => addItem(product)}
-                            onDecrement={() => {
-                              if (count === 1) setIsOpen(false);
-                              decrementItem(product.uuid);
-                            }}
+                            onDecrement={() => decrementItem(product.uuid)}
                           />
                         ) : (
                           <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
@@ -865,8 +869,8 @@ export function CartBar({
                     ))}
                   </ul>
 
-                  {!showGuestFieldsUpFront ? (
-                    <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
+                  {isInTableFlow ? (
+                    <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
                       {!isAddition &&
                       !tableLockedFromQr &&
                       orderType === "IN_TABLE" ? (
@@ -892,7 +896,7 @@ export function CartBar({
 
                       <details className="group">
                         <summary
-                          className={`${focusRing} cursor-pointer list-none py-1 text-xs font-medium text-muted-foreground underline-offset-2 marker:content-none hover:underline [&::-webkit-details-marker]:hidden`}
+                          className={`${focusRing} flex min-h-11 cursor-pointer list-none items-center text-xs font-medium text-muted-foreground underline-offset-2 marker:content-none hover:underline [&::-webkit-details-marker]:hidden`}
                         >
                           Nombre o teléfono (opcional)
                         </summary>
@@ -935,27 +939,175 @@ export function CartBar({
                           </label>
                         </div>
                       </details>
+
+                      {confirmClear ? (
+                        <ClearCartConfirm
+                          disabled={isSubmitting}
+                          onConfirm={handleClearCart}
+                          onCancel={() => setConfirmClear(false)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={handleClearCart}
+                          className={`${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive`}
+                        >
+                          Vaciar pedido
+                        </button>
+                      )}
+
+                      {showMesaExtras ? (
+                        <details ref={mesaExtrasRef} className="group pt-1">
+                          <summary
+                            className={`${focusRing} flex min-h-11 cursor-pointer list-none items-center text-xs font-medium text-muted-foreground marker:content-none [&::-webkit-details-marker]:hidden`}
+                          >
+                            Más opciones
+                            <span
+                              aria-hidden
+                              className="ml-1 transition-transform group-open:rotate-180"
+                            >
+                              ▾
+                            </span>
+                          </summary>
+                          <div
+                            className="flex flex-col gap-0.5 pb-1"
+                            role="group"
+                            aria-label="Opciones de mesa"
+                          >
+                            {showChangeMesa ? (
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={onChangeTable}
+                                className={mesaExtrasLink}
+                              >
+                                Cambiar mesa
+                              </button>
+                            ) : null}
+                            {showLeaveMesa ? (
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => {
+                                  onLeaveWrongTable?.();
+                                }}
+                                className={mesaExtrasLink}
+                              >
+                                Salir y seguir con este carrito
+                              </button>
+                            ) : null}
+                            {showUnjoin ? (
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={onUnjoinSharedOrder}
+                                className={mesaExtrasLink}
+                              >
+                                Dejar de sumarme
+                              </button>
+                            ) : null}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  ) : showGuestFieldsUpFront ? (
+                    <div className="mt-3 space-y-2.5 border-t border-border/60 pt-3">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {isPickupFlow
+                          ? "Para avisarte cuando esté listo"
+                          : "Datos de entrega"}
+                      </p>
+                      <div className="space-y-2">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Nombre{isPickupFlow ? " *" : ""}
+                          </span>
+                          <input
+                            ref={nameInputRef}
+                            type="text"
+                            name="customerName"
+                            autoComplete="name"
+                            maxLength={100}
+                            required={isPickupFlow}
+                            placeholder={
+                              isPickupFlow ? "Tu nombre" : "Opcional"
+                            }
+                            value={customerName}
+                            disabled={isSubmitting}
+                            onChange={(event) =>
+                              setCustomerName(event.target.value)
+                            }
+                            className={fieldClass}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Teléfono{isPickupFlow ? " *" : ""}
+                          </span>
+                          <input
+                            ref={phoneInputRef}
+                            type="tel"
+                            name="customerPhone"
+                            autoComplete="tel"
+                            maxLength={20}
+                            required={isPickupFlow}
+                            placeholder={
+                              isPickupFlow
+                                ? "Para avisarte"
+                                : isDeliveryFlow
+                                  ? "Recomendado"
+                                  : "Opcional"
+                            }
+                            value={customerPhone}
+                            disabled={isSubmitting}
+                            onChange={(event) =>
+                              setCustomerPhone(event.target.value)
+                            }
+                            className={fieldClass}
+                          />
+                        </label>
+                        {isDeliveryFlow ? (
+                          <label className="flex flex-col gap-1">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              Dirección de entrega *
+                            </span>
+                            <input
+                              ref={addressInputRef}
+                              type="text"
+                              name="deliveryAddress"
+                              autoComplete="street-address"
+                              maxLength={255}
+                              placeholder="Calle, número, colonia…"
+                              value={deliveryAddress}
+                              disabled={isSubmitting}
+                              onChange={(event) =>
+                                setDeliveryAddress(event.target.value)
+                              }
+                              className={fieldClass}
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+
+                      {confirmClear ? (
+                        <ClearCartConfirm
+                          disabled={isSubmitting}
+                          onConfirm={handleClearCart}
+                          onCancel={() => setConfirmClear(false)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={handleClearCart}
+                          className={`${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive`}
+                        >
+                          Vaciar pedido
+                        </button>
+                      )}
                     </div>
                   ) : null}
-
-                  <div className="mt-3 pt-1">
-                    {confirmClear ? (
-                      <ClearCartConfirm
-                        disabled={isSubmitting}
-                        onConfirm={handleClearCart}
-                        onCancel={() => setConfirmClear(false)}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={isSubmitting}
-                        onClick={handleClearCart}
-                        className={`${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive`}
-                      >
-                        Vaciar pedido
-                      </button>
-                    )}
-                  </div>
                 </div>
                   </>
                 )}
@@ -963,7 +1115,7 @@ export function CartBar({
             )}
 
             {!(isMesaEditView && pendingTableChange) ? (
-            <div className="shrink-0 space-y-2.5 border-t border-border bg-card px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+            <div className="sticky bottom-0 z-10 shrink-0 space-y-2.5 border-t border-border bg-card px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
               {isMesaEditView ? (
                   <div className="flex flex-col gap-2">
                     <button
@@ -972,7 +1124,7 @@ export function CartBar({
                       onClick={onConfirmTableEdit}
                       className={`${focusRing} w-full rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98]`}
                     >
-                      Usar esta mesa
+                      Confirmar mesa
                     </button>
                     <button
                       type="button"
@@ -982,6 +1134,18 @@ export function CartBar({
                     >
                       Volver al pedido
                     </button>
+                    {onLeaveWrongTable ? (
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => {
+                          onLeaveWrongTable();
+                        }}
+                        className={`${focusRing} inline-flex min-h-11 w-full items-center justify-center text-xs font-medium text-muted-foreground underline underline-offset-2`}
+                      >
+                        Salir y seguir con este carrito
+                      </button>
+                    ) : null}
                   </div>
               ) : ordersUnavailable ? (
                 <button
@@ -1001,6 +1165,16 @@ export function CartBar({
                     </span>
                   </div>
 
+                  {needsSharedJoin && !errorMessage ? (
+                    <p
+                      role="status"
+                      className="rounded-xl border border-border bg-secondary/60 px-3 py-2.5 text-sm leading-snug text-foreground"
+                    >
+                      Hay un pedido abierto en esta mesa. Súmate para enviar
+                      estos platillos a esa cuenta.
+                    </p>
+                  ) : null}
+
                   {errorMessage ? (
                     <p
                       role="alert"
@@ -1017,7 +1191,7 @@ export function CartBar({
                     onClick={() => {
                       void handleConfirmOrder();
                     }}
-                    className={`${focusRing} w-full rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-70`}
+                    className={`${focusRing} w-full rounded-2xl bg-[var(--menu-accent)] px-5 py-4 font-semibold text-[var(--menu-accent-fg)] shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70`}
                   >
                     {confirmLabel}
                   </button>

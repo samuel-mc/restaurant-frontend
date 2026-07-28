@@ -81,7 +81,7 @@ export function MenuView({
   const [isEditingTable, setIsEditingTable] = useState(false);
   const [draftTable, setDraftTable] = useState("");
   const [tableEditError, setTableEditError] = useState<string | null>(null);
-  /** Mesa pendiente de confirmación cuando hay cuenta abierta. */
+  /** Mesa pendiente de confirmación cuando hay pedido de la mesa. */
   const [pendingTableChange, setPendingTableChange] = useState<string | null>(
     null,
   );
@@ -89,7 +89,13 @@ export function MenuView({
   const [sessionLoading, setSessionLoading] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [sessionRetryKey, setSessionRetryKey] = useState(0);
+  const [tenantSwitchNotice, setTenantSwitchNotice] = useState(false);
+  const [qrRecoveryNotice, setQrRecoveryNotice] = useState(false);
+  const [cartHydrated, setCartHydrated] = useState(() =>
+    useCartStore.persist.hasHydrated(),
+  );
 
+  const ensureTenant = useCartStore((s) => s.ensureTenant);
   const setActiveOrderSession = useCartStore((s) => s.setActiveOrderSession);
   const clearActiveOrderSession = useCartStore((s) => s.clearActiveOrderSession);
   const releaseActiveOrder = useCartStore((s) => s.releaseActiveOrder);
@@ -98,6 +104,30 @@ export function MenuView({
   const activeOrderId = useCartStore((s) => s.activeOrderId);
   const cartCount = useCartCount();
   const hasOpenAccount = Boolean(sessionOrder) || Boolean(activeOrderId);
+
+  useEffect(() => {
+    const unsub = useCartStore.persist.onFinishHydration(() => {
+      setCartHydrated(true);
+    });
+    if (useCartStore.persist.hasHydrated()) {
+      setCartHydrated(true);
+    }
+    return unsub;
+  }, []);
+
+  // Aislar carrito por tenant (evita enviar platillos de otro local).
+  useEffect(() => {
+    if (!cartHydrated) return;
+    const cleared = ensureTenant(tenantSlug);
+    if (cleared) {
+      setTenantSwitchNotice(true);
+      setSessionOrder(null);
+      setSessionError(null);
+      setTableLockedFromQr(false);
+      setIsEditingTable(false);
+      setPendingTableChange(null);
+    }
+  }, [cartHydrated, tenantSlug, ensureTenant]);
 
   // Anclaje de mesa: solo con ?m= en la URL.
   // Sin ?m= → exploración / pickup (no heredar mesa de localStorage).
@@ -110,6 +140,7 @@ export function MenuView({
       setIsEditingTable(false);
       setTableEditError(null);
       setPendingTableChange(null);
+      setQrRecoveryNotice(false);
       return;
     }
 
@@ -130,6 +161,7 @@ export function MenuView({
 
   // Consulta sesión activa de la mesa
   useEffect(() => {
+    if (!cartHydrated) return;
     const table = cartTable?.trim();
     if (!orderingEnabled || !table || isEditingTable) {
       if (!table) {
@@ -151,11 +183,13 @@ export function MenuView({
         if (controller.signal.aborted) return;
         if (session.hasActiveOrder && session.order) {
           setSessionOrder(session.order);
-          setActiveOrderSession({
-            activeOrderId: session.order.uuid,
-            tableNumber: session.order.tableNumber ?? table,
-            customerName: session.order.customerName,
-          });
+          // No auto-unir: el comensal confirma «Sumarme» (clarify ownership).
+          const alreadyJoined =
+            useCartStore.getState().activeOrderId === session.order.uuid;
+          if (!alreadyJoined) {
+            releaseActiveOrder();
+            setCartTable(session.order.tableNumber ?? table);
+          }
         } else {
           setSessionOrder(null);
           releaseActiveOrder();
@@ -166,7 +200,7 @@ export function MenuView({
         if (error instanceof DOMException && error.name === "AbortError") return;
         setSessionOrder(null);
         setSessionError(
-          "No pudimos ver la cuenta de la mesa. Puedes seguir pidiendo.",
+          "No pudimos ver el pedido de la mesa. Puedes seguir pidiendo.",
         );
       } finally {
         if (!controller.signal.aborted) setSessionLoading(false);
@@ -177,7 +211,14 @@ export function MenuView({
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reconsultar al cambiar mesa
-  }, [cartTable, tenantSlug, orderingEnabled, isEditingTable, sessionRetryKey]);
+  }, [
+    cartHydrated,
+    cartTable,
+    tenantSlug,
+    orderingEnabled,
+    isEditingTable,
+    sessionRetryKey,
+  ]);
 
   useEffect(() => {
     if (sections.length === 0) return;
@@ -230,7 +271,7 @@ export function MenuView({
     setIsEditingTable(true);
   }
 
-  /** Salir del QR con carrito vacío (no edita número; vuelve a explorar / pickup). */
+  /** Salir del QR (libera ?m=); conserva platillos del carrito. */
   function handleLeaveWrongTable() {
     clearStoredTable(tenantSlug);
     clearActiveOrderSession();
@@ -240,6 +281,7 @@ export function MenuView({
     setTableLockedFromQr(false);
     setIsEditingTable(false);
     setPendingTableChange(null);
+    setQrRecoveryNotice(true);
     router.replace("/menu");
   }
 
@@ -283,7 +325,7 @@ export function MenuView({
       return;
     }
 
-    // Con cuenta abierta: pedir confirmación antes de desligar.
+    // Con pedido de la mesa: pedir confirmación antes de desligar.
     if (hasOpenAccount) {
       setPendingTableChange(next);
       setTableEditError(null);
@@ -297,14 +339,94 @@ export function MenuView({
     setPendingTableChange(null);
   }
 
+  function handleJoinSharedOrder() {
+    if (!sessionOrder) return;
+    const table =
+      sessionOrder.tableNumber?.trim() ||
+      cartTable?.trim() ||
+      normalizeTableParam(tableFromQuery) ||
+      "";
+    setActiveOrderSession({
+      activeOrderId: sessionOrder.uuid,
+      tableNumber: table,
+      customerName: sessionOrder.customerName,
+    });
+  }
+
+  /** Deshacer Sumarme sin salir del QR (vuelve al gate de join). */
+  function handleUnjoinSharedOrder() {
+    releaseActiveOrder();
+  }
+
+  const joinedSharedOrder =
+    Boolean(sessionOrder) && activeOrderId === sessionOrder?.uuid;
+  const pendingSharedJoin =
+    Boolean(sessionOrder) && !joinedSharedOrder && tableLockedFromQr;
+
   const exploreOrdersUnavailable =
     !tableLockedFromQr &&
     Boolean(modules) &&
     !(modules?.hasPickup ?? true) &&
     !modules?.hasDelivery;
+  /** Sin QR ni canales: solo consulta (no Agregar). */
+  const canAddToCart = orderingEnabled && !exploreOrdersUnavailable;
+  const showCartBar =
+    orderingEnabled && (!exploreOrdersUnavailable || cartCount > 0);
+  const listBottomPad = showCartBar
+    ? "pb-32"
+    : !orderingEnabled || exploreOrdersUnavailable
+      ? "pb-20"
+      : "pb-8";
+
+  const noticeShell =
+    "-mx-4 mb-2 border-b border-[color-mix(in_srgb,var(--menu-accent)_16%,var(--border))] bg-[var(--menu-accent-muted)] px-4 py-2 text-xs leading-snug text-muted-foreground";
+  const noticeAction =
+    "inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
   return (
     <>
+      {tenantSwitchNotice ? (
+        <div
+          role="status"
+          className={`${noticeShell} flex items-center justify-between gap-3`}
+        >
+          <p className="min-w-0 flex-1">
+            <span className="font-medium text-foreground">
+              Cambiaste de restaurante.
+            </span>{" "}
+            Vaciamos el pedido anterior.
+          </p>
+          <button
+            type="button"
+            onClick={() => setTenantSwitchNotice(false)}
+            className={`${noticeAction} shrink-0`}
+          >
+            Entendido
+          </button>
+        </div>
+      ) : null}
+
+      {qrRecoveryNotice && !tableLockedFromQr && !tenantSwitchNotice ? (
+        <div
+          role="status"
+          className={`${noticeShell} flex items-center justify-between gap-3`}
+        >
+          <p className="min-w-0 flex-1">
+            <span className="font-medium text-foreground">
+              Escanea el QR de tu mesa
+            </span>{" "}
+            para pedir ahí · o pide ayuda al personal.
+          </p>
+          <button
+            type="button"
+            onClick={() => setQrRecoveryNotice(false)}
+            className={`${noticeAction} shrink-0`}
+          >
+            Entendido
+          </button>
+        </div>
+      ) : null}
+
       {orderingEnabled ? (
         <MenuContextStrip
           tableLockedFromQr={tableLockedFromQr}
@@ -313,8 +435,12 @@ export function MenuView({
           sessionLoading={sessionLoading}
           sessionOrder={sessionOrder}
           sessionError={sessionError}
-          exploreOrdersUnavailable={exploreOrdersUnavailable}
+          pendingSharedJoin={pendingSharedJoin}
+          joinedSharedOrder={joinedSharedOrder}
+          onJoinSharedOrder={handleJoinSharedOrder}
+          onUnjoinSharedOrder={handleUnjoinSharedOrder}
           onLeaveWrongTable={handleLeaveWrongTable}
+          onChangeTable={handleChangeTable}
           onRetrySession={() => {
             setSessionError(null);
             setSessionRetryKey((key) => key + 1);
@@ -330,7 +456,7 @@ export function MenuView({
 
       <div
         aria-label="Platillos del menú"
-        className="flex flex-col gap-8 pb-32 pt-4"
+        className={`flex flex-col gap-8 pt-4 ${listBottomPad}`}
       >
         {sections.map((section) => (
           <section
@@ -345,16 +471,20 @@ export function MenuView({
           >
             <h2
               id={`heading-${section.id}`}
-              className="mb-2.5 text-sm font-semibold tracking-tight text-muted-foreground"
+              className="mb-2.5 flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground"
             >
+              <span
+                aria-hidden
+                className="h-4 w-1 shrink-0 rounded-full bg-[var(--menu-accent)]"
+              />
               {section.name}
             </h2>
-            <ul className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/80 bg-card">
+            <ul className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/80 bg-card shadow-[inset_2px_0_0_0_var(--menu-accent-muted)]">
               {section.products.map((product) => (
                 <li key={product.uuid}>
                   <ProductCard
                     product={product}
-                    orderingEnabled={orderingEnabled}
+                    orderingEnabled={canAddToCart}
                   />
                 </li>
               ))}
@@ -363,7 +493,7 @@ export function MenuView({
         ))}
       </div>
 
-      {orderingEnabled ? (
+      {showCartBar ? (
         <CartBar
           tenantSlug={tenantSlug}
           modules={modules}
@@ -372,20 +502,37 @@ export function MenuView({
           draftTable={draftTable}
           tableEditError={tableEditError}
           pendingTableChange={pendingTableChange}
+          openOrderId={sessionOrder?.uuid ?? activeOrderId}
           onDraftTableChange={setDraftTable}
           onChangeTable={handleChangeTable}
+          onLeaveWrongTable={handleLeaveWrongTable}
+          onJoinSharedOrder={
+            pendingSharedJoin ? handleJoinSharedOrder : undefined
+          }
+          onUnjoinSharedOrder={
+            joinedSharedOrder ? handleUnjoinSharedOrder : undefined
+          }
           onConfirmTableEdit={handleConfirmTableEdit}
           onCancelTableEdit={handleCancelTableEdit}
           onCancelPendingTableChange={handleCancelPendingTableChange}
         />
-      ) : (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 text-center backdrop-blur-sm">
-          <p className="text-xs font-medium text-muted-foreground">
-            Solo consulta · pedidos desactivados
-          </p>
-        </div>
-      )}
+      ) : exploreOrdersUnavailable ? (
+        <MenuConsultaFooter message="Solo consulta · para pedir usa el QR de tu mesa" />
+      ) : !orderingEnabled ? (
+        <MenuConsultaFooter message="Solo consulta · pedidos desactivados" />
+      ) : null}
     </>
+  );
+}
+
+/**
+ * Franja inferior fija para modos solo consulta.
+ */
+function MenuConsultaFooter({ message }: { message: string }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-center backdrop-blur-sm">
+      <p className="text-xs font-medium text-muted-foreground">{message}</p>
+    </div>
   );
 }
 
@@ -399,8 +546,12 @@ function MenuContextStrip({
   sessionLoading,
   sessionOrder,
   sessionError,
-  exploreOrdersUnavailable = false,
+  pendingSharedJoin = false,
+  joinedSharedOrder = false,
+  onJoinSharedOrder,
+  onUnjoinSharedOrder,
   onLeaveWrongTable,
+  onChangeTable,
   onRetrySession,
 }: {
   tableLockedFromQr: boolean;
@@ -409,41 +560,144 @@ function MenuContextStrip({
   sessionLoading: boolean;
   sessionOrder: Order | null;
   sessionError: string | null;
-  exploreOrdersUnavailable?: boolean;
+  pendingSharedJoin?: boolean;
+  joinedSharedOrder?: boolean;
+  onJoinSharedOrder?: () => void;
+  onUnjoinSharedOrder?: () => void;
   onLeaveWrongTable: () => void;
+  onChangeTable: () => void;
   onRetrySession: () => void;
 }) {
   const shell =
-    "-mx-4 border-b border-border/70 px-4 py-2 text-xs leading-snug text-muted-foreground";
+    "-mx-4 border-b border-[color-mix(in_srgb,var(--menu-accent)_16%,var(--border))] px-4 py-2 text-xs leading-snug text-muted-foreground";
+  const stripAction =
+    "inline-flex min-h-11 items-center font-medium underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  const leaveLabel =
+    cartCount > 0
+      ? "Salir y seguir con este carrito"
+      : "Salir de esta mesa";
 
   if (sessionLoading && !sessionOrder) {
     return (
       <div role="status" className={shell}>
-        Consultando la cuenta…
+        {tableNumber ? (
+          <>
+            <span className="font-medium text-foreground">
+              {formatTableLabel(tableNumber)}
+            </span>
+            {" · consultando…"}
+          </>
+        ) : (
+          "Consultando el pedido…"
+        )}
       </div>
     );
   }
 
-  if (sessionOrder && tableNumber) {
+  if (sessionOrder && tableNumber && pendingSharedJoin) {
+    const { countLabel, totalLabel, peekLabel } =
+      orderPlatilloSummary(sessionOrder);
+    return (
+      <div
+        role="region"
+        aria-label="Pedido de la mesa"
+        className={`${shell} space-y-1.5 py-2`}
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <p className="min-w-0 flex-1 basis-[12rem] truncate">
+            <span className="font-medium text-foreground">
+              {formatTableLabel(tableNumber)}
+            </span>
+            {" · "}
+            <span className="font-medium text-foreground">
+              {countLabel}
+              {" · "}
+              {totalLabel}
+            </span>
+          </p>
+          <div className="flex shrink-0 flex-wrap items-center gap-x-2">
+            <button
+              type="button"
+              onClick={onJoinSharedOrder}
+              aria-label="Sumarme al pedido de la mesa"
+              className="inline-flex min-h-11 items-center rounded-xl bg-[var(--menu-accent)] px-3 text-sm font-semibold text-[var(--menu-accent-fg)] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              Sumarme
+            </button>
+            <button
+              type="button"
+              onClick={onLeaveWrongTable}
+              aria-label={leaveLabel}
+              className={stripAction}
+            >
+              Salir
+            </button>
+          </div>
+        </div>
+        {peekLabel ? (
+          <p className="line-clamp-1 text-muted-foreground" title={peekLabel}>
+            {peekLabel}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (sessionOrder && tableNumber && joinedSharedOrder) {
+    const { countLabel, totalLabel, peekLabel } =
+      orderPlatilloSummary(sessionOrder);
+    /** Con carrito abierto, Dejar de sumarme vive en Más opciones del sheet. */
+    const showUnjoinOnStrip = Boolean(onUnjoinSharedOrder) && cartCount === 0;
     return (
       <div
         role="status"
-        className={`${shell} flex items-center justify-between gap-3`}
+        aria-live="polite"
+        className={`${shell} space-y-1.5 py-2`}
       >
-        <p className="min-w-0 truncate">
-          <span className="font-medium text-foreground">
-            {formatTableLabel(tableNumber)}
-          </span>
-          {" · cuenta abierta · "}
-          {sessionOrder.formattedTotal ||
-            formatCurrency(sessionOrder.totalAmount)}
-        </p>
-        <Link
-          href={`/orders/${sessionOrder.uuid}`}
-          className="inline-flex min-h-11 shrink-0 items-center font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Ver pedido
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+          <p className="min-w-0 flex-1 basis-[12rem] truncate">
+            <span className="font-medium text-foreground">
+              {formatTableLabel(tableNumber)}
+            </span>
+            {" · "}
+            <span className="font-medium text-foreground">
+              {countLabel}
+              {" · "}
+              {totalLabel}
+            </span>
+          </p>
+          <div className="flex shrink-0 flex-wrap items-center gap-x-3">
+            <Link
+              href={`/orders/${sessionOrder.uuid}`}
+              className={`${stripAction} text-foreground`}
+            >
+              Ver pedido
+            </Link>
+            {showUnjoinOnStrip ? (
+              <button
+                type="button"
+                onClick={onUnjoinSharedOrder}
+                aria-label="Dejar de sumarme a este pedido"
+                className={stripAction}
+              >
+                Dejar de sumarme
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onLeaveWrongTable}
+              aria-label={leaveLabel}
+              className={stripAction}
+            >
+              Salir
+            </button>
+          </div>
+        </div>
+        {peekLabel ? (
+          <p className="line-clamp-1 text-muted-foreground" title={peekLabel}>
+            {peekLabel}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -458,7 +712,7 @@ function MenuContextStrip({
         <button
           type="button"
           onClick={onRetrySession}
-          className="inline-flex min-h-11 shrink-0 items-center font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={`${stripAction} shrink-0 text-foreground`}
         >
           Reintentar
         </button>
@@ -470,37 +724,70 @@ function MenuContextStrip({
     return (
       <div
         role="status"
-        className={`${shell} flex items-center justify-between gap-3`}
+        className={`${shell} flex flex-wrap items-center justify-between gap-x-3 gap-y-1`}
       >
-        <p className="min-w-0 truncate">
+        <p className="min-w-0 flex-1 truncate">
           <span className="font-medium text-foreground">
             {formatTableLabel(tableNumber)}
           </span>
-          <span> · pedido en esta mesa</span>
+          <span> · listo para pedir</span>
         </p>
-        {cartCount === 0 ? (
+        <div className="flex shrink-0 items-center gap-x-3">
+          {cartCount > 0 ? (
+            <button
+              type="button"
+              onClick={onChangeTable}
+              aria-label="Cambiar mesa"
+              className={stripAction}
+            >
+              Cambiar mesa
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onLeaveWrongTable}
-            className="inline-flex min-h-11 shrink-0 items-center font-medium underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={leaveLabel}
+            className={stripAction}
           >
-            ¿No es tu mesa?
+            Salir
           </button>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (exploreOrdersUnavailable) {
-    return (
-      <div role="status" className={shell}>
-        <p>
-          <span className="font-medium text-foreground">Solo consulta</span>
-          {" · para pedir usa el QR de tu mesa"}
-        </p>
+        </div>
       </div>
     );
   }
 
   return null;
+}
+
+/** Conteo, total y peek (1–2 nombres) del pedido de la mesa. */
+function orderPlatilloSummary(order: Order): {
+  countLabel: string;
+  totalLabel: string;
+  peekLabel: string | null;
+} {
+  const lines = order.items.filter((item) => item.quantity > 0);
+  const count = lines.reduce((sum, item) => sum + item.quantity, 0);
+  const shown = lines.slice(0, 2);
+  const shownQty = shown.reduce((sum, item) => sum + item.quantity, 0);
+  const moreQty = Math.max(0, count - shownQty);
+
+  const peekParts = shown.map((item) => {
+    const name = item.productName.trim() || "Platillo";
+    return item.quantity > 1 ? `${name} ×${item.quantity}` : name;
+  });
+
+  let peekLabel: string | null = null;
+  if (peekParts.length > 0) {
+    peekLabel = peekParts.join(", ");
+    if (moreQty > 0) {
+      peekLabel +=
+        moreQty === 1 ? " · y 1 más" : ` · y ${moreQty} más`;
+    }
+  }
+
+  return {
+    countLabel: count === 1 ? "1 platillo" : `${count} platillos`,
+    totalLabel: order.formattedTotal || formatCurrency(order.totalAmount),
+    peekLabel,
+  };
 }

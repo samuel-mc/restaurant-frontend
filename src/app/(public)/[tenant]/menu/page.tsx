@@ -7,6 +7,7 @@ import { ApiError } from "@/services/apiClient";
 import type { Product, RestaurantProfile } from "@/types/api";
 import { MenuView } from "@/components/customer/menu-view";
 import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
+import { resolveMenuAccentPair } from "@/lib/color-contrast";
 
 type TenantMenuPageProps = {
   params: Promise<{ tenant: string }>;
@@ -96,7 +97,7 @@ export default async function TenantMenuPage({
 
   return (
     <main
-      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background font-jakarta-sans text-foreground"
+      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-[var(--menu-accent-wash,var(--background))] font-jakarta-sans text-foreground"
       style={brand.style}
     >
       <header
@@ -130,10 +131,15 @@ export default async function TenantMenuPage({
             <img
               src={profile.logoUrl}
               alt={`Logo de ${restaurantName}`}
+              width={48}
+              height={48}
+              sizes="48px"
+              decoding="async"
+              fetchPriority="high"
               className={
                 hasBrandFill
-                  ? "size-12 rounded-xl object-cover ring-1 ring-[var(--menu-accent-fg)]/20"
-                  : "size-12 rounded-xl object-cover ring-1 ring-border"
+                  ? "size-12 shrink-0 rounded-xl object-cover ring-1 ring-[var(--menu-accent-fg)]/20"
+                  : "size-12 shrink-0 rounded-xl object-cover ring-1 ring-border"
               }
             />
           ) : (
@@ -149,7 +155,7 @@ export default async function TenantMenuPage({
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold leading-tight tracking-tight">
+            <h1 className="line-clamp-2 text-xl font-bold leading-tight tracking-tight">
               {restaurantName}
             </h1>
             {supportLine ? (
@@ -200,10 +206,10 @@ function brandFromProfile(profile: RestaurantProfile | null): {
 } {
   const primary = profile?.primaryColor?.trim() ?? "";
   const secondary = profile?.secondaryColor?.trim() ?? "";
-  const accent = HEX.test(primary) ? primary : null;
-  const soft = HEX.test(secondary) ? secondary : accent;
+  const accentRaw = HEX.test(primary) ? primary : null;
+  const soft = HEX.test(secondary) ? secondary : accentRaw;
 
-  if (!accent) {
+  if (!accentRaw) {
     return {
       accent: null,
       style: {
@@ -212,33 +218,25 @@ function brandFromProfile(profile: RestaurantProfile | null): {
         ["--menu-accent-muted" as string]:
           "color-mix(in srgb, var(--foreground) 12%, transparent)",
         ["--menu-accent-soft" as string]: "var(--muted)",
+        ["--menu-accent-wash" as string]: "var(--background)",
       },
     };
   }
+
+  const { accent, foreground } = resolveMenuAccentPair(accentRaw);
 
   return {
     accent,
     style: {
       ["--menu-accent" as string]: accent,
-      ["--menu-accent-fg" as string]: accentForeground(accent),
+      ["--menu-accent-fg" as string]: foreground,
       ["--menu-accent-muted" as string]:
         `color-mix(in srgb, ${accent} 14%, transparent)`,
       ["--menu-accent-soft" as string]: soft ?? accent,
+      ["--menu-accent-wash" as string]:
+        `color-mix(in srgb, ${accent} 6%, var(--background))`,
     },
   };
-}
-
-/** Blanco u oscuro según luminancia relativa del accent (WCAG-ish). */
-function accentForeground(hex: string): string {
-  const raw = hex.replace("#", "");
-  const r = Number.parseInt(raw.slice(0, 2), 16) / 255;
-  const g = Number.parseInt(raw.slice(2, 4), 16) / 255;
-  const b = Number.parseInt(raw.slice(4, 6), 16) / 255;
-  const toLinear = (c: number) =>
-    c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  const L =
-    0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-  return L > 0.45 ? "#171717" : "#ffffff";
 }
 
 function headerSupport(profile: RestaurantProfile | null): string | null {

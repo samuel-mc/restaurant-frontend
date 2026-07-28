@@ -5,6 +5,8 @@
  * Targets ≥44px para uso con pulgar en mesa.
  */
 
+import { useEffect, useRef, useState } from "react";
+
 interface QuantityStepperProps {
   quantity: number;
   onIncrement: () => void;
@@ -22,6 +24,19 @@ export function QuantityStepper({
   onDecrement,
   label,
 }: QuantityStepperProps) {
+  const prevQuantityRef = useRef(quantity);
+  const [quantityBump, setQuantityBump] = useState(false);
+
+  useEffect(() => {
+    if (quantity > prevQuantityRef.current) {
+      setQuantityBump(true);
+      const id = window.setTimeout(() => setQuantityBump(false), 280);
+      prevQuantityRef.current = quantity;
+      return () => window.clearTimeout(id);
+    }
+    prevQuantityRef.current = quantity;
+  }, [quantity]);
+
   return (
     <div className="flex items-center gap-0.5 rounded-xl bg-[var(--menu-accent-muted)] p-0.5">
       <button
@@ -34,7 +49,9 @@ export function QuantityStepper({
       </button>
       <span
         aria-live="polite"
-        className="min-w-8 text-center text-sm font-bold tabular-nums"
+        className={`min-w-8 text-center text-sm font-bold tabular-nums ${
+          quantityBump ? "cart-count-bump" : ""
+        }`}
       >
         {quantity}
       </span>

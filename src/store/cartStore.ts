@@ -2,6 +2,7 @@
 
 /**
  * Carrito de compras local del comensal + sesión de orden activa (adiciones).
+ * Persistido por tenant: al cambiar de restaurante se vacía el carrito ajeno.
  */
 
 import { create } from "zustand";
@@ -22,6 +23,8 @@ export interface ActiveOrderSession {
 }
 
 interface CartState {
+  /** Tenant al que pertenece el carrito persistido. */
+  tenantSlug: string | null;
   lines: Record<string, CartLine>;
   activeOrderId: string | null;
   tableNumber: string | null;
@@ -35,15 +38,37 @@ interface CartState {
   /** Libera el ticket activo pero conserva la mesa anclada (QR). */
   releaseActiveOrder: () => void;
   setTableNumber: (tableNumber: string | null) => void;
+  /**
+   * Ata el carrito al tenant actual.
+   * Si había otro tenant con contenido, vacía líneas/sesión y devuelve true.
+   */
+  ensureTenant: (slug: string) => boolean;
+}
+
+const emptySession = {
+  lines: {} as Record<string, CartLine>,
+  activeOrderId: null as string | null,
+  tableNumber: null as string | null,
+  customerName: null as string | null,
+};
+
+function hasCartContent(state: {
+  lines: Record<string, CartLine>;
+  activeOrderId: string | null;
+  tableNumber: string | null;
+}): boolean {
+  return (
+    Object.keys(state.lines).length > 0 ||
+    Boolean(state.activeOrderId) ||
+    Boolean(state.tableNumber)
+  );
 }
 
 export const useCartStore = create<CartState>()(
   persist(
-    (set) => ({
-      lines: {},
-      activeOrderId: null,
-      tableNumber: null,
-      customerName: null,
+    (set, get) => ({
+      tenantSlug: null,
+      ...emptySession,
 
       addItem: (product) =>
         set((state) => {
@@ -104,10 +129,32 @@ export const useCartStore = create<CartState>()(
         }),
 
       setTableNumber: (tableNumber) => set({ tableNumber }),
+
+      ensureTenant: (slug) => {
+        const normalized = slug.trim().toLowerCase();
+        if (!normalized) return false;
+
+        const state = get();
+        if (state.tenantSlug === normalized) return false;
+
+        // Migración: primer stamp sin tenant previo → conservar carrito.
+        if (state.tenantSlug === null) {
+          set({ tenantSlug: normalized });
+          return false;
+        }
+
+        const cleared = hasCartContent(state);
+        set({
+          tenantSlug: normalized,
+          ...emptySession,
+        });
+        return cleared;
+      },
     }),
     {
       name: "platolisto-cart",
       partialize: (state) => ({
+        tenantSlug: state.tenantSlug,
         lines: state.lines,
         activeOrderId: state.activeOrderId,
         tableNumber: state.tableNumber,

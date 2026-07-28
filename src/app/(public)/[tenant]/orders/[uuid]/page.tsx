@@ -87,6 +87,7 @@ export default async function OrderTrackingPage({
         <OrderTracker
           initialOrder={result.order}
           restaurantName={restaurantName}
+          tenantSlug={tenant}
         />
       ) : (
         <OrderUnavailableState

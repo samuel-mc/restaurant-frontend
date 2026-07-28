@@ -4,6 +4,7 @@
  * Suscripción STOMP al canal de cocina/caja del tenant.
  * Topic: `/topic/admin/{tenantSlug}/orders`
  *
+ * Requiere JWT (vía `/api/admin/ws-token`) en CONNECT.
  * Reconexión con backoff exponencial para redes de restaurante inestables.
  */
 
@@ -28,6 +29,7 @@ interface UseKitchenOrdersSubscriptionOptions {
 
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
+const WS_TOKEN_PATH = "/api/admin/ws-token";
 
 function parseOrderMessage(message: IMessage): Order | null {
   try {
@@ -47,6 +49,23 @@ function nextReconnectDelay(attempt: number): number {
   // Jitter ±20% para evitar thundering herd si varias tablets reconectan.
   const jitter = exp * (0.8 + Math.random() * 0.4);
   return Math.round(Math.min(RECONNECT_MAX_MS, jitter));
+}
+
+async function fetchWsToken(): Promise<string | null> {
+  try {
+    const response = await fetch(WS_TOKEN_PATH, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { token?: unknown };
+    const token = typeof body.token === "string" ? body.token.trim() : "";
+    return token || null;
+  } catch {
+    return null;
+  }
 }
 
 export function useKitchenOrdersSubscription({
@@ -84,8 +103,14 @@ export function useKitchenOrdersSubscription({
         heartbeatOutgoing: 10_000,
         connectionTimeout: 8_000,
         beforeConnect: async () => {
-          // Ajusta el delay del próximo ciclo con backoff exponencial.
           client.reconnectDelay = nextReconnectDelay(attempt);
+          const token = await fetchWsToken();
+          if (!token) {
+            throw new Error("No se pudo obtener token para WebSocket.");
+          }
+          client.connectHeaders = {
+            Authorization: `Bearer ${token}`,
+          };
         },
         onConnect: () => {
           attempt = 0;

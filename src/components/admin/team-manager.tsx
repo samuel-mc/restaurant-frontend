@@ -28,6 +28,10 @@ const ROLE_OPTIONS: { value: StaffRole; label: string }[] = [
   { value: "ADMIN", label: "Admin" },
 ];
 
+/**
+ * Badges de rol = categoría, no alarma.
+ * `warn` queda para atención ahora (offline, pendientes, busy).
+ */
 function roleBadge(role: StaffRole): { label: string; className: string } {
   switch (role) {
     case "ADMIN":
@@ -43,7 +47,7 @@ function roleBadge(role: StaffRole): { label: string; className: string } {
     case "COCINA":
       return {
         label: "Cocina",
-        className: "bg-warn-muted text-warn-ink",
+        className: "bg-secondary text-foreground",
       };
   }
 }

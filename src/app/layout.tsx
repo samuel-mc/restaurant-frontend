@@ -30,10 +30,7 @@ export default function RootLayout({
       <body className="min-h-screen antialiased">
         <ThemeSync />
         {children}
-      {/* impeccable-live-start */}
-<script src="http://localhost:8400/live.js?token=363292a5-a00f-4116-984e-6b9326fb2aa5"></script>
-{/* impeccable-live-end */}
-</body>
+      </body>
     </html>
   );
 }

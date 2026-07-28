@@ -3,6 +3,8 @@ import {
   ADMIN_TOKEN_MAX_AGE_SECONDS,
   SUPERADMIN_TOKEN_COOKIE,
 } from "@/lib/auth-cookie";
+import { isTokenExpired } from "@/lib/jwt-payload";
+import { isSameOriginRequest, looksLikeJwt } from "@/lib/same-origin";
 
 type SessionBody = {
   token?: unknown;
@@ -10,6 +12,10 @@ type SessionBody = {
 
 /** Establece cookie HttpOnly del SuperAdmin. */
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "Origen no permitido." }, { status: 403 });
+  }
+
   let body: SessionBody;
   try {
     body = (await request.json()) as SessionBody;
@@ -18,7 +24,7 @@ export async function POST(request: Request) {
   }
 
   const token = typeof body.token === "string" ? body.token.trim() : "";
-  if (!token) {
+  if (!token || !looksLikeJwt(token) || isTokenExpired(token)) {
     return NextResponse.json(
       { error: "Se requiere un token válido." },
       { status: 400 },
@@ -38,7 +44,11 @@ export async function POST(request: Request) {
   return response;
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "Origen no permitido." }, { status: 403 });
+  }
+
   const response = NextResponse.json({ ok: true });
   response.cookies.set({
     name: SUPERADMIN_TOKEN_COOKIE,

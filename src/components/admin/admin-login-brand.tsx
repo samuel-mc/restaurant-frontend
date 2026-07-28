@@ -94,9 +94,10 @@ export function AdminLoginBrand({
           logoUrl={logoUrl}
           size="chip"
         />
-        <p className="min-w-0 truncate text-sm font-semibold tracking-tight text-muted-foreground">
+        {/* h1 preservado en chip: el paso PIN no puede perder el título de página. */}
+        <h1 className="min-w-0 truncate text-sm font-semibold tracking-tight text-muted-foreground">
           {restaurantName}
-        </p>
+        </h1>
       </header>
     );
   }

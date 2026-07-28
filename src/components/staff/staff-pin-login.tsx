@@ -39,10 +39,14 @@ const ROLE_ORDER: StaffRole[] = ["COCINA", "MESERO", "ADMIN"];
 const lastStaffStorageKey = (tenantSlug: string) =>
   `platolisto.staff.lastId.${tenantSlug}`;
 
+/**
+ * Badges de rol = categoría, no alarma.
+ * `warn` queda para busy / offline / atención ahora (DESIGN Attention rule).
+ */
 function roleMeta(role: StaffRole): { label: string; badgeClass: string } {
   switch (role) {
     case "COCINA":
-      return { label: "Cocina", badgeClass: "bg-warn-muted text-warn-ink" };
+      return { label: "Cocina", badgeClass: "bg-secondary text-foreground" };
     case "MESERO":
       return { label: "Mesero", badgeClass: "bg-live-muted text-live-ink" };
     case "ADMIN":
@@ -130,6 +134,8 @@ export function StaffPinLogin({
   const submittingRef = useRef(false);
   const busyRef = useRef(false);
   const attemptRef = useRef(0);
+  /** Fallos de acceso (401) seguidos para el mismo miembro — recovery tras el 2º. */
+  const accessFailStreakRef = useRef(0);
   const mountedRef = useRef(true);
   const selectedRef = useRef<PublicStaffMember | null>(null);
   const errorAlertRef = useRef<HTMLParagraphElement>(null);
@@ -167,6 +173,7 @@ export function StaffPinLogin({
 
   const goBackToSelection = useCallback(() => {
     invalidateInFlight();
+    accessFailStreakRef.current = 0;
     setSelected(null);
     setPin("");
     setError(null);
@@ -174,14 +181,28 @@ export function StaffPinLogin({
     setBusy(false);
   }, [invalidateInFlight]);
 
-  const failPinAttempt = useCallback((message: string, recovery: boolean) => {
+  const failPinAttempt = useCallback((message: string, accessFailure: boolean) => {
     submittingRef.current = false;
     setBusy(false);
     setError(message);
-    setShowRecovery(recovery);
+    if (accessFailure) {
+      accessFailStreakRef.current += 1;
+      // Primer typo: solo el error. Recovery a partir del 2º fallo de acceso.
+      setShowRecovery(accessFailStreakRef.current >= 2);
+    } else {
+      accessFailStreakRef.current = 0;
+      setShowRecovery(false);
+    }
     setPin("");
-    // Haptic breve — sin shake ni dots rojos sólidos (tablet compartida).
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    // Haptic breve — respeta prefers-reduced-motion.
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (
+      !reduceMotion &&
+      typeof navigator !== "undefined" &&
+      "vibrate" in navigator
+    ) {
       navigator.vibrate?.(35);
     }
     queueMicrotask(() => errorAlertRef.current?.focus());
@@ -214,6 +235,7 @@ export function StaffPinLogin({
         ) {
           return;
         }
+        accessFailStreakRef.current = 0;
         writeLastStaffId(tenantSlug, member.id);
         await setToken(result.token);
         if (
@@ -317,6 +339,7 @@ export function StaffPinLogin({
   const selectMember = useCallback(
     (member: PublicStaffMember) => {
       invalidateInFlight();
+      accessFailStreakRef.current = 0;
       setSelected(member);
       setPin("");
       setError(null);
@@ -553,6 +576,7 @@ function StaffSelectionGrid({
 
   return (
     <div
+      role="region"
       className="flex min-h-0 flex-1 flex-col gap-4"
       aria-label="Equipo del turno"
     >

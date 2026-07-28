@@ -16,6 +16,8 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   busy?: boolean;
   tone?: "danger" | "neutral";
+  /** Error de API / acción visible dentro del diálogo (no bajo el overlay). */
+  error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -32,6 +34,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancelar",
   busy = false,
   tone = "danger",
+  error = null,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -50,7 +53,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel();
@@ -76,6 +79,14 @@ export function ConfirmDialog({
         >
           {description}
         </p>
+        {error ? (
+          <p
+            role="alert"
+            className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {error}
+          </p>
+        ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"

@@ -30,7 +30,7 @@ import type { PublicStaffMember, StaffRole } from "@/types/api";
 const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-live focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-const linkClass = `rounded-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`;
+const linkClass = `inline-flex min-h-11 touch-manipulation items-center justify-center rounded-sm px-1 font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`;
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"] as const;
 
@@ -46,7 +46,10 @@ const lastStaffStorageKey = (tenantSlug: string) =>
 function roleMeta(role: StaffRole): { label: string; badgeClass: string } {
   switch (role) {
     case "COCINA":
-      return { label: "Cocina", badgeClass: "bg-secondary text-foreground" };
+      return {
+        label: "Cocina",
+        badgeClass: "border border-border bg-secondary text-foreground",
+      };
     case "MESERO":
       return { label: "Mesero", badgeClass: "bg-live-muted text-live-ink" };
     case "ADMIN":
@@ -357,7 +360,7 @@ export function StaffPinLogin({
   const descriptionMuted = directoryLoadFailed || staff.length === 0;
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] font-jakarta-sans text-foreground">
+    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] font-jakarta-sans text-foreground">
       {!selected ? (
         <>
           <div className="shrink-0 pt-2 sm:pt-4">
@@ -577,7 +580,9 @@ function StaffSelectionGrid({
   return (
     <div
       role="region"
-      className="flex min-h-0 flex-1 flex-col gap-4"
+      className={`flex min-h-0 flex-col gap-4 ${
+        showSearch ? "flex-1" : "shrink-0"
+      }`}
       aria-label="Equipo del turno"
     >
       {showSearch ? (
@@ -602,13 +607,13 @@ function StaffSelectionGrid({
               spellCheck={false}
               maxLength={64}
               enterKeyHint="search"
-              className={`min-h-11 w-full rounded-xl border border-border bg-secondary py-2.5 pl-10 pr-11 text-sm outline-none transition focus-visible:border-live focus-visible:ring-2 focus-visible:ring-live/20`}
+              className={`min-h-11 w-full rounded-xl border border-border bg-secondary py-2.5 pl-10 pr-14 text-base outline-none transition focus-visible:border-live focus-visible:ring-2 focus-visible:ring-live/20 sm:text-sm`}
             />
             {query ? (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className={`absolute right-1.5 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground ${focusRing}`}
+                className={`absolute right-1 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground ${focusRing}`}
                 aria-label="Borrar búsqueda"
               >
                 <X className="size-4" aria-hidden />
@@ -619,9 +624,9 @@ function StaffSelectionGrid({
       ) : null}
 
       <div
-        className={`flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${
-          showRoleHeadings ? "gap-5" : "gap-3"
-        }`}
+        className={`flex min-h-0 flex-col overscroll-contain ${
+          showSearch ? "flex-1 overflow-y-auto" : "shrink-0"
+        } ${showRoleHeadings ? "gap-5" : "gap-3"}`}
       >
         {noMatches ? (
           <div
@@ -639,7 +644,7 @@ function StaffSelectionGrid({
             <button
               type="button"
               onClick={() => setQuery("")}
-              className={`mt-3 inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`}
+              className={`mt-3 inline-flex min-h-11 touch-manipulation items-center justify-center rounded-xl px-3 text-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`}
             >
               Limpiar búsqueda
             </button>
@@ -731,8 +736,8 @@ function StaffEmptyState({
       >
         <UsersRound className="size-6" />
       </span>
-      <p className="text-base font-semibold">Aún no hay equipo</p>
-      <p className="mt-2 max-w-sm text-sm leading-snug text-muted-foreground [overflow-wrap:anywhere]">
+      {/* Un solo titular: la marca ya dice “Falta registrar el equipo”. */}
+      <p className="max-w-sm text-sm leading-snug text-muted-foreground [overflow-wrap:anywhere]">
         Registra los nombres una vez. Después cada quien entra con su PIN.
       </p>
       <div className="mt-6 flex w-full max-w-xs flex-col gap-3">
@@ -801,13 +806,9 @@ function PinPad({
     : showFailedDots
       ? "Ese PIN no coincide. Inténtalo de nuevo."
       : `PIN: ${pin.length} de 4`;
-  const statusHint = busy
-    ? "Comprobando PIN…"
-    : error
-      ? "Vuelve a escribir tu PIN"
-      : offline
-        ? "Sin conexión — reconéctate para entrar"
-        : "Al completar 4 dígitos entras";
+  // Hint bajo el pad solo cuando no hay banner/alert que ya diga lo mismo.
+  const statusHint =
+    busy || error || offline ? null : "Al completar 4 dígitos entras";
 
   return (
     <div className="w-full">
@@ -815,7 +816,7 @@ function PinPad({
         <button
           type="button"
           onClick={onBack}
-          className={`inline-flex min-h-11 min-w-0 touch-manipulation items-center gap-1.5 rounded-xl px-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground ${focusRing}`}
+          className={`inline-flex min-h-11 min-w-0 touch-manipulation items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground ${focusRing}`}
         >
           <ArrowLeft className="size-4 shrink-0" aria-hidden />
           <span className="truncate">Elegir otro nombre</span>
@@ -950,10 +951,10 @@ function PinPad({
 
       <p
         className="mt-3 min-h-4 text-center text-xs text-muted-foreground"
-        aria-live={busy ? undefined : "polite"}
+        aria-live="polite"
         aria-atomic="true"
       >
-        {busy ? null : statusHint}
+        {statusHint}
       </p>
     </div>
   );

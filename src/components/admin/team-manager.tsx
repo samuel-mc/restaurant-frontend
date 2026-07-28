@@ -22,6 +22,8 @@ const focusRing =
 const btnPrimary = `inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 ${focusRing}`;
 const btnSecondary = `inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`;
 
+const pinInputClass = `min-h-11 rounded-xl border border-border bg-secondary px-3 font-medium tracking-[0.3em] ${focusRing}`;
+
 const ROLE_OPTIONS: { value: StaffRole; label: string }[] = [
   { value: "MESERO", label: "Mesero" },
   { value: "COCINA", label: "Cocina" },
@@ -47,9 +49,13 @@ function roleBadge(role: StaffRole): { label: string; className: string } {
     case "COCINA":
       return {
         label: "Cocina",
-        className: "bg-secondary text-foreground",
+        className: "border border-border bg-secondary text-foreground",
       };
   }
+}
+
+function normalizePin(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 4);
 }
 
 interface TeamManagerProps {
@@ -61,10 +67,15 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
   const [members, setMembers] = useState(initialMembers);
   const [modalOpen, setModalOpen] = useState(false);
   const [pinTarget, setPinTarget] = useState<StaffMemberResponse | null>(null);
+  const [pendingPin, setPendingPin] = useState<string | null>(null);
   const [deactivateTarget, setDeactivateTarget] =
     useState<StaffMemberResponse | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [pinFormError, setPinFormError] = useState<string | null>(null);
+  const [pinConfirmError, setPinConfirmError] = useState<string | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
 
   const sorted = useMemo(
     () =>
@@ -80,21 +91,23 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
     role: StaffRole;
     pin: string;
   }) {
-    setError(null);
+    setCreateError(null);
     setBusyId("create");
     try {
       const created = await createTeamMember(tenantSlug, input);
       setMembers((prev) => [...prev, created]);
       setModalOpen(false);
     } catch (err) {
-      setError(getAdminErrorMessage(err, "No se pudo agregar al miembro."));
+      setCreateError(
+        getAdminErrorMessage(err, "No se pudo agregar al miembro. Revisa e intenta de nuevo."),
+      );
     } finally {
       setBusyId(null);
     }
   }
 
   async function handleToggleActive(member: StaffMemberResponse) {
-    setError(null);
+    setListError(null);
     setBusyId(member.id);
     try {
       const updated = await updateTeamMember(tenantSlug, member.id, {
@@ -104,23 +117,38 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
         prev.map((m) => (m.id === member.id ? updated : m)),
       );
     } catch (err) {
-      setError(getAdminErrorMessage(err, "No se pudo actualizar el estado."));
+      setListError(
+        getAdminErrorMessage(
+          err,
+          "No se pudo actualizar el estado. Intenta de nuevo.",
+        ),
+      );
     } finally {
       setBusyId(null);
     }
   }
 
-  async function handleChangePin(member: StaffMemberResponse, pin: string) {
-    setError(null);
-    setBusyId(member.id);
+  async function confirmChangePin() {
+    if (!pinTarget || !pendingPin) return;
+    setPinConfirmError(null);
+    setBusyId(pinTarget.id);
     try {
-      const updated = await updateTeamMember(tenantSlug, member.id, { pin });
+      const updated = await updateTeamMember(tenantSlug, pinTarget.id, {
+        pin: pendingPin,
+      });
       setMembers((prev) =>
-        prev.map((m) => (m.id === member.id ? updated : m)),
+        prev.map((m) => (m.id === pinTarget.id ? updated : m)),
       );
+      setPendingPin(null);
       setPinTarget(null);
+      setPinFormError(null);
     } catch (err) {
-      setError(getAdminErrorMessage(err, "No se pudo cambiar el PIN."));
+      setPinConfirmError(
+        getAdminErrorMessage(
+          err,
+          "No se pudo cambiar el PIN. Intenta de nuevo.",
+        ),
+      );
     } finally {
       setBusyId(null);
     }
@@ -128,7 +156,7 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
 
   async function confirmDeactivate() {
     if (!deactivateTarget) return;
-    setError(null);
+    setDeactivateError(null);
     setBusyId(deactivateTarget.id);
     try {
       await deactivateTeamMember(tenantSlug, deactivateTarget.id);
@@ -139,10 +167,43 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
       );
       setDeactivateTarget(null);
     } catch (err) {
-      setError(getAdminErrorMessage(err, "No se pudo desactivar el miembro."));
+      setDeactivateError(
+        getAdminErrorMessage(
+          err,
+          "No se pudo desactivar al miembro. Intenta de nuevo.",
+        ),
+      );
     } finally {
       setBusyId(null);
     }
+  }
+
+  function openCreateModal() {
+    setListError(null);
+    setCreateError(null);
+    setModalOpen(true);
+  }
+
+  function openPinModal(member: StaffMemberResponse) {
+    setListError(null);
+    setPinFormError(null);
+    setPinConfirmError(null);
+    setPendingPin(null);
+    setPinTarget(member);
+  }
+
+  function closePinModal() {
+    if (busyId) return;
+    setPinTarget(null);
+    setPendingPin(null);
+    setPinFormError(null);
+    setPinConfirmError(null);
+  }
+
+  function openDeactivate(member: StaffMemberResponse) {
+    setListError(null);
+    setDeactivateError(null);
+    setDeactivateTarget(member);
   }
 
   return (
@@ -154,25 +215,18 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
             Gestiona meseros, cocina y admins con acceso rápido por PIN.
           </p>
         </div>
-        <button
-          type="button"
-          className={btnPrimary}
-          onClick={() => {
-            setError(null);
-            setModalOpen(true);
-          }}
-        >
+        <button type="button" className={btnPrimary} onClick={openCreateModal}>
           <Plus className="size-4" aria-hidden />
           Agregar miembro
         </button>
       </header>
 
-      {error ? (
+      {listError ? (
         <p
           role="alert"
           className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
-          {error}
+          {listError}
         </p>
       ) : null}
 
@@ -201,12 +255,14 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
             ) : (
               sorted.map((member) => {
                 const badge = roleBadge(member.role);
+                const rowBusy = busyId === member.id;
                 return (
-                  <tr
-                    key={member.id}
-                    className="border-t border-border/80"
-                  >
-                    <td className="px-4 py-3 font-semibold">{member.name}</td>
+                  <tr key={member.id} className="border-t border-border/80">
+                    <td className="max-w-[14rem] px-4 py-3 font-semibold">
+                      <span className="block truncate" title={member.name}>
+                        {member.name}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}
@@ -230,8 +286,8 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
                         <button
                           type="button"
                           className={btnSecondary}
-                          disabled={busyId === member.id}
-                          onClick={() => setPinTarget(member)}
+                          disabled={rowBusy}
+                          onClick={() => openPinModal(member)}
                         >
                           <KeyRound className="size-4" aria-hidden />
                           PIN
@@ -240,19 +296,19 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
                           <button
                             type="button"
                             className={btnSecondary}
-                            disabled={busyId === member.id}
-                            onClick={() => setDeactivateTarget(member)}
+                            disabled={rowBusy}
+                            onClick={() => openDeactivate(member)}
                           >
-                            Desactivar
+                            {rowBusy ? "Guardando…" : "Desactivar"}
                           </button>
                         ) : (
                           <button
                             type="button"
                             className={btnSecondary}
-                            disabled={busyId === member.id}
-                            onClick={() => handleToggleActive(member)}
+                            disabled={rowBusy}
+                            onClick={() => void handleToggleActive(member)}
                           >
-                            Activar
+                            {rowBusy ? "Guardando…" : "Activar"}
                           </button>
                         )}
                       </div>
@@ -274,6 +330,7 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
         ) : (
           sorted.map((member) => {
             const badge = roleBadge(member.role);
+            const rowBusy = busyId === member.id;
             return (
               <li
                 key={member.id}
@@ -281,7 +338,9 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-semibold">{member.name}</p>
+                    <p className="truncate font-semibold" title={member.name}>
+                      {member.name}
+                    </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}
@@ -304,8 +363,8 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
                   <button
                     type="button"
                     className={btnSecondary}
-                    disabled={busyId === member.id}
-                    onClick={() => setPinTarget(member)}
+                    disabled={rowBusy}
+                    onClick={() => openPinModal(member)}
                   >
                     Cambiar PIN
                   </button>
@@ -313,19 +372,19 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
                     <button
                       type="button"
                       className={btnSecondary}
-                      disabled={busyId === member.id}
-                      onClick={() => setDeactivateTarget(member)}
+                      disabled={rowBusy}
+                      onClick={() => openDeactivate(member)}
                     >
-                      Desactivar
+                      {rowBusy ? "Guardando…" : "Desactivar"}
                     </button>
                   ) : (
                     <button
                       type="button"
                       className={btnSecondary}
-                      disabled={busyId === member.id}
-                      onClick={() => handleToggleActive(member)}
+                      disabled={rowBusy}
+                      onClick={() => void handleToggleActive(member)}
                     >
-                      Activar
+                      {rowBusy ? "Guardando…" : "Activar"}
                     </button>
                   )}
                 </div>
@@ -338,17 +397,42 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
       <MemberFormModal
         open={modalOpen}
         busy={busyId === "create"}
-        onClose={() => !busyId && setModalOpen(false)}
+        serverError={createError}
+        onClose={() => {
+          if (busyId) return;
+          setModalOpen(false);
+          setCreateError(null);
+        }}
         onSubmit={handleCreate}
       />
 
       <PinFormModal
-        open={!!pinTarget}
+        open={!!pinTarget && pendingPin === null}
         memberName={pinTarget?.name ?? ""}
-        busy={!!pinTarget && busyId === pinTarget.id}
-        onClose={() => !busyId && setPinTarget(null)}
+        busy={false}
+        serverError={pinFormError}
+        onClose={closePinModal}
         onSubmit={(pin) => {
-          if (pinTarget) void handleChangePin(pinTarget, pin);
+          setPinFormError(null);
+          setPinConfirmError(null);
+          setPendingPin(pin);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!pinTarget && pendingPin !== null}
+        title="Cambiar PIN"
+        description={`¿Cambiar el PIN de ${pinTarget?.name ?? "este miembro"}? El PIN anterior dejará de funcionar de inmediato.`}
+        confirmLabel="Cambiar PIN"
+        busyLabel="Guardando…"
+        tone="danger"
+        busy={!!pinTarget && busyId === pinTarget.id}
+        error={pinConfirmError}
+        onConfirm={() => void confirmChangePin()}
+        onCancel={() => {
+          if (busyId) return;
+          setPendingPin(null);
+          setPinConfirmError(null);
         }}
       />
 
@@ -357,9 +441,15 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
         title="Desactivar miembro"
         description={`¿Desactivar a ${deactivateTarget?.name ?? "este miembro"}? Ya no podrá entrar con su PIN.`}
         confirmLabel="Desactivar"
+        busyLabel="Guardando…"
         busy={!!deactivateTarget && busyId === deactivateTarget.id}
+        error={deactivateError}
         onConfirm={() => void confirmDeactivate()}
-        onCancel={() => setDeactivateTarget(null)}
+        onCancel={() => {
+          if (busyId) return;
+          setDeactivateTarget(null);
+          setDeactivateError(null);
+        }}
       />
     </div>
   );
@@ -368,11 +458,13 @@ export function TeamManager({ tenantSlug, initialMembers }: TeamManagerProps) {
 function MemberFormModal({
   open,
   busy,
+  serverError,
   onClose,
   onSubmit,
 }: {
   open: boolean;
   busy: boolean;
+  serverError: string | null;
   onClose: () => void;
   onSubmit: (input: { name: string; role: StaffRole; pin: string }) => void;
 }) {
@@ -384,6 +476,7 @@ function MemberFormModal({
   const [name, setName] = useState("");
   const [role, setRole] = useState<StaffRole>("MESERO");
   const [pin, setPin] = useState("");
+  const [pinConfirm, setPinConfirm] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -391,16 +484,20 @@ function MemberFormModal({
       setName("");
       setRole("MESERO");
       setPin("");
+      setPinConfirm("");
       setLocalError(null);
     }
   }, [open]);
 
   if (!open) return null;
 
+  const alertMessage = localError ?? serverError;
+
   function resetAndClose() {
     setName("");
     setRole("MESERO");
     setPin("");
+    setPinConfirm("");
     setLocalError(null);
     onClose();
   }
@@ -414,6 +511,10 @@ function MemberFormModal({
     }
     if (!/^\d{4}$/.test(pin)) {
       setLocalError("El PIN debe ser exactamente 4 dígitos.");
+      return;
+    }
+    if (pin !== pinConfirm) {
+      setLocalError("Los PIN no coinciden. Escríbelos de nuevo.");
       return;
     }
     setLocalError(null);
@@ -433,7 +534,8 @@ function MemberFormModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="team-member-modal-title"
-        className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
+        aria-describedby={alertMessage ? "team-member-modal-error" : undefined}
+        className="w-full max-w-md rounded-t-2xl border border-border bg-card p-5 sm:rounded-2xl"
       >
         <h2
           id="team-member-modal-title"
@@ -450,6 +552,7 @@ function MemberFormModal({
               maxLength={100}
               disabled={busy}
               placeholder="Ej. Juan — Cocinero 1"
+              aria-invalid={localError === "El nombre es obligatorio."}
               className={`min-h-11 rounded-xl border border-border bg-secondary px-3 font-medium ${focusRing}`}
             />
           </label>
@@ -471,22 +574,44 @@ function MemberFormModal({
           <label className="flex flex-col gap-1.5 text-sm font-semibold">
             PIN (4 dígitos)
             <input
+              type="password"
               value={pin}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
-              }
+              onChange={(e) => setPin(normalizePin(e.target.value))}
               inputMode="numeric"
               pattern="\d{4}"
               maxLength={4}
               disabled={busy}
-              autoComplete="off"
+              autoComplete="new-password"
               placeholder="••••"
-              className={`min-h-11 rounded-xl border border-border bg-secondary px-3 font-medium tracking-[0.3em] ${focusRing}`}
+              aria-invalid={
+                !!localError && localError.includes("PIN") && !localError.includes("coinciden")
+              }
+              className={pinInputClass}
             />
           </label>
-          {localError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {localError}
+          <label className="flex flex-col gap-1.5 text-sm font-semibold">
+            Confirmar PIN
+            <input
+              type="password"
+              value={pinConfirm}
+              onChange={(e) => setPinConfirm(normalizePin(e.target.value))}
+              inputMode="numeric"
+              pattern="\d{4}"
+              maxLength={4}
+              disabled={busy}
+              autoComplete="new-password"
+              placeholder="••••"
+              aria-invalid={localError === "Los PIN no coinciden. Escríbelos de nuevo."}
+              className={pinInputClass}
+            />
+          </label>
+          {alertMessage ? (
+            <p
+              id="team-member-modal-error"
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
+              {alertMessage}
             </p>
           ) : null}
           <div className="mt-1 flex justify-end gap-2">
@@ -512,12 +637,14 @@ function PinFormModal({
   open,
   memberName,
   busy,
+  serverError,
   onClose,
   onSubmit,
 }: {
   open: boolean;
   memberName: string;
   busy: boolean;
+  serverError: string | null;
   onClose: () => void;
   onSubmit: (pin: string) => void;
 }) {
@@ -527,21 +654,29 @@ function PinFormModal({
     escapeEnabled: !busy,
   });
   const [pin, setPin] = useState("");
+  const [pinConfirm, setPinConfirm] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
       setPin("");
+      setPinConfirm("");
       setLocalError(null);
     }
   }, [open]);
 
   if (!open) return null;
 
+  const alertMessage = localError ?? serverError;
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!/^\d{4}$/.test(pin)) {
       setLocalError("El PIN debe ser exactamente 4 dígitos.");
+      return;
+    }
+    if (pin !== pinConfirm) {
+      setLocalError("Los PIN no coinciden. Escríbelos de nuevo.");
       return;
     }
     setLocalError(null);
@@ -563,7 +698,8 @@ function PinFormModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="team-pin-modal-title"
-        className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
+        aria-describedby="team-pin-modal-desc"
+        className="w-full max-w-md rounded-t-2xl border border-border bg-card p-5 sm:rounded-2xl"
       >
         <h2
           id="team-pin-modal-title"
@@ -571,26 +707,54 @@ function PinFormModal({
         >
           Cambiar PIN
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">{memberName}</p>
+        <p
+          id="team-pin-modal-desc"
+          className="mt-1 text-sm text-muted-foreground"
+        >
+          <span className="font-semibold text-foreground">{memberName}</span>
+          {" — "}
+          el PIN actual dejará de servir en cuanto confirmes el cambio.
+        </p>
         <form className="mt-4 flex flex-col gap-4" onSubmit={submit}>
           <label className="flex flex-col gap-1.5 text-sm font-semibold">
             Nuevo PIN
             <input
+              type="password"
               value={pin}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
-              }
+              onChange={(e) => setPin(normalizePin(e.target.value))}
               inputMode="numeric"
               pattern="\d{4}"
               maxLength={4}
               disabled={busy}
-              autoComplete="off"
-              className={`min-h-11 rounded-xl border border-border bg-secondary px-3 font-medium tracking-[0.3em] ${focusRing}`}
+              autoComplete="new-password"
+              aria-invalid={
+                !!localError &&
+                localError.includes("4 dígitos")
+              }
+              className={pinInputClass}
             />
           </label>
-          {localError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {localError}
+          <label className="flex flex-col gap-1.5 text-sm font-semibold">
+            Confirmar nuevo PIN
+            <input
+              type="password"
+              value={pinConfirm}
+              onChange={(e) => setPinConfirm(normalizePin(e.target.value))}
+              inputMode="numeric"
+              pattern="\d{4}"
+              maxLength={4}
+              disabled={busy}
+              autoComplete="new-password"
+              aria-invalid={localError === "Los PIN no coinciden. Escríbelos de nuevo."}
+              className={pinInputClass}
+            />
+          </label>
+          {alertMessage ? (
+            <p
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
+              {alertMessage}
             </p>
           ) : null}
           <div className="flex justify-end gap-2">
@@ -603,7 +767,7 @@ function PinFormModal({
               Cancelar
             </button>
             <button type="submit" className={btnPrimary} disabled={busy}>
-              {busy ? "Guardando…" : "Actualizar PIN"}
+              Continuar
             </button>
           </div>
         </form>

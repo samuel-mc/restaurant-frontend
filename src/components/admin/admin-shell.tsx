@@ -1,8 +1,7 @@
 "use client";
 
 /**
- * Shell del panel admin: sidebar persistente + drawer móvil.
- * Navegación oficial: Métricas, Cocina, Pedidos, QR, Menú, Configuración + logout.
+ * Shell del panel admin: sidebar por rol + cambio de turno.
  */
 
 import Link from "next/link";
@@ -15,16 +14,18 @@ import {
   type ReactNode,
 } from "react";
 import { LogOut, Menu, X } from "lucide-react";
-import {
-  ADMIN_NAV,
-  isAdminNavActive,
-  type AdminNavItem,
-} from "@/lib/admin-nav";
+import { isAdminNavActive, type AdminNavItem } from "@/lib/admin-nav";
+import { navItemsForRole } from "@/lib/admin-nav-access";
+import { logoutPathForSession } from "@/lib/jwt-payload";
 import { clearToken } from "@/services/authService";
 
 interface AdminShellProps {
   restaurantName: string;
   tenantSlug: string;
+  /** Rol del JWT (`OWNER` | `ADMIN` | `MESERO` | `COCINA`…). */
+  accessRole?: string | null;
+  /** `staff` cuando el JWT viene del login por PIN. */
+  tokenType?: string | null;
   children: ReactNode;
 }
 
@@ -34,6 +35,8 @@ const focusRing =
 export function AdminShell({
   restaurantName,
   tenantSlug,
+  accessRole = null,
+  tokenType = null,
   children,
 }: AdminShellProps) {
   const pathname = usePathname();
@@ -43,6 +46,13 @@ export function AdminShell({
   const drawerTitleId = useId();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+  const navItems = navItemsForRole(accessRole);
+  const isStaffShift =
+    tokenType === "staff" ||
+    accessRole === "MESERO" ||
+    accessRole === "COCINA" ||
+    accessRole === "ROLE_MESERO" ||
+    accessRole === "ROLE_COCINA";
 
   useEffect(() => {
     setMobileOpen(false);
@@ -100,12 +110,13 @@ export function AdminShell({
   async function handleLogout() {
     if (loggingOut) return;
     setLoggingOut(true);
+    const dest = logoutPathForSession({ role: accessRole, tokenType });
     try {
       await clearToken();
     } catch {
       // Forzamos salida aunque falle la red.
     } finally {
-      router.replace("/admin/login");
+      router.replace(dest);
       router.refresh();
       setLoggingOut(false);
     }
@@ -121,15 +132,23 @@ export function AdminShell({
       </a>
 
       <aside className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card print:hidden md:flex lg:w-64">
-        <SidebarBrand restaurantName={restaurantName} tenantSlug={tenantSlug} />
+        <SidebarBrand
+          restaurantName={restaurantName}
+          tenantSlug={tenantSlug}
+          accessRole={accessRole}
+        />
         <nav
           className="flex flex-1 flex-col overflow-y-auto px-3 py-3"
           aria-label="Navegación del panel"
         >
-          <NavList items={ADMIN_NAV} pathname={pathname} />
+          <NavList items={navItems} pathname={pathname} />
         </nav>
         <div className="border-t border-border p-3">
-          <LogoutButton busy={loggingOut} onClick={handleLogout} />
+          <LogoutButton
+            busy={loggingOut}
+            shiftMode={isStaffShift}
+            onClick={handleLogout}
+          />
         </div>
       </aside>
 
@@ -197,10 +216,14 @@ export function AdminShell({
                 className="flex flex-1 flex-col overflow-y-auto px-3 py-3"
                 aria-label="Navegación del panel"
               >
-                <NavList items={ADMIN_NAV} pathname={pathname} />
+                <NavList items={navItems} pathname={pathname} />
               </nav>
               <div className="border-t border-border p-3">
-                <LogoutButton busy={loggingOut} onClick={handleLogout} />
+                <LogoutButton
+                  busy={loggingOut}
+                  shiftMode={isStaffShift}
+                  onClick={handleLogout}
+                />
               </div>
             </aside>
           </div>
@@ -216,9 +239,11 @@ export function AdminShell({
 
 function LogoutButton({
   busy,
+  shiftMode,
   onClick,
 }: {
   busy: boolean;
+  shiftMode: boolean;
   onClick: () => void;
 }) {
   return (
@@ -230,7 +255,11 @@ function LogoutButton({
     >
       <LogOut className="size-4 shrink-0" aria-hidden />
       <span className="truncate">
-        {busy ? "Cerrando sesión…" : "Cerrar sesión"}
+        {busy
+          ? "Cerrando…"
+          : shiftMode
+            ? "Cambio de turno"
+            : "Cerrar sesión"}
       </span>
     </button>
   );
@@ -239,10 +268,19 @@ function LogoutButton({
 function SidebarBrand({
   restaurantName,
   tenantSlug,
+  accessRole,
 }: {
   restaurantName: string;
   tenantSlug: string;
+  accessRole?: string | null;
 }) {
+  const roleHint =
+    accessRole === "COCINA" || accessRole === "ROLE_COCINA"
+      ? "Cocina"
+      : accessRole === "MESERO" || accessRole === "ROLE_MESERO"
+        ? "Mesero"
+        : null;
+
   return (
     <div className="border-b border-border px-4 py-5">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-live-ink">
@@ -252,7 +290,7 @@ function SidebarBrand({
         {restaurantName}
       </p>
       <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-        {tenantSlug}
+        {roleHint ? `${roleHint} · ${tenantSlug}` : tenantSlug}
       </p>
     </div>
   );

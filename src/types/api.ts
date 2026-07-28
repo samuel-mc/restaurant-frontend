@@ -41,6 +41,60 @@ export interface LoginResponse {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Equipo / staff (PIN)                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** Roles operativos del equipo (`StaffRole.java`). */
+export type StaffRole = "ADMIN" | "MESERO" | "COCINA";
+
+/** Login por PIN (`StaffPinLoginRequest.java`). */
+export interface StaffPinLoginRequest {
+  tenantSlug: string;
+  staffId: string;
+  pin: string;
+}
+
+/** Respuesta login PIN (`StaffPinLoginResponse.java`). */
+export interface StaffPinLoginResponse {
+  token: string;
+  role: StaffRole;
+  staffId: string;
+  name: string;
+}
+
+/** Directorio público de personal (`PublicStaffMemberResponse.java`). */
+export interface PublicStaffMember {
+  id: string;
+  name: string;
+  role: StaffRole;
+}
+
+/** Miembro del equipo (`StaffMemberResponse.java`). */
+export interface StaffMemberResponse {
+  id: string;
+  name: string;
+  role: StaffRole;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Alta de miembro (`StaffMemberRequest.java`). */
+export interface StaffMemberRequest {
+  name: string;
+  role: StaffRole;
+  pin: string;
+}
+
+/** Actualización parcial (`StaffMemberUpdateRequest.java`). */
+export interface StaffMemberUpdateRequest {
+  name?: string;
+  role?: StaffRole;
+  pin?: string;
+  active?: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Capa "wire": payloads crudos del backend (BigDecimal → number, fechas ISO)  */
 /* -------------------------------------------------------------------------- */
 

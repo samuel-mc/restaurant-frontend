@@ -6,7 +6,7 @@
  *   (mitiga XSS; el token no es legible desde JavaScript).
  */
 
-import type { LoginRequest, LoginResponse } from "@/types/api";
+import type { LoginRequest, LoginResponse, StaffPinLoginRequest, StaffPinLoginResponse } from "@/types/api";
 import { resolveTenantSlug } from "@/lib/tenant";
 import { apiClient, ApiError } from "@/services/apiClient";
 
@@ -14,6 +14,7 @@ import { apiClient, ApiError } from "@/services/apiClient";
 const TENANT_HEADER = "X-Tenant";
 
 const LOGIN_PATH = "/api/v1/auth/login";
+const PIN_LOGIN_PATH = "/api/v1/staff/login-pin";
 const SESSION_PATH = "/api/auth/session";
 
 export interface LoginCredentials {
@@ -79,6 +80,81 @@ export async function login(
 }
 
 /**
+ * Login rápido del equipo: empleado seleccionado + PIN de 4 dígitos.
+ */
+export async function loginWithPin(
+  staffId: string,
+  pin: string,
+  tenantSlug: string,
+): Promise<StaffPinLoginResponse> {
+  if (!staffId.trim()) {
+    throw new ApiError({
+      message: "Selecciona un empleado.",
+      status: 0,
+      statusText: "Bad Request",
+      url: PIN_LOGIN_PATH,
+    });
+  }
+
+  if (!/^\d{4}$/.test(pin)) {
+    throw new ApiError({
+      message: "El PIN debe ser de exactamente 4 dígitos.",
+      status: 0,
+      statusText: "Bad Request",
+      url: PIN_LOGIN_PATH,
+    });
+  }
+
+  let slug: string;
+  try {
+    slug = resolveTenantSlug(tenantSlug);
+  } catch (error) {
+    throw new ApiError({
+      message:
+        error instanceof Error
+          ? error.message
+          : "No se pudo identificar el restaurante.",
+      status: 0,
+      statusText: "Bad Request",
+      url: PIN_LOGIN_PATH,
+    });
+  }
+
+  const body: StaffPinLoginRequest = {
+    tenantSlug: slug,
+    staffId: staffId.trim(),
+    pin,
+  };
+
+  const response = await apiClient.post<StaffPinLoginResponse>(
+    PIN_LOGIN_PATH,
+    body,
+    {
+      headers: { [TENANT_HEADER]: slug },
+      cache: "no-store",
+    },
+  );
+
+  const token = response?.token?.trim();
+  if (!token || !response.role) {
+    throw new ApiError({
+      message: "No pudimos completar el acceso.",
+      status: 0,
+      statusText: "Invalid Response",
+      url: PIN_LOGIN_PATH,
+      body: response,
+    });
+  }
+
+  return {
+    token,
+    role: response.role,
+    staffId: response.staffId,
+    name: response.name,
+  };
+}
+
+/**
  * Persiste el JWT en una cookie HttpOnly (same-origin Route Handler).
  * Así el token viaja en peticiones posteriores a rutas protegidas de Next.js
  * sin exponerse a scripts de la página.
@@ -131,7 +207,7 @@ export function getLoginErrorMessage(error: unknown): string {
       return "No pudimos completar el acceso. Intenta de nuevo en unos segundos.";
     }
     if (error.status === 401) {
-      return "Correo o contraseña incorrectos. Revisa tus datos e intenta de nuevo.";
+      return "PIN o credenciales incorrectos. Revisa e intenta de nuevo.";
     }
     if (error.status === 403) {
       return "No tienes permiso para entrar a este panel.";

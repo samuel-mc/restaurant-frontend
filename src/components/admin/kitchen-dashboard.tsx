@@ -81,12 +81,27 @@ const COLUMNS: Array<{
   },
 ];
 
+/** Etiquetas KDS (tablet / turno cocina): estados claros y cortos. */
+const KDS_COLUMN_TITLES: Record<OrderStatus, string | undefined> = {
+  PENDING: "PENDIENTE",
+  ACCEPTED: "EN COLA",
+  IN_KITCHEN: "PREPARANDO",
+  DELIVERED: "LISTO",
+  CLOSED: undefined,
+  CANCELLED: undefined,
+};
+
 interface KitchenDashboardProps {
   tenantSlug: string;
   restaurantName: string;
   initialOrders: Order[];
   /** UUID desde Pedidos (`?order=`) para enfocar carril + ticket. */
   focusOrderUuid?: string | null;
+  /**
+   * Presentación KDS (tablet / ROLE_COCINA):
+   * etiquetas PENDIENTE / PREPARANDO / LISTO y tipografía más grande.
+   */
+  kdsMode?: boolean;
 }
 
 const FOCUS_PRIORITY: OrderStatus[] = [
@@ -105,7 +120,10 @@ function nextStatusFor(status: OrderStatus): OrderStatus | null {
   return null;
 }
 
-function columnTitleFor(status: OrderStatus): string {
+function columnTitleFor(status: OrderStatus, kdsMode = false): string {
+  if (kdsMode) {
+    return KDS_COLUMN_TITLES[status] ?? COLUMNS.find((c) => c.status === status)?.title ?? status;
+  }
   return COLUMNS.find((column) => column.status === status)?.title ?? status;
 }
 
@@ -187,9 +205,20 @@ export function KitchenDashboard({
   restaurantName,
   initialOrders,
   focusOrderUuid = null,
+  kdsMode = false,
 }: KitchenDashboardProps) {
   const router = useRouter();
   const deepLinkOrder = findActiveOrder(initialOrders, focusOrderUuid);
+  const columns = useMemo(
+    () =>
+      COLUMNS.map((column) => ({
+        ...column,
+        title: kdsMode
+          ? (KDS_COLUMN_TITLES[column.status] ?? column.title)
+          : column.title,
+      })),
+    [kdsMode],
+  );
   const [orders, setOrders] = useState<Order[]>(() =>
     sortByCreatedAt(initialOrders),
   );
@@ -365,7 +394,7 @@ export function KitchenDashboard({
     setFocusStatus(order.status);
     setSelectedUuid(order.uuid);
     setBanner(
-      `Desde Pedidos · ${orderWho(order)} · ${columnTitleFor(order.status)}`,
+      `Desde Pedidos · ${orderWho(order)} · ${columnTitleFor(order.status, kdsMode)}`,
     );
     window.setTimeout(() => setBanner(null), 4_000);
     router.replace("/admin/dashboard/kitchen", { scroll: false });
@@ -432,7 +461,7 @@ export function KitchenDashboard({
       );
       handleOrderEvent(updated);
       setBanner(
-        `Deshecho · ${orderWho(previous)} volvió a ${columnTitleFor(previous.status)}`,
+        `Deshecho · ${orderWho(previous)} volvió a ${columnTitleFor(previous.status, kdsMode)}`,
       );
       window.setTimeout(() => setBanner(null), 3_500);
     } catch (error) {
@@ -737,7 +766,7 @@ export function KitchenDashboard({
   }, []);
 
   function renderLane(status: OrderStatus, laneOrders: Order[]) {
-    const column = COLUMNS.find((entry) => entry.status === status);
+    const column = columns.find((entry) => entry.status === status);
     if (!column) return null;
 
     return (
@@ -792,7 +821,7 @@ export function KitchenDashboard({
     );
   }
 
-  const otherColumns = COLUMNS.filter(
+  const otherColumns = columns.filter(
     (column) => column.status !== focusStatus,
   );
 
@@ -810,7 +839,7 @@ export function KitchenDashboard({
             className="truncate text-lg font-bold tracking-tight md:text-xl"
             title={restaurantName}
           >
-            Cocina
+            {kdsMode ? "Monitor de Cocina" : "Cocina"}
           </h1>
           <div className="flex shrink-0 items-center gap-1.5">
             <KitchenShortcutCheatsheet />
@@ -828,7 +857,7 @@ export function KitchenDashboard({
           aria-label="Etapas de cocina"
           className="flex gap-1 overflow-x-auto px-4 pb-2 md:gap-1.5 md:px-6"
         >
-          {COLUMNS.map((column, index) => {
+          {columns.map((column, index) => {
             const count = grouped[column.status]?.length ?? 0;
             const overdue = overdueCounts[column.status] ?? 0;
             const selected = column.status === focusStatus;
@@ -847,7 +876,9 @@ export function KitchenDashboard({
                 }
                 tabIndex={selected ? 0 : -1}
                 onClick={() => focusColumn(column.status)}
-                className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2.5 text-sm font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:gap-1.5 md:px-3 ${
+                className={`inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:gap-1.5 md:px-3 ${
+                  kdsMode ? "min-h-12 px-3 text-sm tracking-wide md:min-h-14 md:text-base" : "min-h-11 text-sm"
+                } ${
                   selected
                     ? "bg-primary text-primary-foreground"
                     : overdue > 0
@@ -1341,7 +1372,7 @@ function KitchenStatusRail({
           <div className="min-w-0">
             <p className="font-semibold">
               {orderWho(statusUndo.previous)} →{" "}
-              {columnTitleFor(statusUndo.toStatus)}
+              {columnTitleFor(statusUndo.toStatus, kdsMode)}
             </p>
             <p className="mt-0.5 text-muted-foreground">
               Deshacer ·{" "}
@@ -1380,7 +1411,7 @@ function KitchenStatusRail({
               Revisa antes de avanzar
             </p>
             <p className="mt-0.5 text-muted-foreground">
-              {orderWho(reviewOrder)} · {columnTitleFor(reviewOrder.status)}
+              {orderWho(reviewOrder)} · {columnTitleFor(reviewOrder.status, kdsMode)}
             </p>
           </div>
           <button
@@ -1408,7 +1439,7 @@ function KitchenStatusRail({
             </p>
             <p className="mt-0.5 text-muted-foreground">
               {orderAgeMinutes(oldestOverdue, now)} min (+15) ·{" "}
-              {columnTitleFor(oldestOverdue.status)}
+              {columnTitleFor(oldestOverdue.status, kdsMode)}
               {focusStatus !== oldestOverdue.status ? " · otra etapa" : ""}
             </p>
           </div>

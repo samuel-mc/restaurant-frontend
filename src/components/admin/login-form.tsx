@@ -355,6 +355,13 @@ export function LoginForm({
             </>
           ) : null}
           {" · "}
+          <Link
+            href="/staff/login"
+            className={`rounded-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`}
+          >
+            Acceso con PIN
+          </Link>
+          {" · "}
           <a
             href={supportMailto}
             className={`rounded-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`}

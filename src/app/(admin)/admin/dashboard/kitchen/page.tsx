@@ -6,12 +6,17 @@ import { RefreshCw } from "lucide-react";
 import { KitchenDashboard } from "@/components/admin/kitchen-dashboard";
 import { prettifyTenantSlug } from "@/lib/admin-nav";
 import { getAdminAccessToken } from "@/lib/auth-server";
+import {
+  extractRoleFromToken,
+  normalizePanelRole,
+  STAFF_LOGIN_PATH,
+} from "@/lib/jwt-payload";
 import { getActiveOrders } from "@/services/adminOrderQueries";
 import { ApiError } from "@/services/apiClient";
 import type { Order } from "@/types/api";
 
 export const metadata: Metadata = {
-  title: "Cocina · Panel",
+  title: "Monitor de Cocina · Panel",
   description: "Monitor en tiempo real de comandas activas.",
 };
 
@@ -28,7 +33,7 @@ function parseOrderUuid(
 
 /**
  * Cocina — monitor reactivo (WebSockets / STOMP).
- * Deep-link: `?order=<uuid>` enfoca carril + ticket desde Pedidos.
+ * Para ROLE_COCINA es la pantalla de inicio (KDS tablet).
  */
 export default async function AdminKitchenPage({
   searchParams,
@@ -51,8 +56,11 @@ export default async function AdminKitchenPage({
 
   const token = await getAdminAccessToken();
   if (!token) {
-    redirect("/admin/login");
+    redirect(STAFF_LOGIN_PATH);
   }
+
+  const role = normalizePanelRole(extractRoleFromToken(token));
+  const kdsMode = role === "COCINA";
 
   const query = await searchParams;
   const focusOrderUuid = parseOrderUuid(query.order);
@@ -64,7 +72,7 @@ export default async function AdminKitchenPage({
     initialOrders = await getActiveOrders(tenantSlug);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      redirect("/admin/login");
+      redirect(STAFF_LOGIN_PATH);
     }
     loadError =
       error instanceof ApiError
@@ -100,6 +108,7 @@ export default async function AdminKitchenPage({
       restaurantName={prettifyTenantSlug(tenantSlug)}
       initialOrders={initialOrders}
       focusOrderUuid={focusOrderUuid}
+      kdsMode={kdsMode}
     />
   );
 }

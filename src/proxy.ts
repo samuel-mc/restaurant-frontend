@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { ADMIN_TOKEN_COOKIE } from "@/lib/auth-cookie";
+import {
+  extractRoleFromToken,
+  isTokenExpired,
+  redirectIfRoleForbidden,
+  STAFF_LOGIN_PATH,
+} from "@/lib/jwt-payload";
 
 /**
  * Dominio raíz de la plataforma. En desarrollo se usa `localhost`; en producción
@@ -41,6 +48,18 @@ function extractSubdomain(host: string): string | null {
   return null;
 }
 
+function clearAdminCookie(response: NextResponse): void {
+  response.cookies.set({
+    name: ADMIN_TOKEN_COOKIE,
+    value: "",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
@@ -70,6 +89,33 @@ export function proxy(request: NextRequest): NextResponse {
   // Zona privada: `/admin/*` ya vive en el route group `(admin)`.
   // Mantenemos la URL tal cual e inyectamos el contexto del tenant por cabecera.
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    const isAuthEntry =
+      pathname === "/admin/login" ||
+      pathname.startsWith("/admin/login/") ||
+      pathname === "/admin/impersonate" ||
+      pathname.startsWith("/admin/impersonate/");
+
+    if (!isAuthEntry && pathname.startsWith("/admin/dashboard")) {
+      const token = request.cookies.get(ADMIN_TOKEN_COOKIE)?.value?.trim();
+
+      // Sin sesión o JWT expirado → login de personal (cambio de turno).
+      if (!token || isTokenExpired(token)) {
+        const url = request.nextUrl.clone();
+        url.pathname = STAFF_LOGIN_PATH;
+        const response = NextResponse.redirect(url);
+        if (token) clearAdminCookie(response);
+        return response;
+      }
+
+      const role = extractRoleFromToken(token);
+      const forbiddenRedirect = redirectIfRoleForbidden(role, pathname);
+      if (forbiddenRedirect && forbiddenRedirect !== pathname) {
+        const url = request.nextUrl.clone();
+        url.pathname = forbiddenRedirect;
+        return NextResponse.redirect(url);
+      }
+    }
+
     return NextResponse.next({
       request: { headers: requestHeaders },
     });

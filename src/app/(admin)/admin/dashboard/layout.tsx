@@ -2,18 +2,11 @@ import { headers } from "next/headers";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getAdminAccessToken } from "@/lib/auth-server";
 import { prettifyTenantSlug } from "@/lib/admin-nav";
+import { decodeJwtPayload, extractRoleFromToken } from "@/lib/jwt-payload";
 import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 
 /**
  * Layout persistente del dashboard admin.
- *
- * Rutas hijas (todas envueltas por el sidebar):
- * - `/admin/dashboard`           → métricas / analíticas
- * - `/admin/dashboard/kitchen`   → cocina en vivo (WebSockets)
- * - `/admin/dashboard/orders`    → pedidos / cuentas
- * - `/admin/dashboard/qr`        → códigos QR de menú y mesas
- * - `/admin/dashboard/menu`      → catálogo
- * - `/admin/dashboard/settings`  → configuración
  */
 export default async function AdminDashboardLayout({
   children,
@@ -25,10 +18,14 @@ export default async function AdminDashboardLayout({
     ? prettifyTenantSlug(tenantSlug)
     : "Restaurante";
   let restaurantName = fallbackName;
+  let accessRole: string | null = null;
+  let tokenType: string | null = null;
 
   if (tenantSlug) {
     const token = await getAdminAccessToken();
     if (token) {
+      accessRole = extractRoleFromToken(token);
+      tokenType = decodeJwtPayload(token)?.tokenType?.trim() ?? null;
       try {
         const profile = await getRestaurantProfile(tenantSlug);
         const name = profile.name?.trim();
@@ -43,6 +40,8 @@ export default async function AdminDashboardLayout({
     <AdminShell
       tenantSlug={tenantSlug || "restaurante"}
       restaurantName={restaurantName}
+      accessRole={accessRole}
+      tokenType={tokenType}
     >
       {children}
     </AdminShell>

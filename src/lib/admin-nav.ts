@@ -5,8 +5,10 @@ import {
   ClipboardList,
   QrCode,
   Settings,
+  Users,
   UtensilsCrossed,
 } from "lucide-react";
+import type { PanelAccessRole } from "@/lib/jwt-payload";
 
 export interface AdminNavItem {
   href: string;
@@ -15,11 +17,27 @@ export interface AdminNavItem {
   icon: LucideIcon;
   /** Si es true, solo coincide la ruta exacta (home de métricas). */
   exact?: boolean;
+  /**
+   * Roles que pueden ver este ítem.
+   * Usa roles canónicos (sin prefijo ROLE_).
+   */
+  roles: readonly PanelAccessRole[];
 }
 
+const ADMIN_ONLY = ["OWNER", "ADMIN"] as const satisfies readonly PanelAccessRole[];
+const KITCHEN_ROLES = [
+  "OWNER",
+  "ADMIN",
+  "COCINA",
+] as const satisfies readonly PanelAccessRole[];
+const WAITER_ROLES = [
+  "OWNER",
+  "ADMIN",
+  "MESERO",
+] as const satisfies readonly PanelAccessRole[];
+
 /**
- * Navegación oficial del panel admin.
- * Orden = flujo operativo: Métricas → Cocina → Pedidos → QR → Menú → Configuración.
+ * Navegación oficial del panel admin, con ACL por rol.
  */
 export const ADMIN_NAV: readonly AdminNavItem[] = [
   {
@@ -28,36 +46,49 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
     description: "KPIs, facturación y top platillos",
     icon: BarChart3,
     exact: true,
+    roles: ADMIN_ONLY,
   },
   {
     href: "/admin/dashboard/kitchen",
-    label: "Cocina",
-    description: "Comandas y cobro en vivo",
+    label: "Monitor de Cocina",
+    description: "Comandas en vivo (KDS)",
     icon: ChefHat,
+    roles: KITCHEN_ROLES,
   },
   {
     href: "/admin/dashboard/orders",
-    label: "Pedidos",
-    description: "Historial y detalle de cuentas",
+    label: "Gestión de Mesas",
+    description: "Mesas, cuentas y cobro",
     icon: ClipboardList,
+    roles: WAITER_ROLES,
   },
   {
     href: "/admin/dashboard/qr",
     label: "Códigos QR",
     description: "Menú y mesas para escanear",
     icon: QrCode,
+    roles: ADMIN_ONLY,
   },
   {
     href: "/admin/dashboard/menu",
     label: "Menú",
     description: "Catálogo y platillos",
     icon: UtensilsCrossed,
+    roles: ADMIN_ONLY,
+  },
+  {
+    href: "/admin/dashboard/team",
+    label: "Mi Equipo",
+    description: "Roles y PINs del personal",
+    icon: Users,
+    roles: ADMIN_ONLY,
   },
   {
     href: "/admin/dashboard/settings",
-    label: "Configuración",
+    label: "Ajustes",
     description: "Marca, horarios y módulos",
     icon: Settings,
+    roles: ADMIN_ONLY,
   },
 ] as const;
 

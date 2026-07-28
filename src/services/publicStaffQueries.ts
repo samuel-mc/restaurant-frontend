@@ -9,6 +9,12 @@ import { apiClient, ApiError } from "@/services/apiClient";
 const TENANT_HEADER = "X-Tenant";
 const PUBLIC_STAFF_PATH = "/api/v1/public/staff";
 
+export type PublicStaffDirectory = {
+  staff: PublicStaffMember[];
+  /** true cuando la API falló (no confundir con lista vacía real). */
+  loadFailed: boolean;
+};
+
 export async function getPublicActiveStaff(
   tenantSlug: string,
 ): Promise<PublicStaffMember[]> {
@@ -24,16 +30,29 @@ export async function getPublicActiveStaff(
   );
 }
 
+/**
+ * Carga el directorio sin tumbar la página.
+ * Distingue vacío real (ok) de fallo de red/API (`loadFailed`).
+ */
+export async function getPublicActiveStaffDirectory(
+  tenantSlug: string,
+): Promise<PublicStaffDirectory> {
+  try {
+    const staff = await getPublicActiveStaff(tenantSlug);
+    return { staff: Array.isArray(staff) ? staff : [], loadFailed: false };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return { staff: [], loadFailed: false };
+    }
+    console.error("No se pudo cargar el directorio de personal", error);
+    return { staff: [], loadFailed: true };
+  }
+}
+
+/** @deprecated Preferir `getPublicActiveStaffDirectory` para no confundir error con vacío. */
 export async function getPublicActiveStaffOrEmpty(
   tenantSlug: string,
 ): Promise<PublicStaffMember[]> {
-  try {
-    return await getPublicActiveStaff(tenantSlug);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return [];
-    }
-    console.error("No se pudo cargar el directorio de personal", error);
-    return [];
-  }
+  const { staff } = await getPublicActiveStaffDirectory(tenantSlug);
+  return staff;
 }

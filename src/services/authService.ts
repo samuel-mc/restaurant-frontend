@@ -89,7 +89,7 @@ export async function loginWithPin(
 ): Promise<StaffPinLoginResponse> {
   if (!staffId.trim()) {
     throw new ApiError({
-      message: "Selecciona un empleado.",
+      message: "Elige tu nombre primero.",
       status: 0,
       statusText: "Bad Request",
       url: PIN_LOGIN_PATH,
@@ -98,7 +98,7 @@ export async function loginWithPin(
 
   if (!/^\d{4}$/.test(pin)) {
     throw new ApiError({
-      message: "El PIN debe ser de exactamente 4 dígitos.",
+      message: "El PIN son 4 dígitos.",
       status: 0,
       statusText: "Bad Request",
       url: PIN_LOGIN_PATH,
@@ -249,4 +249,58 @@ export function getLoginErrorMessage(error: unknown): string {
     return error.message;
   }
   return "No pudimos iniciar sesión. Intenta de nuevo.";
+}
+
+/**
+ * Mensaje de error para login por PIN (turno / tablet compartida).
+ * Lenguaje de piso: sin “credenciales” ni jerga de panel.
+ */
+export function getStaffPinErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 401) {
+      return "Ese PIN no coincide. Inténtalo de nuevo.";
+    }
+    if (error.status === 403) {
+      return "Tu acceso está desactivado. Habla con el encargado.";
+    }
+    if (error.url === SESSION_PATH || /sesión/i.test(error.message)) {
+      return "El PIN es correcto, pero no abrimos la sesión. Inténtalo de nuevo.";
+    }
+    if (error.statusText === "Timeout") {
+      return "Tardó demasiado. Inténtalo de nuevo.";
+    }
+    if (error.isNetworkError) {
+      return isDev
+        ? "No hay conexión con el servicio. ¿Backend en localhost:8080 y CORS para *.localhost?"
+        : "Sin conexión. Revisa la red e inténtalo de nuevo.";
+    }
+    if (error.status === 429) {
+      return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
+    }
+    if (error.status === 404) {
+      return "Este restaurante no aparece. Abre el enlace de tu local.";
+    }
+    if (error.status >= 500 || error.statusText === "Invalid Response") {
+      return "El servicio no responde. Inténtalo en unos segundos.";
+    }
+    if (error.statusText === "Configuration Error") {
+      return getLoginErrorMessage(error);
+    }
+    if (error.status === 400) {
+      const safe =
+        error.message &&
+        !/localhost|NEXT_PUBLIC|CORS|API_URL/i.test(error.message)
+          ? error.message
+          : null;
+      return safe || "No pudimos validar el PIN. Inténtalo de nuevo.";
+    }
+  }
+  return getLoginErrorMessage(error);
+}
+
+/** Fallo de auth o permiso: mostrar pista de recuperación en UI de staff. */
+export function isStaffPinAccessFailure(error: unknown): boolean {
+  return (
+    error instanceof ApiError && (error.status === 401 || error.status === 403)
+  );
 }

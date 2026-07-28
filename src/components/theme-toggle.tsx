@@ -41,7 +41,7 @@ export function ThemeToggle({
   const preference = useSyncExternalStore(
     subscribeTheme,
     getStoredTheme,
-    () => "light" as ThemePreference,
+    () => "system" as ThemePreference,
   );
 
   function select(value: ThemePreference) {
@@ -68,11 +68,13 @@ export function ThemeToggle({
             title={`Tema ${label}`}
             aria-label={`Tema ${label}${active ? ", seleccionado" : ""}`}
             onClick={() => select(value)}
-            className={`inline-flex min-h-9 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-[0.625rem] font-bold tracking-wide transition-colors ${focusRing} ${
+            className={`inline-flex flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-xs font-bold tracking-wide transition-colors ${focusRing} ${
+              compact ? "min-h-9 min-w-9" : "min-h-11"
+            } ${
               active
                 ? "bg-card text-live-ink shadow-[0_1px_0_rgba(0,0,0,0.06)]"
                 : "text-muted-foreground hover:text-foreground"
-            } ${compact ? "min-w-9" : ""}`}
+            }`}
           >
             <ThemeIcon preference={value} />
             {compact ? (

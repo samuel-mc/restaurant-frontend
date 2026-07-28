@@ -1,6 +1,7 @@
 /**
  * Tema Operate (admin + comensal).
- * Default: claro. Persistencia: localStorage. Marketing SaaS no usa esto.
+ * Default: sistema (`prefers-color-scheme`). Persistencia: localStorage.
+ * Marketing SaaS no usa esto.
  */
 
 export type ThemePreference = "light" | "dark" | "system";
@@ -14,14 +15,14 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 }
 
 export function getStoredTheme(): ThemePreference {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "system";
   try {
     const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (isThemePreference(raw)) return raw;
   } catch {
     /* private / blocked */
   }
-  return "light";
+  return "system";
 }
 
 export function setStoredTheme(preference: ThemePreference): void {
@@ -50,7 +51,7 @@ export function applyTheme(preference: ThemePreference): void {
 }
 
 /** Inline script source — must stay in sync with resolveIsDark / getStoredTheme. */
-export const THEME_BOOTSTRAP_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var p=localStorage.getItem(k);if(p!=="light"&&p!=="dark"&&p!=="system")p="light";var dark=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",dark);document.documentElement.dataset.theme=p;}catch(e){document.documentElement.classList.remove("dark");document.documentElement.dataset.theme="light";}})();`;
+export const THEME_BOOTSTRAP_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var p=localStorage.getItem(k);if(p!=="light"&&p!=="dark"&&p!=="system")p="system";var dark=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",dark);document.documentElement.dataset.theme=p;}catch(e){var d=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d);document.documentElement.dataset.theme="system";}})();`;
 
 const THEME_CHANGE_EVENT = "platolisto:theme";
 

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import { ClipboardList } from "lucide-react";
 import { getOrderByUuid } from "@/services/orderService";
 import { ApiError } from "@/services/apiClient";
 import { OrderTracker } from "@/components/customer/order-tracker";
+import { OrderUnavailableState } from "@/components/customer/order-unavailable-state";
+import { CustomerBrandHeader } from "@/components/customer/customer-brand-header";
 import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
 import { getPublicRestaurantProfileOrNull } from "@/services/publicRestaurantQueries";
+import { brandFromProfile } from "@/lib/menu-brand";
 import type { Order } from "@/types/api";
 
 type OrderTrackingPageProps = {
@@ -35,7 +37,7 @@ export async function generateMetadata({
 
 type OrderLoadResult =
   | { status: "ok"; order: Order }
-  | { status: "unavailable"; message: string };
+  | { status: "unavailable"; message: string; canRetry: boolean };
 
 async function loadOrder(
   tenant: string,
@@ -48,6 +50,7 @@ async function loadOrder(
     if (error instanceof ApiError && (error.status === 404 || error.status === 400)) {
       return {
         status: "unavailable",
+        canRetry: false,
         message:
           "No encontramos este pedido. Verifica el enlace o pregunta al personal.",
       };
@@ -55,12 +58,14 @@ async function loadOrder(
     if (error instanceof ApiError && error.isNetworkError) {
       return {
         status: "unavailable",
+        canRetry: true,
         message:
           "No pudimos cargar tu pedido. Revisa tu conexión e intenta de nuevo.",
       };
     }
     return {
       status: "unavailable",
+      canRetry: true,
       message:
         "No pudimos cargar el seguimiento en este momento. Intenta de nuevo en unos segundos.",
     };
@@ -70,67 +75,57 @@ async function loadOrder(
 /**
  * Tracking del pedido en tiempo real (Módulo Pedidos).
  *
- * Server Component: `GET /api/v1/orders/{uuid}` pinta el estado inicial (SSR).
- * Client (`OrderTracker`): STOMP + SockJS sobre `NEXT_PUBLIC_WS_URL`,
- * suscrito a `/topic/order/{uuid}` con reconexión automática.
+ * Encabezado homologado al menú: colores de marca del perfil (`primaryColor`).
+ * Client (`OrderTracker`): STOMP + SockJS, suscrito a `/topic/order/{uuid}`.
  */
 export default async function OrderTrackingPage({
   params,
 }: OrderTrackingPageProps) {
   const { tenant, uuid } = await params;
-  const restaurantName = prettifyTenant(tenant);
+  const profile = await getPublicRestaurantProfileOrNull(tenant);
+  const restaurantName = profile?.name?.trim() || prettifyTenant(tenant);
+  const brand = brandFromProfile(profile);
+  const hasBrandFill = Boolean(brand.accent);
   const result = await loadOrder(tenant, uuid);
 
+  const supportLine =
+    result.status === "ok"
+      ? undefined
+      : "Seguimiento de pedido";
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-neutral-50 px-4 dark:bg-neutral-950">
+    <main
+      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-[var(--menu-accent-wash,var(--background))] font-jakarta-sans text-foreground"
+      style={brand.style}
+    >
       {result.status === "ok" ? (
         <OrderTracker
           initialOrder={result.order}
           restaurantName={restaurantName}
           tenantSlug={tenant}
+          whatsapp={profile?.whatsapp ?? null}
+          logoUrl={profile?.logoUrl ?? null}
+          hasBrandFill={hasBrandFill}
         />
       ) : (
-        <OrderUnavailableState
-          title="Pedido no disponible"
-          description={result.message}
-        />
+        <>
+          <CustomerBrandHeader
+            restaurantName={restaurantName}
+            logoUrl={profile?.logoUrl}
+            supportLine={supportLine}
+            hasBrandFill={hasBrandFill}
+          />
+          <div className="flex flex-1 flex-col px-4">
+            <OrderUnavailableState
+              title="Pedido no disponible"
+              description={result.message}
+              canRetry={result.canRetry}
+              whatsapp={profile?.whatsapp ?? null}
+              orderRef={uuid.slice(0, 8)}
+            />
+          </div>
+        </>
       )}
     </main>
-  );
-}
-
-function OrderUnavailableState({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <>
-      <header className="-mx-4 mb-1 bg-linear-to-br from-amber-500 to-orange-600 px-6 pb-8 pt-10 text-white shadow-sm">
-        <p className="text-xs font-medium uppercase tracking-widest text-white/80">
-          Seguimiento
-        </p>
-        <h1 className="mt-1 text-3xl font-extrabold tracking-tight">
-          Tu pedido
-        </h1>
-      </header>
-      <section
-        aria-live="polite"
-        className="my-8 flex flex-col items-center gap-3 rounded-3xl bg-white px-6 py-12 text-center shadow-sm ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10"
-      >
-        <div
-          aria-hidden
-          className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400"
-        >
-          <ClipboardList className="size-7 stroke-[1.5]" />
-        </div>
-        <h2 className="text-lg font-bold text-foreground">{title}</h2>
-        <p className="max-w-xs text-sm leading-relaxed text-black/55 dark:text-white/55">
-          {description}
-        </p>
-      </section>
-    </>
   );
 }

@@ -9,10 +9,16 @@ export function digitsOnlyPhone(raw: string | null | undefined): string {
 }
 
 /** URL de chat de WhatsApp, o `null` si no hay número usable. */
-export function whatsappChatUrl(whatsapp: string | null | undefined): string | null {
+export function whatsappChatUrl(
+  whatsapp: string | null | undefined,
+  options?: { text?: string },
+): string | null {
   const digits = digitsOnlyPhone(whatsapp);
   if (digits.length < 8) return null;
-  return `https://wa.me/${digits}`;
+  const base = `https://wa.me/${digits}`;
+  const text = options?.text?.trim();
+  if (!text) return base;
+  return `${base}?text=${encodeURIComponent(text)}`;
 }
 
 /** `tel:` href, o `null`. */

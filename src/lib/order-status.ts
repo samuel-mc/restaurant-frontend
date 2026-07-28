@@ -1,13 +1,15 @@
 /**
  * Presentación del flujo de tracking del comensal.
  *
- * UI (producto): Recibido → En Cocina → En preparación → Entregado
+ * UI (producto): Recibido → Confirmado → Preparando → Entregado
  * Backend:       PENDING → ACCEPTED → IN_KITCHEN → DELIVERED
  *
- * El mapeo mantiene el contrato Spring Boot sin romper la UX pedida.
+ * No prometemos «Listo» como paso: el backend no emite un estado diner-facing
+ * aparte de IN_KITCHEN / DELIVERED. Copy de cierre varía por canal.
  */
 
-import type { OrderStatus } from "@/types/api";
+import type { OrderType, OrderStatus } from "@/types/api";
+import { formatTableLabel } from "@/lib/table-session";
 
 /** Claves del stepper visibles en la UI del comensal. */
 export type TrackingStepKey =
@@ -26,17 +28,20 @@ export const TRACKING_STEPS: TrackingStep[] = [
   {
     key: "PENDING",
     label: "Recibido",
-    description: "Tu pedido ya llegó al restaurante",
+    description:
+      "Tu pedido ya llegó al restaurante. Te avisaremos aquí cuando lo confirmen.",
   },
   {
     key: "IN_PREPARATION",
-    label: "En Cocina",
-    description: "El restaurante aceptó tu orden",
+    label: "Confirmado",
+    description:
+      "El restaurante aceptó tu pedido. Te avisaremos aquí cuando la cocina empiece.",
   },
   {
     key: "READY",
-    label: "En preparación",
-    description: "La cocina está preparando tu platillo",
+    label: "Preparando",
+    description:
+      "La cocina ya lo está preparando. Te avisaremos aquí cuando cambie el estado.",
   },
   {
     key: "DELIVERED",
@@ -84,13 +89,90 @@ export function getStatusLabel(status: OrderStatus): string {
   return TRACKING_STEPS.find((step) => step.key === key)?.label ?? status;
 }
 
-export function getStatusDescription(status: OrderStatus): string {
+/** Título del resumen según canal (no siempre «cuenta de la mesa»). */
+export function getOrderSummaryTitle(
+  orderType: OrderType,
+  tableNumber?: string | null,
+): string {
+  switch (orderType) {
+    case "IN_TABLE": {
+      const mesa = tableNumber?.trim();
+      return mesa ? formatTableLabel(mesa) : "Pedido en mesa";
+    }
+    case "PICKUP":
+      return "Para llevar";
+    case "DELIVERY":
+      return "A domicilio";
+  }
+}
+
+/** Etiqueta corta de canal para meta del hero / chips. */
+export function getOrderChannelLabel(
+  orderType: OrderType,
+  tableNumber?: string | null,
+): string {
+  switch (orderType) {
+    case "IN_TABLE": {
+      const mesa = tableNumber?.trim();
+      return mesa ? formatTableLabel(mesa) : "En mesa";
+    }
+    case "PICKUP":
+      return "Para llevar";
+    case "DELIVERY":
+      return "A domicilio";
+  }
+}
+
+/**
+ * Copy del hero: qué pasó + qué hacer mientras (sin inventar tiempos).
+ * Canal ajusta el cierre y el “qué sigue” en cocina / entregado.
+ */
+export function getStatusDescription(
+  status: OrderStatus,
+  orderType: OrderType = "IN_TABLE",
+): string {
   if (status === "CANCELLED") {
     return "Este pedido fue cancelado. Habla con el personal si necesitas ayuda.";
   }
   if (status === "CLOSED") {
-    return "La cuenta de la mesa ya fue cobrada. ¡Gracias por tu visita!";
+    if (orderType === "IN_TABLE") {
+      return "La cuenta de la mesa ya fue cobrada. ¡Gracias por tu visita!";
+    }
+    return "Este pedido ya quedó cerrado. ¡Gracias!";
   }
+
+  switch (status) {
+    case "PENDING":
+      return (
+        TRACKING_STEPS.find((step) => step.key === "PENDING")?.description ?? ""
+      );
+    case "ACCEPTED":
+      return (
+        TRACKING_STEPS.find((step) => step.key === "IN_PREPARATION")
+          ?.description ?? ""
+      );
+    case "IN_KITCHEN":
+      switch (orderType) {
+        case "PICKUP":
+          return "La cocina ya lo está preparando. Quédate cerca: te avisaremos aquí cuando puedas recogerlo.";
+        case "DELIVERY":
+          return "La cocina ya lo está preparando. Te avisaremos aquí cuando quede entregado.";
+        case "IN_TABLE":
+          return "La cocina ya lo está preparando. Puedes quedarte en la mesa; te avisaremos aquí cuando cambie el estado.";
+      }
+      break;
+    case "DELIVERED":
+      switch (orderType) {
+        case "PICKUP":
+          return "Ya puedes recogerlo en el local. ¡Buen provecho!";
+        case "DELIVERY":
+          return "Tu pedido ya fue entregado. ¡Buen provecho!";
+        case "IN_TABLE":
+          return "Ya te lo llevamos a la mesa. ¡Buen provecho!";
+      }
+      break;
+  }
+
   const key = toTrackingStepKey(status);
   return TRACKING_STEPS.find((step) => step.key === key)?.description ?? "";
 }
@@ -114,8 +196,7 @@ export function getStatusTheme(status: OrderStatus): {
     case "IN_PREPARATION":
       return {
         hero: "from-amber-400 to-yellow-500",
-        badge:
-          "bg-yellow-400/20 text-yellow-800 dark:text-yellow-200 animate-pulse",
+        badge: "bg-yellow-400/20 text-yellow-800 dark:text-yellow-200",
         ring: "ring-yellow-400",
         badgePulse: true,
       };

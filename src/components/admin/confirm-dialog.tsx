@@ -4,12 +4,15 @@
  * Diálogo de confirmación reutilizable (overlay admin).
  */
 
+import type { ReactNode } from "react";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
   description: string;
+  /** Bloque adicional bajo la descripción (p. ej. PIN a confirmar). */
+  detail?: ReactNode;
   confirmLabel?: string;
   /** Texto del botón confirm mientras `busy` (p. ej. "Cerrando…"). */
   busyLabel?: string;
@@ -29,6 +32,7 @@ export function ConfirmDialog({
   open,
   title,
   description,
+  detail = null,
   confirmLabel = "Confirmar",
   busyLabel = "Procesando…",
   cancelLabel = "Cancelar",
@@ -49,7 +53,15 @@ export function ConfirmDialog({
   const confirmClass =
     tone === "danger"
       ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-      : "bg-primary text-primary-foreground disabled:opacity-50";
+      : "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50";
+
+  const describedBy = [
+    "confirm-dialog-desc",
+    detail ? "confirm-dialog-detail" : null,
+    error ? "confirm-dialog-error" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
@@ -64,8 +76,8 @@ export function ConfirmDialog({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-desc"
-        className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
+        aria-describedby={describedBy}
+        className="w-full max-w-md max-h-[min(92dvh,100%)] overflow-y-auto rounded-t-2xl border border-border bg-card p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] sm:rounded-2xl sm:pb-5"
       >
         <h2
           id="confirm-dialog-title"
@@ -79,20 +91,26 @@ export function ConfirmDialog({
         >
           {description}
         </p>
+        {detail ? (
+          <div id="confirm-dialog-detail" className="mt-3">
+            {detail}
+          </div>
+        ) : null}
         {error ? (
           <p
+            id="confirm-dialog-error"
             role="alert"
             className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           >
             {error}
           </p>
         ) : null}
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end [&>button]:w-full sm:[&>button]:w-auto">
           <button
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`}
+            className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50 ${focusRing}`}
           >
             {cancelLabel}
           </button>
@@ -100,7 +118,7 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold ${confirmClass} ${focusRing}`}
+            className={`inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${confirmClass} ${focusRing}`}
           >
             {busy ? busyLabel : confirmLabel}
           </button>

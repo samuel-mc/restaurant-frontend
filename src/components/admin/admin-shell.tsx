@@ -14,6 +14,10 @@ import {
   type ReactNode,
 } from "react";
 import { LogOut, Menu, X } from "lucide-react";
+import {
+  isAdminLeaveBlocked,
+  requestAdminLeave,
+} from "@/lib/admin-leave-guard";
 import { isAdminNavActive, type AdminNavItem } from "@/lib/admin-nav";
 import { navItemsForRole } from "@/lib/admin-nav-access";
 import { logoutPathForSession } from "@/lib/jwt-payload";
@@ -107,7 +111,7 @@ export function AdminShell({
     };
   }, [mobileOpen]);
 
-  async function handleLogout() {
+  async function performLogout() {
     if (loggingOut) return;
     setLoggingOut(true);
     const dest = logoutPathForSession({ role: accessRole, tokenType });
@@ -120,6 +124,13 @@ export function AdminShell({
       router.refresh();
       setLoggingOut(false);
     }
+  }
+
+  function handleLogout() {
+    if (loggingOut) return;
+    requestAdminLeave(() => {
+      void performLogout();
+    });
   }
 
   return (
@@ -303,6 +314,7 @@ function NavList({
   items: readonly AdminNavItem[];
   pathname: string;
 }) {
+  const router = useRouter();
   return (
     <ul className="space-y-0.5">
       {items.map((item) => {
@@ -314,6 +326,14 @@ function NavList({
               href={item.href}
               title={item.description}
               aria-current={active ? "page" : undefined}
+              onClick={(event) => {
+                if (active) return;
+                if (!isAdminLeaveBlocked()) return;
+                event.preventDefault();
+                requestAdminLeave(() => {
+                  router.push(item.href);
+                });
+              }}
               className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${focusRing} ${
                 active
                   ? "bg-live-muted text-live-ink"

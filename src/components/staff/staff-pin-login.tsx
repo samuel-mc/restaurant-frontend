@@ -51,13 +51,16 @@ function roleMeta(role: StaffRole): { label: string; badgeClass: string } {
         badgeClass: "border border-border bg-secondary text-foreground",
       };
     case "MESERO":
-      return { label: "Mesero", badgeClass: "bg-live-muted text-live-ink" };
+      return {
+        label: "Mesero",
+        badgeClass: "bg-channel-muted text-channel-ink",
+      };
     case "ADMIN":
-      return { label: "Admin", badgeClass: "bg-primary/15 text-primary" };
+      return { label: "Administrador", badgeClass: "bg-primary/15 text-primary" };
     default:
       return {
         label: String(role),
-        badgeClass: "bg-secondary text-muted-foreground",
+        badgeClass: "border border-border bg-secondary text-muted-foreground",
       };
   }
 }
@@ -142,13 +145,17 @@ export function StaffPinLogin({
   const mountedRef = useRef(true);
   const selectedRef = useRef<PublicStaffMember | null>(null);
   const errorAlertRef = useRef<HTMLParagraphElement>(null);
-  selectedRef.current = selected;
-  busyRef.current = busy;
 
   const staffSignature = useMemo(
     () => staff.map((member) => member.id).join("\0"),
     [staff],
   );
+
+  // Mirror state for event handlers / async checks — never write refs during render.
+  useEffect(() => {
+    selectedRef.current = selected;
+    busyRef.current = busy;
+  }, [selected, busy]);
 
   useEffect(() => {
     mountedRef.current = true;

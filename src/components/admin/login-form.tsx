@@ -16,6 +16,7 @@ import {
   type FocusEvent,
   type FormEvent,
   type KeyboardEvent,
+  type ModifierKey,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -69,13 +70,12 @@ function validateCredentials(email: string, password: string): FormErrors {
   return errors;
 }
 
-function readCapsLock(
-  event: {
-    getModifierState?: (key: string) => boolean;
-  },
-): boolean {
+function readCapsLock(event: object): boolean {
   try {
-    return event.getModifierState?.("CapsLock") ?? false;
+    const getModifierState = (
+      event as { getModifierState?: (key: ModifierKey) => boolean }
+    ).getModifierState;
+    return getModifierState?.("CapsLock") ?? false;
   } catch {
     return false;
   }

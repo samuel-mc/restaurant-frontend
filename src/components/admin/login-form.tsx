@@ -20,7 +20,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { whatsappChatUrl } from "@/lib/contact-links";
 import {
   getLoginErrorMessage,
@@ -355,39 +355,28 @@ export function LoginForm({
           </Link>
         </p>
 
-        <details className="group text-left text-muted-foreground">
-          <summary
-            className={`flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-sm font-medium marker:content-none underline-offset-2 hover:underline [&::-webkit-details-marker]:hidden ${focusRing}`}
-          >
-            <ChevronDown
-              className="size-4 shrink-0 transition-transform motion-safe:group-open:rotate-180"
-              aria-hidden
-            />
-            Salidas
-          </summary>
-          <div className="mt-1 flex flex-col gap-2 pl-5">
-            <p>
-              <Link
-                href="/menu"
-                className={`rounded-sm font-semibold text-foreground underline-offset-2 hover:underline ${focusRing}`}
-              >
-                Ir al menú
-              </Link>
-              <span aria-hidden> · </span>
-              <Link
-                href="/"
-                className={`rounded-sm font-semibold text-foreground underline-offset-2 hover:underline ${focusRing}`}
-              >
-                Sitio del local
-              </Link>
-            </p>
-            <p>
-              ¿No es este restaurante? Estás en la cocina de{" "}
-              <span className="font-medium text-foreground">{localName}</span>.
-              Abre el panel desde el enlace de tu local.
-            </p>
-          </div>
-        </details>
+        <div className="flex flex-col gap-2 text-center text-muted-foreground">
+          <p>
+            <Link
+              href="/menu"
+              className={`rounded-sm font-semibold text-foreground underline-offset-2 hover:underline ${focusRing}`}
+            >
+              Ir al menú
+            </Link>
+            <span aria-hidden> · </span>
+            <Link
+              href="/"
+              className={`rounded-sm font-semibold text-foreground underline-offset-2 hover:underline ${focusRing}`}
+            >
+              Sitio del local
+            </Link>
+          </p>
+          <p>
+            ¿No es este restaurante? Estás en la cocina de{" "}
+            <span className="font-medium text-foreground">{localName}</span>.
+            Abre el panel desde el enlace de tu local.
+          </p>
+        </div>
       </div>
     </div>
   );

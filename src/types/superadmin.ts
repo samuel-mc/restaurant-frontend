@@ -18,6 +18,10 @@ export interface SuperAdminTenant {
   updatedAt: string | null;
 }
 
+/**
+ * Métricas de Panel. Campos de atención pueden venir del API Spring
+ * o enriquecerse en servidor a partir de tenants/cupones.
+ */
 export interface SuperAdminMetrics {
   totalTenants: number;
   activeTenants: number;
@@ -27,7 +31,35 @@ export interface SuperAdminMetrics {
   estimatedMrr: number;
   churnRate: number;
   registrationGrowth: Array<{ month: string; count: number }>;
+  /** Restaurantes con cobro pendiente. */
+  pendingPaymentTenants: number;
+  /** Cupones activos en riesgo (expiran pronto o agotados). */
+  couponsAtRisk: number;
+  couponsExpiringSoon: number;
+  couponsExhausted: number;
+  /** Ventana en días para «expira pronto». */
+  couponRiskWindowDays: number;
 }
+
+/** Respuesta cruda del API (campos de atención opcionales hasta que el backend los exponga). */
+export type SuperAdminMetricsApi = Omit<
+  SuperAdminMetrics,
+  | "pendingPaymentTenants"
+  | "couponsAtRisk"
+  | "couponsExpiringSoon"
+  | "couponsExhausted"
+  | "couponRiskWindowDays"
+> &
+  Partial<
+    Pick<
+      SuperAdminMetrics,
+      | "pendingPaymentTenants"
+      | "couponsAtRisk"
+      | "couponsExpiringSoon"
+      | "couponsExhausted"
+      | "couponRiskWindowDays"
+    >
+  >;
 
 export interface ImpersonateResult {
   token: string;

@@ -10,7 +10,7 @@ export const saFocusOnSurface =
   "outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#111113]";
 
 export const saField =
-  "w-full rounded-xl border border-white/[0.08] bg-[#0c0c0e] px-3 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50";
+  "w-full rounded-xl border border-white/[0.08] bg-[#0c0c0e] px-3 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-400 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50";
 
 export const saSelect =
   "max-w-full rounded-lg border border-white/10 bg-[#0c0c0e] px-2 py-1.5 text-xs font-medium text-zinc-200 outline-none focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50";

@@ -7,7 +7,7 @@ import type {
   SuperAdminCoupon,
   SuperAdminCouponCreateInput,
   SuperAdminCouponUpdateInput,
-  SuperAdminMetrics,
+  SuperAdminMetricsApi,
   SuperAdminPaymentStatus,
   SuperAdminPlan,
   SuperAdminTenant,
@@ -79,15 +79,19 @@ async function bffJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const body = (await response.json().catch(() => null)) as
     | T
-    | { error?: string }
+    | { error?: string; message?: string }
     | null;
   if (!response.ok) {
-    const message =
-      body && typeof body === "object" && "error" in body && body.error
-        ? String(body.error)
-        : "Error en SuperAdmin API.";
+    const fromBody =
+      body && typeof body === "object"
+        ? ("error" in body && body.error
+            ? String(body.error)
+            : "message" in body && body.message
+              ? String(body.message)
+              : null)
+        : null;
     throw new ApiError({
-      message,
+      message: fromBody ?? fallbackSuperAdminError(response.status),
       status: response.status,
       statusText: response.statusText,
       url,
@@ -97,8 +101,27 @@ async function bffJson<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export async function fetchSuperAdminMetrics(): Promise<SuperAdminMetrics> {
-  return bffJson<SuperAdminMetrics>("/api/superadmin/metrics");
+function fallbackSuperAdminError(status: number): string {
+  if (status === 401 || status === 403) {
+    return "Sesión SuperAdmin no válida o expirada. Vuelve a iniciar sesión.";
+  }
+  if (status === 404) {
+    return "No se encontró el recurso. Actualiza la lista e inténtalo de nuevo.";
+  }
+  if (status === 409) {
+    return "El cambio entra en conflicto con el estado actual. Actualiza e inténtalo de nuevo.";
+  }
+  if (status === 429) {
+    return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
+  }
+  if (status >= 500) {
+    return "El servidor no respondió. Revisa la conexión e inténtalo de nuevo.";
+  }
+  return "No se pudo completar la acción. Revisa los datos e inténtalo de nuevo.";
+}
+
+export async function fetchSuperAdminMetrics(): Promise<SuperAdminMetricsApi> {
+  return bffJson<SuperAdminMetricsApi>("/api/superadmin/metrics");
 }
 
 export async function fetchSuperAdminTenants(): Promise<SuperAdminTenant[]> {

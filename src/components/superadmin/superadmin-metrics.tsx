@@ -2,13 +2,14 @@
 
 /**
  * Panel SuperAdmin — layout Operate:
- * 1) Atención ahora (hero)
+ * 1) Atención ahora (cola priorizada)
  * 2) Métricas compactas con click-through
  * 3) Altas (contexto)
  */
 
 import Link from "next/link";
 import type { SuperAdminMetrics } from "@/types/superadmin";
+import { buildAttentionQueue } from "@/lib/superadmin-attention";
 import { saFocus, saFocusOnSurface } from "@/components/superadmin/superadmin-ui";
 
 function formatMrr(value: number): string {
@@ -38,13 +39,14 @@ export function SuperAdminMetricsGrid({
 }: {
   metrics: SuperAdminMetrics;
 }) {
-  const needsAttention = metrics.suspendedTenants > 0;
+  const attention = buildAttentionQueue(metrics);
+  const hasAttention = attention.length > 0;
 
   const metricsRow: MetricLink[] = [
     {
       label: "Ingreso mensual estimado",
       value: formatMrr(metrics.estimatedMrr),
-      hint: "Pro activos × $999 MXN",
+      hint: "Según métricas del servidor · no es facturación cerrada",
       href: "/superadmin/tenants",
     },
     {
@@ -56,9 +58,9 @@ export function SuperAdminMetricsGrid({
     {
       label: "Suspendidos",
       value: String(metrics.suspendedTenants),
-      hint: `Tasa de baja ${metrics.churnRate.toFixed(1)}%`,
+      hint: `Tasa de suspensión ${metrics.churnRate.toFixed(1)}%`,
       href: "/superadmin/tenants?status=suspended",
-      emphasize: needsAttention,
+      emphasize: metrics.suspendedTenants > 0,
     },
     {
       label: "Plan Pro",
@@ -90,37 +92,67 @@ export function SuperAdminMetricsGrid({
           Atención ahora
         </h2>
 
-        {needsAttention ? (
-          <div className="flex flex-col gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/[0.09] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-6">
-            <div className="min-w-0 space-y-1">
-              <p className="text-3xl font-semibold tracking-tight text-amber-50 tabular-nums sm:text-4xl">
-                {metrics.suspendedTenants}
-              </p>
-              <p className="text-sm font-medium text-amber-100">
-                restaurante
-                {metrics.suspendedTenants === 1 ? "" : "s"} suspendido
-                {metrics.suspendedTenants === 1 ? "" : "s"}
-              </p>
-              <p className="text-xs leading-relaxed text-amber-100/70">
-                Revisar cobro o reactivar. El filtro Suspendidos ya queda
-                aplicado en el directorio.
-              </p>
-            </div>
-            <Link
-              href="/superadmin/tenants?status=suspended"
-              className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-amber-400 px-5 text-sm font-semibold text-amber-950 transition hover:bg-amber-300 ${saFocusOnSurface}`}
-            >
-              Ver suspendidos
-            </Link>
-          </div>
+        {hasAttention ? (
+          <ol className="space-y-2">
+            {attention.map((item, index) => {
+              const primary = index === 0;
+              return (
+                <li key={item.id}>
+                  <div
+                    className={`flex flex-col gap-4 rounded-2xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 ${
+                      primary
+                        ? "border-amber-500/30 bg-amber-500/[0.09]"
+                        : "border-white/[0.08] bg-[#111113]"
+                    }`}
+                  >
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <p
+                          className={`text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl ${
+                            primary ? "text-amber-50" : "text-white"
+                          }`}
+                        >
+                          {item.count}
+                        </p>
+                        <p
+                          className={`text-sm font-semibold ${
+                            primary ? "text-amber-100" : "text-zinc-200"
+                          }`}
+                        >
+                          {item.label}
+                        </p>
+                      </div>
+                      <p
+                        className={`text-xs leading-relaxed ${
+                          primary ? "text-amber-100/70" : "text-zinc-400"
+                        }`}
+                      >
+                        {item.why}
+                      </p>
+                    </div>
+                    <Link
+                      href={item.href}
+                      className={
+                        primary
+                          ? `inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-amber-400 px-5 text-sm font-semibold text-amber-950 transition hover:bg-amber-300 ${saFocusOnSurface}`
+                          : `inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.08] ${saFocusOnSurface}`
+                      }
+                    >
+                      {item.cta}
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         ) : (
           <div className="flex flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-emerald-100">
-                Sin restaurantes suspendidos
+                Nada requiere atención ahora
               </p>
-              <p className="mt-1 text-xs text-emerald-100/65">
-                El directorio está al corriente en estado operativo.
+              <p className="mt-1 text-xs text-emerald-100/70">
+                Sin pagos pendientes, suspendidos ni cupones en riesgo.
               </p>
             </div>
             <Link

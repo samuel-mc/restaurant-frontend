@@ -5,9 +5,24 @@
  * resumen + «Gestionar»; mutaciones en panel expandido.
  */
 
-import { useEffect, useMemo, useState, useTransition, Fragment } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  Fragment,
+  type ReactNode,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ExternalLink, Search, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronDown,
+  ExternalLink,
+  Search,
+  X,
+} from "lucide-react";
 import type {
   SuperAdminPaymentStatus,
   SuperAdminPlan,
@@ -20,6 +35,7 @@ import {
 } from "@/services/superadminService";
 import { ApiError } from "@/services/apiClient";
 import { SuperAdminConfirmDialog } from "@/components/superadmin/superadmin-confirm-dialog";
+import { MutationReviewDetail } from "@/components/superadmin/superadmin-mutation-review";
 import {
   saAlertError,
   saAlertSuccess,
@@ -68,6 +84,8 @@ function paymentLabel(status: SuperAdminPaymentStatus): string {
 }
 
 type StatusFilter = "all" | "active" | "suspended" | "pending_payment";
+type SortKey = "name" | "plan" | "payment" | "status";
+type SortDir = "asc" | "desc";
 
 function parseStatusFilter(raw: string | null): StatusFilter {
   if (
@@ -78,6 +96,46 @@ function parseStatusFilter(raw: string | null): StatusFilter {
     return raw;
   }
   return "all";
+}
+
+function parseSortKey(raw: string | null): SortKey {
+  if (raw === "plan" || raw === "payment" || raw === "status") return raw;
+  return "name";
+}
+
+function parseSortDir(raw: string | null): SortDir {
+  return raw === "desc" ? "desc" : "asc";
+}
+
+function compareTenants(
+  a: SuperAdminTenant,
+  b: SuperAdminTenant,
+  key: SortKey,
+  dir: SortDir,
+): number {
+  let cmp = 0;
+  switch (key) {
+    case "name":
+      cmp = a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+      if (cmp === 0) {
+        cmp = a.subdomain.localeCompare(b.subdomain, "es", {
+          sensitivity: "base",
+        });
+      }
+      break;
+    case "plan":
+      cmp = asPlan(a.plan).localeCompare(asPlan(b.plan));
+      break;
+    case "payment":
+      cmp = asPayment(a.paymentStatus).localeCompare(
+        asPayment(b.paymentStatus),
+      );
+      break;
+    case "status":
+      cmp = Number(b.active) - Number(a.active);
+      break;
+  }
+  return dir === "asc" ? cmp : -cmp;
 }
 
 type PendingAction =
@@ -95,6 +153,175 @@ type PendingAction =
     }
   | { kind: "impersonate"; tenant: SuperAdminTenant };
 
+function TenantStatusBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+        active ? "text-emerald-300" : "text-zinc-400"
+      }`}
+    >
+      <span
+        className={`size-1.5 rounded-full ${
+          active ? "bg-emerald-400" : "bg-zinc-600"
+        }`}
+        aria-hidden
+      />
+      {active ? "Activo" : "Suspendido"}
+    </span>
+  );
+}
+
+/** Hechos del restaurante compartidos entre card móvil y celdas de tabla. */
+function TenantSummaryFacts({
+  tenant,
+  variant,
+}: {
+  tenant: SuperAdminTenant;
+  variant: "card" | "table";
+}) {
+  const published = tenant.websitePublished
+    ? "Sitio publicado"
+    : "Sitio no publicado";
+
+  if (variant === "card") {
+    return (
+      <div className="min-w-0">
+        <p className="font-medium text-white">{tenant.name}</p>
+        <p className="mt-0.5 font-mono text-xs text-zinc-400">
+          {tenant.subdomain}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-300">
+          <span>{planLabel(asPlan(tenant.plan))}</span>
+          <span>{paymentLabel(asPayment(tenant.paymentStatus))}</span>
+          <TenantStatusBadge active={tenant.active} />
+        </div>
+        <p className="mt-1 text-xs text-zinc-400">{published}</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <p className="truncate font-medium text-white" title={tenant.name}>
+        {tenant.name}
+      </p>
+      <p
+        className="mt-0.5 truncate font-mono text-xs text-zinc-400"
+        title={tenant.subdomain}
+      >
+        {tenant.subdomain}
+      </p>
+      <p
+        className={`mt-1 text-xs ${
+          tenant.websitePublished ? "text-emerald-400/80" : "text-zinc-400"
+        }`}
+      >
+        {published}
+      </p>
+    </>
+  );
+}
+
+function TenantManageFields({
+  tenant,
+  busy,
+  pendingPlan,
+  pendingPayment,
+  onPlanChange,
+  onPaymentChange,
+  onSuspend,
+  onActivate,
+  onImpersonate,
+}: {
+  tenant: SuperAdminTenant;
+  busy: boolean;
+  pendingPlan: SuperAdminPlan | null;
+  pendingPayment: SuperAdminPaymentStatus | null;
+  onPlanChange: (plan: SuperAdminPlan) => void;
+  onPaymentChange: (status: SuperAdminPaymentStatus) => void;
+  onSuspend: () => void;
+  onActivate: () => void;
+  onImpersonate: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-4 rounded-xl border border-white/[0.06] bg-[#0c0c0e] p-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-zinc-400">Plan</span>
+            <select
+              aria-label={`Plan de ${tenant.name}`}
+              className={`${saSelect} w-full`}
+              disabled={busy}
+              value={pendingPlan ?? asPlan(tenant.plan)}
+              onChange={(e) => {
+                const plan = e.target.value as SuperAdminPlan;
+                if (plan === asPlan(tenant.plan)) return;
+                onPlanChange(plan);
+              }}
+            >
+              <option value="BASIC">Básico</option>
+              <option value="PRO">Pro</option>
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-zinc-400">Cobro</span>
+            <select
+              aria-label={`Cobro de ${tenant.name}`}
+              className={`${saSelect} w-full`}
+              disabled={busy}
+              value={pendingPayment ?? asPayment(tenant.paymentStatus)}
+              onChange={(e) => {
+                const paymentStatus = e.target
+                  .value as SuperAdminPaymentStatus;
+                if (paymentStatus === asPayment(tenant.paymentStatus)) return;
+                onPaymentChange(paymentStatus);
+              }}
+            >
+              <option value="ACTIVE">Al corriente</option>
+              <option value="PENDING_PAYMENT">Pago pendiente</option>
+            </select>
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {tenant.active ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onSuspend}
+              className={`${saDangerBtn} ${saFocus}`}
+            >
+              Suspender
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onActivate}
+              className={`${saSoftSuccessBtn} ${saFocus}`}
+            >
+              Reactivar
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={busy || !tenant.active}
+            onClick={onImpersonate}
+            className={`${saSecondaryBtn} ${saFocus}`}
+          >
+            <ExternalLink className="size-3.5" aria-hidden />
+            Abrir panel
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-zinc-400">
+        Los cambios de plan, cobro y estado piden confirmación. Abrir panel usa
+        otra pestaña; SuperAdmin no se cierra.
+      </p>
+    </div>
+  );
+}
+
 export function SuperAdminTenantsTable({
   initialTenants,
 }: {
@@ -104,9 +331,15 @@ export function SuperAdminTenantsTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [tenants, setTenants] = useState(initialTenants);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
     parseStatusFilter(searchParams.get("status")),
+  );
+  const [sortKey, setSortKey] = useState<SortKey>(() =>
+    parseSortKey(searchParams.get("sort")),
+  );
+  const [sortDir, setSortDir] = useState<SortDir>(() =>
+    parseSortDir(searchParams.get("dir")),
   );
   const [managingId, setManagingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +354,10 @@ export function SuperAdminTenantsTable({
   }, [initialTenants]);
 
   useEffect(() => {
+    setQuery(searchParams.get("q") ?? "");
     setStatusFilter(parseStatusFilter(searchParams.get("status")));
+    setSortKey(parseSortKey(searchParams.get("sort")));
+    setSortDir(parseSortDir(searchParams.get("dir")));
   }, [searchParams]);
 
   useEffect(() => {
@@ -130,21 +366,62 @@ export function SuperAdminTenantsTable({
     return () => window.clearTimeout(t);
   }, [success]);
 
-  function applyStatusFilter(next: StatusFilter) {
-    setStatusFilter(next);
+  function replaceParams(mutate: (params: URLSearchParams) => void) {
     const params = new URLSearchParams(searchParams.toString());
-    if (next === "all") {
-      params.delete("status");
-    } else {
-      params.set("status", next);
-    }
+    mutate(params);
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
+  function applyStatusFilter(next: StatusFilter) {
+    setStatusFilter(next);
+    replaceParams((params) => {
+      if (next === "all") params.delete("status");
+      else params.set("status", next);
+    });
+  }
+
+  function applySort(nextKey: SortKey) {
+    const nextDir: SortDir =
+      sortKey === nextKey && sortDir === "asc" ? "desc" : "asc";
+    setSortKey(nextKey);
+    setSortDir(nextDir);
+    replaceParams((params) => {
+      if (nextKey === "name" && nextDir === "asc") {
+        params.delete("sort");
+        params.delete("dir");
+      } else {
+        params.set("sort", nextKey);
+        params.set("dir", nextDir);
+      }
+    });
+  }
+
+  useEffect(() => {
+    const urlQ = searchParams.get("q") ?? "";
+    if (query.trim() === urlQ) return;
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      const trimmed = query.trim();
+      if (!trimmed) params.delete("q");
+      else params.set("q", trimmed);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query, searchParams, pathname, router]);
+
   function clearFilters() {
     setQuery("");
-    applyStatusFilter("all");
+    setStatusFilter("all");
+    setSortKey("name");
+    setSortDir("asc");
+    replaceParams((params) => {
+      params.delete("status");
+      params.delete("q");
+      params.delete("sort");
+      params.delete("dir");
+    });
   }
 
   const filterCounts = useMemo(() => {
@@ -161,7 +438,7 @@ export function SuperAdminTenantsTable({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tenants.filter((t) => {
+    const rows = tenants.filter((t) => {
       if (statusFilter === "active" && !t.active) return false;
       if (statusFilter === "suspended" && t.active) return false;
       if (
@@ -177,7 +454,8 @@ export function SuperAdminTenantsTable({
         t.plan.toLowerCase().includes(q)
       );
     });
-  }, [tenants, query, statusFilter]);
+    return [...rows].sort((a, b) => compareTenants(a, b, sortKey, sortDir));
+  }, [tenants, query, statusFilter, sortKey, sortDir]);
 
   function flashSuccess(message: string) {
     setSuccess(message);
@@ -337,7 +615,7 @@ export function SuperAdminTenantsTable({
     busyLabel: string;
     tone: "danger" | "neutral";
     challenge?: string;
-    detail?: string;
+    detail?: ReactNode;
   } | null => {
     if (!pending) return null;
     const name = pending.tenant.name;
@@ -346,35 +624,77 @@ export function SuperAdminTenantsTable({
       case "suspend":
         return {
           title: `¿Suspender ${name}?`,
-          description: `El restaurante ${name} (${slug}) dejará de operar en su subdominio hasta que lo reactives. Los comensales y el panel del local quedarán bloqueados.`,
+          description: `El restaurante ${name} dejará de operar en su subdominio hasta que lo reactives. Los comensales y el panel del local quedarán bloqueados.`,
           confirmLabel: "Suspender restaurante",
           busyLabel: "Suspendiendo…",
           tone: "danger",
           challenge: slug,
+          detail: (
+            <MutationReviewDetail
+              rows={[
+                { label: "Estado", from: "Activo", to: "Suspendido" },
+              ]}
+              note={`Subdominio: ${slug}`}
+            />
+          ),
         };
       case "activate":
         return {
           title: `¿Reactivar ${name}?`,
-          description: `Se restablecerá el acceso al subdominio ${slug} y al panel del restaurante.`,
+          description: `Se restablecerá el acceso al subdominio y al panel del restaurante.`,
           confirmLabel: "Reactivar restaurante",
           busyLabel: "Reactivando…",
           tone: "neutral",
+          detail: (
+            <MutationReviewDetail
+              rows={[
+                { label: "Estado", from: "Suspendido", to: "Activo" },
+              ]}
+              note={`Subdominio: ${slug}`}
+            />
+          ),
         };
       case "plan":
         return {
           title: `¿Cambiar plan de ${name}?`,
-          description: `Pasará de ${planLabel(asPlan(pending.tenant.plan))} a ${planLabel(pending.plan)}. Esto afecta límites de menú y el acceso al sitio institucional Pro.`,
+          description:
+            "Esto afecta límites de menú y el acceso al sitio institucional Pro.",
           confirmLabel: `Cambiar a ${planLabel(pending.plan)}`,
           busyLabel: "Guardando…",
           tone: "neutral",
+          detail: (
+            <MutationReviewDetail
+              rows={[
+                {
+                  label: "Plan",
+                  from: planLabel(asPlan(pending.tenant.plan)),
+                  to: planLabel(pending.plan),
+                },
+              ]}
+              note={name}
+            />
+          ),
         };
       case "payment":
         return {
           title: `¿Actualizar cobro de ${name}?`,
-          description: `El estado de cobro pasará de «${paymentLabel(asPayment(pending.tenant.paymentStatus))}» a «${paymentLabel(pending.paymentStatus)}».`,
+          description:
+            "El estado de cobro cambia de inmediato. La suspensión es una acción aparte.",
           confirmLabel: "Guardar cobro",
           busyLabel: "Guardando…",
           tone: "neutral",
+          detail: (
+            <MutationReviewDetail
+              rows={[
+                {
+                  label: "Cobro",
+                  from: paymentLabel(asPayment(pending.tenant.paymentStatus)),
+                  to: paymentLabel(pending.paymentStatus),
+                },
+              ]}
+              note={name}
+            />
+          ),
         };
       case "impersonate": {
         const destination = buildTenantAdminUrl(slug, "/admin/dashboard");
@@ -385,11 +705,41 @@ export function SuperAdminTenantsTable({
           busyLabel: "Abriendo…",
           tone: "danger",
           challenge: slug,
-          detail: `Destino: ${destination}`,
+          detail: (
+            <MutationReviewDetail
+              rows={[]}
+              note={`Destino: ${destination}`}
+            />
+          ),
         };
       }
     }
   })();
+
+  function manageHandlers(tenant: SuperAdminTenant) {
+    return {
+      onPlanChange: (plan: SuperAdminPlan) => {
+        setDialogError(null);
+        setPending({ kind: "plan", tenant, plan });
+      },
+      onPaymentChange: (paymentStatus: SuperAdminPaymentStatus) => {
+        setDialogError(null);
+        setPending({ kind: "payment", tenant, paymentStatus });
+      },
+      onSuspend: () => {
+        setDialogError(null);
+        setPending({ kind: "suspend", tenant });
+      },
+      onActivate: () => {
+        setDialogError(null);
+        setPending({ kind: "activate", tenant });
+      },
+      onImpersonate: () => {
+        setDialogError(null);
+        setPending({ kind: "impersonate", tenant });
+      },
+    };
+  }
 
   return (
     <div className="space-y-4">
@@ -404,7 +754,7 @@ export function SuperAdminTenantsTable({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por nombre, subdominio o plan…"
             aria-label="Buscar restaurantes por nombre, subdominio o plan"
-            className={`w-full rounded-xl border border-white/[0.08] bg-[#111113] py-2.5 pl-10 pr-10 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20 ${saFocus}`}
+            className={`w-full rounded-xl border border-white/[0.08] bg-[#111113] py-2.5 pl-10 pr-10 text-sm text-zinc-100 placeholder:text-zinc-400 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20 ${saFocus}`}
           />
           {query ? (
             <button
@@ -470,277 +820,269 @@ export function SuperAdminTenantsTable({
         </p>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111113]">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs font-medium tracking-wide text-zinc-400">
-              <tr>
-                <th className="px-4 py-3">Restaurante</th>
-                <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Cobro</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">
-                  <span className="sr-only">Gestionar</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04]">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-10 text-center text-sm text-zinc-400"
-                  >
-                    {query.trim() || statusFilter !== "all" ? (
-                      <span className="inline-flex flex-col items-center gap-3">
-                        <span>
-                          Ningún restaurante coincide con los filtros actuales.
-                        </span>
-                        <button
-                          type="button"
-                          onClick={clearFilters}
-                          className={`${saSecondaryBtn} ${saFocus}`}
-                        >
-                          Quitar filtros
-                        </button>
-                      </span>
-                    ) : (
-                      "Todavía no hay restaurantes registrados."
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((tenant) => {
-                  const busy = isRowBusy(tenant.id);
-                  const open = managingId === tenant.id;
-                  const pendingPlan =
-                    pending?.kind === "plan" && pending.tenant.id === tenant.id
-                      ? pending.plan
-                      : null;
-                  const pendingPayment =
-                    pending?.kind === "payment" &&
-                    pending.tenant.id === tenant.id
-                      ? pending.paymentStatus
-                      : null;
-                  const panelId = `tenant-manage-${tenant.id}`;
+      <label className="flex flex-col gap-1.5 md:hidden">
+        <span className="text-xs font-medium text-zinc-400">Ordenar por</span>
+        <select
+          className={`${saSelect} w-full`}
+          aria-label="Ordenar restaurantes"
+          value={`${sortKey}:${sortDir}`}
+          onChange={(e) => {
+            const [keyRaw, dirRaw] = e.target.value.split(":");
+            const nextKey = parseSortKey(keyRaw ?? null);
+            const nextDir = parseSortDir(dirRaw ?? null);
+            setSortKey(nextKey);
+            setSortDir(nextDir);
+            replaceParams((params) => {
+              if (nextKey === "name" && nextDir === "asc") {
+                params.delete("sort");
+                params.delete("dir");
+              } else {
+                params.set("sort", nextKey);
+                params.set("dir", nextDir);
+              }
+            });
+          }}
+        >
+          <option value="name:asc">Nombre (A–Z)</option>
+          <option value="name:desc">Nombre (Z–A)</option>
+          <option value="plan:asc">Plan</option>
+          <option value="payment:desc">Cobro (pendiente primero)</option>
+          <option value="status:desc">Estado (suspendidos primero)</option>
+        </select>
+      </label>
 
-                  return (
-                    <Fragment key={tenant.id}>
-                      <tr
-                        className={
-                          open
-                            ? "bg-white/[0.03]"
-                            : "hover:bg-white/[0.02]"
-                        }
-                      >
-                        <td className="max-w-[16rem] min-w-0 px-4 py-3.5">
-                          <p
-                            className="truncate font-medium text-white"
-                            title={tenant.name}
-                          >
-                            {tenant.name}
-                          </p>
-                          <p
-                            className="mt-0.5 truncate font-mono text-xs text-zinc-400"
-                            title={tenant.subdomain}
-                          >
-                            {tenant.subdomain}
-                          </p>
-                          {tenant.websitePublished ? (
-                            <p className="mt-1 text-xs text-emerald-400/80">
-                              Sitio publicado
-                            </p>
-                          ) : (
-                            <p className="mt-1 text-xs text-zinc-400">
-                              Sitio no publicado
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5 text-xs font-medium text-zinc-300">
-                          {planLabel(asPlan(tenant.plan))}
-                        </td>
-                        <td className="px-4 py-3.5 text-xs font-medium text-zinc-300">
-                          {paymentLabel(asPayment(tenant.paymentStatus))}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                              tenant.active
-                                ? "text-emerald-300"
-                                : "text-zinc-400"
-                            }`}
-                          >
-                            <span
-                              className={`size-1.5 rounded-full ${
-                                tenant.active
-                                  ? "bg-emerald-400"
-                                  : "bg-zinc-600"
-                              }`}
-                              aria-hidden
-                            />
-                            {tenant.active ? "Activo" : "Suspendido"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-right">
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-white/[0.06] bg-[#111113] px-4 py-10 text-center text-sm text-zinc-400">
+          {query.trim() || statusFilter !== "all" ? (
+            <span className="inline-flex flex-col items-center gap-3">
+              <span>
+                Ningún restaurante coincide con los filtros actuales.
+              </span>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className={`${saSecondaryBtn} ${saFocus}`}
+              >
+                Quitar filtros
+              </button>
+            </span>
+          ) : (
+            "Todavía no hay restaurantes registrados. El alta ocurre fuera de SuperAdmin; cuando existan, aparecerán aquí para plan, cobro y soporte."
+          )}
+        </div>
+      ) : (
+        <>
+          <ul className="space-y-3 md:hidden">
+            {filtered.map((tenant) => {
+              const busy = isRowBusy(tenant.id);
+              const open = managingId === tenant.id;
+              const pendingPlan =
+                pending?.kind === "plan" && pending.tenant.id === tenant.id
+                  ? pending.plan
+                  : null;
+              const pendingPayment =
+                pending?.kind === "payment" &&
+                pending.tenant.id === tenant.id
+                  ? pending.paymentStatus
+                  : null;
+              const panelId = `tenant-manage-mobile-${tenant.id}`;
+
+              return (
+                <li
+                  key={tenant.id}
+                  className={`rounded-2xl border border-white/[0.06] bg-[#111113] p-4 ${
+                    open ? "ring-1 ring-emerald-500/20" : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <TenantSummaryFacts tenant={tenant} variant="card" />
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      aria-controls={panelId}
+                      disabled={busy}
+                      onClick={() => toggleManage(tenant.id)}
+                      className={`${saSecondaryBtn} ${saFocus} shrink-0 ${
+                        open
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                          : ""
+                      }`}
+                    >
+                      {open ? "Cerrar" : "Gestionar"}
+                      <ChevronDown
+                        className={`size-3.5 transition ${
+                          open ? "rotate-180" : ""
+                        }`}
+                        aria-hidden
+                      />
+                    </button>
+                  </div>
+                  {open ? (
+                    <div id={panelId} className="mt-4">
+                      <TenantManageFields
+                        tenant={tenant}
+                        busy={busy}
+                        pendingPlan={pendingPlan}
+                        pendingPayment={pendingPayment}
+                        {...manageHandlers(tenant)}
+                      />
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="hidden overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111113] md:block">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs font-medium tracking-wide text-zinc-400">
+                  <tr>
+                    {(
+                      [
+                        { key: "name" as const, label: "Restaurante" },
+                        { key: "plan" as const, label: "Plan" },
+                        { key: "payment" as const, label: "Cobro" },
+                        { key: "status" as const, label: "Estado" },
+                      ] as const
+                    ).map((col) => {
+                      const active = sortKey === col.key;
+                      const ariaSort = active
+                        ? sortDir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none";
+                      return (
+                        <th
+                          key={col.key}
+                          scope="col"
+                          aria-sort={ariaSort}
+                          className="px-4 py-2"
+                        >
                           <button
                             type="button"
-                            aria-expanded={open}
-                            aria-controls={panelId}
-                            disabled={busy}
-                            onClick={() => toggleManage(tenant.id)}
-                            className={`${saSecondaryBtn} ${saFocus} ${
-                              open
-                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                                : ""
+                            onClick={() => applySort(col.key)}
+                            className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-xs font-medium transition hover:text-zinc-200 ${saFocus} ${
+                              active ? "text-zinc-200" : "text-zinc-400"
                             }`}
                           >
-                            {open ? "Cerrar" : "Gestionar"}
-                            <ChevronDown
-                              className={`size-3.5 transition ${
-                                open ? "rotate-180" : ""
-                              }`}
-                              aria-hidden
-                            />
+                            {col.label}
+                            {active ? (
+                              sortDir === "asc" ? (
+                                <ArrowUp className="size-3.5" aria-hidden />
+                              ) : (
+                                <ArrowDown className="size-3.5" aria-hidden />
+                              )
+                            ) : (
+                              <ArrowUpDown
+                                className="size-3.5 opacity-50"
+                                aria-hidden
+                              />
+                            )}
+                            <span className="sr-only">
+                              {active
+                                ? sortDir === "asc"
+                                  ? "ordenado ascendente, activar para descendente"
+                                  : "ordenado descendente, activar para ascendente"
+                                : "ordenar"}
+                            </span>
                           </button>
-                        </td>
-                      </tr>
-                      {open ? (
-                        <tr className="bg-white/[0.02]">
-                          <td colSpan={5} className="px-4 py-4" id={panelId}>
-                            <div className="flex flex-col gap-4 rounded-xl border border-white/[0.06] bg-[#0c0c0e] p-4 md:flex-row md:items-end md:justify-between">
-                              <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
-                                <label className="block space-y-1.5">
-                                  <span className="text-xs font-medium text-zinc-400">
-                                    Plan
-                                  </span>
-                                  <select
-                                    aria-label={`Plan de ${tenant.name}`}
-                                    className={`${saSelect} w-full`}
-                                    disabled={busy}
-                                    value={pendingPlan ?? asPlan(tenant.plan)}
-                                    onChange={(e) => {
-                                      const plan = e.target
-                                        .value as SuperAdminPlan;
-                                      if (plan === asPlan(tenant.plan)) return;
-                                      setDialogError(null);
-                                      setPending({
-                                        kind: "plan",
-                                        tenant,
-                                        plan,
-                                      });
-                                    }}
-                                  >
-                                    <option value="BASIC">Básico</option>
-                                    <option value="PRO">Pro</option>
-                                  </select>
-                                </label>
-                                <label className="block space-y-1.5">
-                                  <span className="text-xs font-medium text-zinc-400">
-                                    Cobro
-                                  </span>
-                                  <select
-                                    aria-label={`Cobro de ${tenant.name}`}
-                                    className={`${saSelect} w-full`}
-                                    disabled={busy}
-                                    value={
-                                      pendingPayment ??
-                                      asPayment(tenant.paymentStatus)
-                                    }
-                                    onChange={(e) => {
-                                      const paymentStatus = e.target
-                                        .value as SuperAdminPaymentStatus;
-                                      if (
-                                        paymentStatus ===
-                                        asPayment(tenant.paymentStatus)
-                                      ) {
-                                        return;
-                                      }
-                                      setDialogError(null);
-                                      setPending({
-                                        kind: "payment",
-                                        tenant,
-                                        paymentStatus,
-                                      });
-                                    }}
-                                  >
-                                    <option value="ACTIVE">Al corriente</option>
-                                    <option value="PENDING_PAYMENT">
-                                      Pago pendiente
-                                    </option>
-                                  </select>
-                                </label>
-                              </div>
+                        </th>
+                      );
+                    })}
+                    <th className="px-4 py-3 text-right">
+                      <span className="sr-only">Gestionar</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {filtered.map((tenant) => {
+                    const busy = isRowBusy(tenant.id);
+                    const open = managingId === tenant.id;
+                    const pendingPlan =
+                      pending?.kind === "plan" &&
+                      pending.tenant.id === tenant.id
+                        ? pending.plan
+                        : null;
+                    const pendingPayment =
+                      pending?.kind === "payment" &&
+                      pending.tenant.id === tenant.id
+                        ? pending.paymentStatus
+                        : null;
+                    const panelId = `tenant-manage-${tenant.id}`;
 
-                              <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                                {tenant.active ? (
-                                  <button
-                                    type="button"
-                                    disabled={busy}
-                                    onClick={() => {
-                                      setDialogError(null);
-                                      setPending({
-                                        kind: "suspend",
-                                        tenant,
-                                      });
-                                    }}
-                                    className={`${saDangerBtn} ${saFocus}`}
-                                  >
-                                    Suspender
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    disabled={busy}
-                                    onClick={() => {
-                                      setDialogError(null);
-                                      setPending({
-                                        kind: "activate",
-                                        tenant,
-                                      });
-                                    }}
-                                    className={`${saSoftSuccessBtn} ${saFocus}`}
-                                  >
-                                    Reactivar
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  disabled={busy || !tenant.active}
-                                  onClick={() => {
-                                    setDialogError(null);
-                                    setPending({
-                                      kind: "impersonate",
-                                      tenant,
-                                    });
-                                  }}
-                                  className={`${saSecondaryBtn} ${saFocus}`}
-                                >
-                                  <ExternalLink
-                                    className="size-3.5"
-                                    aria-hidden
-                                  />
-                                  Abrir panel
-                                </button>
-                              </div>
-                            </div>
-                            <p className="mt-2 text-xs text-zinc-400">
-                              Los cambios de plan, cobro y estado piden
-                              confirmación. Abrir panel usa otra pestaña;
-                              SuperAdmin no se cierra.
-                            </p>
+                    return (
+                      <Fragment key={tenant.id}>
+                        <tr
+                          className={
+                            open ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
+                          }
+                        >
+                          <td className="max-w-[16rem] min-w-0 px-4 py-3.5">
+                            <TenantSummaryFacts
+                              tenant={tenant}
+                              variant="table"
+                            />
+                          </td>
+                          <td className="px-4 py-3.5 text-xs font-medium text-zinc-300">
+                            {planLabel(asPlan(tenant.plan))}
+                          </td>
+                          <td className="px-4 py-3.5 text-xs font-medium text-zinc-300">
+                            {paymentLabel(asPayment(tenant.paymentStatus))}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <TenantStatusBadge active={tenant.active} />
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            <button
+                              type="button"
+                              aria-expanded={open}
+                              aria-controls={panelId}
+                              disabled={busy}
+                              onClick={() => toggleManage(tenant.id)}
+                              className={`${saSecondaryBtn} ${saFocus} ${
+                                open
+                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                                  : ""
+                              }`}
+                            >
+                              {open ? "Cerrar" : "Gestionar"}
+                              <ChevronDown
+                                className={`size-3.5 transition ${
+                                  open ? "rotate-180" : ""
+                                }`}
+                                aria-hidden
+                              />
+                            </button>
                           </td>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                        {open ? (
+                          <tr className="bg-white/[0.02]">
+                            <td colSpan={5} className="px-4 py-4" id={panelId}>
+                              <TenantManageFields
+                                tenant={tenant}
+                                busy={busy}
+                                pendingPlan={pendingPlan}
+                                pendingPayment={pendingPayment}
+                                {...manageHandlers(tenant)}
+                              />
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
       <p className="text-xs text-zinc-400">
         {filtered.length} de {tenants.length} restaurantes
+        {statusFilter !== "all" || query.trim() || sortKey !== "name" || sortDir !== "asc"
+          ? " · enlace de esta vista listo para guardar o compartir"
+          : null}
       </p>
 
       {dialogCopy && pending ? (
@@ -748,13 +1090,7 @@ export function SuperAdminTenantsTable({
           open
           title={dialogCopy.title}
           description={dialogCopy.description}
-          detail={
-            dialogCopy.detail ? (
-              <p className="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 font-mono text-xs break-all text-zinc-300">
-                {dialogCopy.detail}
-              </p>
-            ) : null
-          }
+          detail={dialogCopy.detail ?? null}
           confirmLabel={dialogCopy.confirmLabel}
           busyLabel={dialogCopy.busyLabel}
           tone={dialogCopy.tone}

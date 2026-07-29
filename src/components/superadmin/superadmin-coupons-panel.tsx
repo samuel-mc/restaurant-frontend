@@ -4,8 +4,16 @@
  * CRUD de cupones para SuperAdmin.
  */
 
-import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type {
   SuperAdminCoupon,
   SuperAdminPlan,
@@ -15,42 +23,58 @@ import {
   updateSuperAdminCoupon,
 } from "@/services/superadminService";
 import { ApiError } from "@/services/apiClient";
+import {
+  COUPON_RISK_WINDOW_DAYS,
+  isCouponAtRisk,
+  isCouponExhausted,
+  isCouponExpiringSoon,
+} from "@/lib/superadmin-attention";
 import { SuperAdminConfirmDialog } from "@/components/superadmin/superadmin-confirm-dialog";
+import { MutationReviewDetail } from "@/components/superadmin/superadmin-mutation-review";
+import {
+  CouponActiveBadge,
+  CouponEditFields,
+  CouponRowActions,
+  CouponSummaryFacts,
+  formatCouponExpires,
+  formatCouponUsages,
+  planGrantLabel,
+  usagesDraftLabel,
+} from "@/components/superadmin/superadmin-coupon-fields";
 import {
   saAlertError,
   saAlertSuccess,
   saChip,
   saChipOff,
   saChipOn,
-  saDangerBtn,
   saField,
   saFocus,
   saPrimaryBtn,
   saSecondaryBtn,
-  saSelect,
-  saSoftSuccessBtn,
 } from "@/components/superadmin/superadmin-ui";
 
-const fieldClassName = saField;
-const selectClassName = saSelect;
+type CouponStatusFilter = "all" | "active" | "inactive";
+type CouponRiskFilter = "all" | "any" | "expiring" | "exhausted";
 
-type CouponFilter = "all" | "active" | "inactive";
+type PendingCreate = {
+  code: string;
+  description: string;
+  grantsPlan: SuperAdminPlan;
+  maxRedemptions: string;
+  expiresLocal: string;
+};
 
-function formatUsages(coupon: SuperAdminCoupon): string {
-  if (coupon.maxRedemptions == null) {
-    return `${coupon.redemptionCount} / ilimitado`;
-  }
-  return `${coupon.redemptionCount} / ${coupon.maxRedemptions}`;
-}
+type PendingEdit = {
+  coupon: SuperAdminCoupon;
+  description: string;
+  grantsPlan: SuperAdminPlan;
+  max: string;
+  expiresLocal: string;
+};
 
-function formatExpires(expiresAt: string | null): string {
-  if (!expiresAt) return "Sin expiración";
-  const d = new Date(expiresAt);
-  if (Number.isNaN(d.getTime())) return expiresAt;
-  return d.toLocaleString("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+function parseRiskFilter(raw: string | null): CouponRiskFilter {
+  if (raw === "any" || raw === "expiring" || raw === "exhausted") return raw;
+  return "all";
 }
 
 /** Convierte datetime-local (local) a ISO-8601 con offset. */
@@ -70,12 +94,67 @@ function isoToLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function parsePositiveMax(raw: string): number | undefined {
+  if (raw.trim() === "") return undefined;
+  const max = Number.parseInt(raw, 10);
+  if (!Number.isFinite(max) || max < 1) {
+    throw new Error("El máximo de usos debe ser un número positivo.");
+  }
+  return max;
+}
+
+function buildEditReviewRows(pending: PendingEdit) {
+  const { coupon } = pending;
+  const rows: { label: string; from: string; to: string }[] = [];
+  const nextDesc = pending.description.trim();
+  const prevDesc = (coupon.description ?? "").trim();
+  if (nextDesc !== prevDesc) {
+    rows.push({
+      label: "Descripción",
+      from: prevDesc || "(vacía)",
+      to: nextDesc || "(vacía)",
+    });
+  }
+  const prevPlan = coupon.grantsPlan === "BASIC" ? "BASIC" : "PRO";
+  if (pending.grantsPlan !== prevPlan) {
+    rows.push({
+      label: "Plan",
+      from: planGrantLabel(prevPlan),
+      to: planGrantLabel(pending.grantsPlan),
+    });
+  }
+  const prevMax =
+    coupon.maxRedemptions == null ? "" : String(coupon.maxRedemptions);
+  if (pending.max.trim() !== prevMax) {
+    rows.push({
+      label: "Máx. usos",
+      from: usagesDraftLabel(prevMax),
+      to: usagesDraftLabel(pending.max),
+    });
+  }
+  const prevExp = isoToLocalInput(coupon.expiresAt);
+  if (pending.expiresLocal.trim() !== prevExp) {
+    rows.push({
+      label: "Expira",
+      from: formatCouponExpires(coupon.expiresAt),
+      to: pending.expiresLocal.trim()
+        ? formatCouponExpires(
+            localInputToIso(pending.expiresLocal) ?? pending.expiresLocal,
+          )
+        : "Sin expiración",
+    });
+  }
+  return rows;
+}
+
 export function SuperAdminCouponsPanel({
   initialCoupons,
 }: {
   initialCoupons: SuperAdminCoupon[];
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [coupons, setCoupons] = useState(initialCoupons);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -83,6 +162,10 @@ export function SuperAdminCouponsPanel({
   const [pendingToggle, setPendingToggle] = useState<SuperAdminCoupon | null>(
     null,
   );
+  const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
+    null,
+  );
+  const [pendingEdit, setPendingEdit] = useState<PendingEdit | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -97,7 +180,10 @@ export function SuperAdminCouponsPanel({
   const [editPlan, setEditPlan] = useState<SuperAdminPlan>("PRO");
   const [editMax, setEditMax] = useState("");
   const [editExpires, setEditExpires] = useState("");
-  const [statusFilter, setStatusFilter] = useState<CouponFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<CouponStatusFilter>("all");
+  const [riskFilter, setRiskFilter] = useState<CouponRiskFilter>(() =>
+    parseRiskFilter(searchParams.get("risk")),
+  );
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
@@ -105,26 +191,62 @@ export function SuperAdminCouponsPanel({
   }, [initialCoupons]);
 
   useEffect(() => {
+    setRiskFilter(parseRiskFilter(searchParams.get("risk")));
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!success) return;
     const t = window.setTimeout(() => setSuccess(null), 4500);
     return () => window.clearTimeout(t);
   }, [success]);
 
+  function applyRiskFilter(next: CouponRiskFilter) {
+    setRiskFilter(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "all") {
+      params.delete("risk");
+    } else {
+      params.set("risk", next);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  const nowMs = Date.now();
+
   const filterCounts = useMemo(() => {
     let active = 0;
     let inactive = 0;
+    let atRisk = 0;
     for (const c of coupons) {
       if (c.active) active += 1;
       else inactive += 1;
+      if (isCouponAtRisk(c, nowMs, COUPON_RISK_WINDOW_DAYS)) atRisk += 1;
     }
-    return { all: coupons.length, active, inactive };
-  }, [coupons]);
+    return { all: coupons.length, active, inactive, atRisk };
+  }, [coupons, nowMs]);
 
   const filteredCoupons = useMemo(() => {
-    if (statusFilter === "active") return coupons.filter((c) => c.active);
-    if (statusFilter === "inactive") return coupons.filter((c) => !c.active);
-    return coupons;
-  }, [coupons, statusFilter]);
+    return coupons.filter((c) => {
+      if (statusFilter === "active" && !c.active) return false;
+      if (statusFilter === "inactive" && c.active) return false;
+      if (riskFilter === "any") {
+        return isCouponAtRisk(c, nowMs, COUPON_RISK_WINDOW_DAYS);
+      }
+      if (riskFilter === "expiring") {
+        return isCouponExpiringSoon(c, nowMs, COUPON_RISK_WINDOW_DAYS);
+      }
+      if (riskFilter === "exhausted") {
+        return isCouponExhausted(c);
+      }
+      return true;
+    });
+  }, [coupons, statusFilter, riskFilter, nowMs]);
+
+  function clearFilters() {
+    setStatusFilter("all");
+    applyRiskFilter("all");
+  }
 
   function refresh() {
     startTransition(() => router.refresh());
@@ -135,24 +257,38 @@ export function SuperAdminCouponsPanel({
     setError(null);
   }
 
-  async function handleCreate(e: FormEvent) {
+  function requestCreate(e: FormEvent) {
     e.preventDefault();
     if (busyId != null) return;
-    setBusyId("create");
     setError(null);
     try {
-      const max =
-        maxRedemptions.trim() === ""
-          ? undefined
-          : Number.parseInt(maxRedemptions, 10);
-      if (max != null && (!Number.isFinite(max) || max < 1)) {
-        throw new Error("El máximo de usos debe ser un número positivo.");
-      }
-      const expiresAt = localInputToIso(expiresLocal);
+      parsePositiveMax(maxRedemptions);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Revisa el máximo de usos.");
+      return;
+    }
+    setDialogError(null);
+    setPendingCreate({
+      code: code.trim(),
+      description: description.trim(),
+      grantsPlan,
+      maxRedemptions,
+      expiresLocal,
+    });
+  }
+
+  async function confirmCreate() {
+    if (!pendingCreate || busyId != null) return;
+    setBusyId("create");
+    setDialogError(null);
+    setError(null);
+    try {
+      const max = parsePositiveMax(pendingCreate.maxRedemptions);
+      const expiresAt = localInputToIso(pendingCreate.expiresLocal);
       const created = await createSuperAdminCoupon({
-        code: code.trim(),
-        description: description.trim() || undefined,
-        grantsPlan,
+        code: pendingCreate.code,
+        description: pendingCreate.description || undefined,
+        grantsPlan: pendingCreate.grantsPlan,
         maxRedemptions: max,
         expiresAt: expiresAt ?? undefined,
       });
@@ -163,10 +299,11 @@ export function SuperAdminCouponsPanel({
       setMaxRedemptions("");
       setExpiresLocal("");
       setCreateOpen(false);
+      setPendingCreate(null);
       flashSuccess(`Cupón ${created.code} creado.`);
       refresh();
     } catch (err) {
-      setError(
+      setDialogError(
         err instanceof ApiError
           ? err.message
           : err instanceof Error
@@ -189,20 +326,44 @@ export function SuperAdminCouponsPanel({
     setError(null);
   }
 
-  async function saveEdit(couponId: number) {
+  function requestSaveEdit(coupon: SuperAdminCoupon) {
     if (busyId != null) return;
-    setBusyId(couponId);
     setError(null);
     try {
-      const clearMax = editMax.trim() === "";
-      const max = clearMax ? undefined : Number.parseInt(editMax, 10);
-      if (!clearMax && (max == null || !Number.isFinite(max) || max < 1)) {
-        throw new Error("El máximo de usos debe ser un número positivo.");
-      }
-      const expiresRaw = editExpires.trim();
+      parsePositiveMax(editMax);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Revisa el máximo de usos.");
+      return;
+    }
+    const draft: PendingEdit = {
+      coupon,
+      description: editDescription,
+      grantsPlan: editPlan,
+      max: editMax,
+      expiresLocal: editExpires,
+    };
+    const rows = buildEditReviewRows(draft);
+    if (rows.length === 0) {
+      setError("Sin cambios para guardar.");
+      return;
+    }
+    setDialogError(null);
+    setPendingEdit(draft);
+  }
+
+  async function confirmEdit() {
+    if (!pendingEdit || busyId != null) return;
+    const couponId = pendingEdit.coupon.id;
+    setBusyId(couponId);
+    setDialogError(null);
+    setError(null);
+    try {
+      const clearMax = pendingEdit.max.trim() === "";
+      const max = clearMax ? undefined : parsePositiveMax(pendingEdit.max);
+      const expiresRaw = pendingEdit.expiresLocal.trim();
       const updated = await updateSuperAdminCoupon(couponId, {
-        description: editDescription.trim(),
-        grantsPlan: editPlan,
+        description: pendingEdit.description.trim(),
+        grantsPlan: pendingEdit.grantsPlan,
         ...(clearMax
           ? { clearMaxRedemptions: true }
           : { maxRedemptions: max }),
@@ -212,10 +373,11 @@ export function SuperAdminCouponsPanel({
         prev.map((c) => (c.id === updated.id ? updated : c)),
       );
       setEditingId(null);
+      setPendingEdit(null);
       flashSuccess(`Cupón ${updated.code} actualizado.`);
       refresh();
     } catch (err) {
-      setError(
+      setDialogError(
         err instanceof ApiError
           ? err.message
           : err instanceof Error
@@ -257,6 +419,71 @@ export function SuperAdminCouponsPanel({
     }
   }
 
+  function editFieldsFor(coupon: SuperAdminCoupon) {
+    const busy = busyId === coupon.id;
+    return (
+      <CouponEditFields
+        description={editDescription}
+        plan={editPlan}
+        max={editMax}
+        expires={editExpires}
+        busy={busy}
+        onDescription={setEditDescription}
+        onPlan={setEditPlan}
+        onMax={setEditMax}
+        onExpires={setEditExpires}
+        onSave={() => requestSaveEdit(coupon)}
+        onCancel={() => setEditingId(null)}
+      />
+    );
+  }
+
+  const createReviewDetail: ReactNode = pendingCreate ? (
+    <MutationReviewDetail
+      rows={[
+        { label: "Código", from: "—", to: pendingCreate.code },
+        {
+          label: "Plan",
+          from: "—",
+          to: planGrantLabel(pendingCreate.grantsPlan),
+        },
+        {
+          label: "Máx. usos",
+          from: "—",
+          to: usagesDraftLabel(pendingCreate.maxRedemptions),
+        },
+        {
+          label: "Expira",
+          from: "—",
+          to: pendingCreate.expiresLocal.trim()
+            ? formatCouponExpires(
+                localInputToIso(pendingCreate.expiresLocal) ??
+                  pendingCreate.expiresLocal,
+              )
+            : "Sin expiración",
+        },
+        ...(pendingCreate.description
+          ? [
+              {
+                label: "Descripción",
+                from: "—",
+                to: pendingCreate.description,
+              },
+            ]
+          : []),
+      ]}
+      note="El código no se podrá editar después."
+    />
+  ) : null;
+
+  const editReviewDetail: ReactNode =
+    pendingEdit != null ? (
+      <MutationReviewDetail
+        rows={buildEditReviewRows(pendingEdit)}
+        note={pendingEdit.coupon.code}
+      />
+    ) : null;
+
   return (
     <div className="space-y-8">
       {error ? (
@@ -288,22 +515,29 @@ export function SuperAdminCouponsPanel({
         >
           {(
             [
-              { id: "all", label: "Todos", count: filterCounts.all },
-              { id: "active", label: "Activos", count: filterCounts.active },
+              { id: "all" as const, label: "Todos", count: filterCounts.all },
               {
-                id: "inactive",
+                id: "active" as const,
+                label: "Activos",
+                count: filterCounts.active,
+              },
+              {
+                id: "inactive" as const,
                 label: "Inactivos",
                 count: filterCounts.inactive,
               },
             ] as const
           ).map((chip) => {
-            const selected = statusFilter === chip.id;
+            const selected = statusFilter === chip.id && riskFilter === "all";
             return (
               <button
                 key={chip.id}
                 type="button"
                 aria-pressed={selected}
-                onClick={() => setStatusFilter(chip.id)}
+                onClick={() => {
+                  setStatusFilter(chip.id);
+                  if (riskFilter !== "all") applyRiskFilter("all");
+                }}
                 className={`${saChip} ${saFocus} ${
                   selected ? saChipOn : saChipOff
                 }`}
@@ -313,6 +547,32 @@ export function SuperAdminCouponsPanel({
               </button>
             );
           })}
+          <button
+            type="button"
+            aria-pressed={riskFilter !== "all"}
+            onClick={() => {
+              setStatusFilter("all");
+              applyRiskFilter(riskFilter !== "all" ? "all" : "any");
+            }}
+            className={`${saChip} ${saFocus} ${
+              riskFilter !== "all" ? saChipOn : saChipOff
+            }`}
+          >
+            {riskFilter === "expiring"
+              ? "Por expirar"
+              : riskFilter === "exhausted"
+                ? "Usos agotados"
+                : "En riesgo"}
+            <span className="tabular-nums opacity-70">
+              {riskFilter === "expiring"
+                ? coupons.filter((c) =>
+                    isCouponExpiringSoon(c, nowMs, COUPON_RISK_WINDOW_DAYS),
+                  ).length
+                : riskFilter === "exhausted"
+                  ? coupons.filter((c) => isCouponExhausted(c)).length
+                  : filterCounts.atRisk}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -323,11 +583,11 @@ export function SuperAdminCouponsPanel({
         >
           <h2 className="text-sm font-semibold text-white">Crear cupón</h2>
           <p className="mt-1 text-xs text-zinc-400">
-            El código queda fijo al crearlo. Para retirarlo del registro, usa
-            Desactivar (no se borra el historial de canjes).
+            El código queda fijo al crearlo. Revisarás el resumen antes de
+            confirmar. Para retirarlo del registro, usa Desactivar.
           </p>
           <form
-            onSubmit={(e) => void handleCreate(e)}
+            onSubmit={requestCreate}
             className="mt-4 grid gap-3 sm:grid-cols-2"
           >
             <label className="block space-y-1.5 sm:col-span-1">
@@ -337,7 +597,7 @@ export function SuperAdminCouponsPanel({
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="PRO-DEMO-2026"
-                className={`${fieldClassName} font-mono`}
+                className={`${saField} font-mono`}
                 disabled={busyId != null}
                 maxLength={40}
               />
@@ -347,7 +607,7 @@ export function SuperAdminCouponsPanel({
                 Plan que otorga
               </span>
               <select
-                className={`${fieldClassName}`}
+                className={saField}
                 value={grantsPlan}
                 onChange={(e) =>
                   setGrantsPlan(e.target.value as SuperAdminPlan)
@@ -366,7 +626,7 @@ export function SuperAdminCouponsPanel({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Pago en efectivo / early access"
-                className={fieldClassName}
+                className={saField}
                 disabled={busyId != null}
                 maxLength={255}
               />
@@ -380,7 +640,7 @@ export function SuperAdminCouponsPanel({
                 min={1}
                 value={maxRedemptions}
                 onChange={(e) => setMaxRedemptions(e.target.value)}
-                className={fieldClassName}
+                className={saField}
                 disabled={busyId != null}
               />
             </label>
@@ -392,7 +652,7 @@ export function SuperAdminCouponsPanel({
                 type="datetime-local"
                 value={expiresLocal}
                 onChange={(e) => setExpiresLocal(e.target.value)}
-                className={fieldClassName}
+                className={saField}
                 disabled={busyId != null}
               />
             </label>
@@ -402,7 +662,7 @@ export function SuperAdminCouponsPanel({
                 disabled={busyId != null || code.trim().length < 3}
                 className={`${saPrimaryBtn} ${saFocus}`}
               >
-                {busyId === "create" ? "Creando…" : "Crear cupón"}
+                Revisar cupón
               </button>
             </div>
           </form>
@@ -414,203 +674,194 @@ export function SuperAdminCouponsPanel({
           <h2 className="text-sm font-semibold text-white">Todos los cupones</h2>
           <p className="mt-0.5 text-xs text-zinc-400">
             {filteredCoupons.length === 0
-              ? statusFilter === "all"
+              ? statusFilter === "all" && riskFilter === "all"
                 ? "Ninguno todavía"
                 : "Ninguno con este filtro"
-              : `${filteredCoupons.length} visibles · ${coupons.length} en total`}
+              : riskFilter !== "all"
+                ? `${filteredCoupons.length} en este filtro · ${coupons.length} en total`
+                : `${filteredCoupons.length} visibles · ${coupons.length} en total`}
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs font-medium tracking-wide text-zinc-400">
-              <tr>
-                <th className="px-4 py-3">Código</th>
-                <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Usos</th>
-                <th className="px-4 py-3">Expira</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04]">
-              {filteredCoupons.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-10 text-center text-sm text-zinc-400"
-                  >
-                    {coupons.length === 0 ? (
-                      <span className="inline-flex flex-col items-center gap-3">
-                        <span>Aún no hay cupones.</span>
-                        <button
-                          type="button"
-                          onClick={() => setCreateOpen(true)}
-                          className={`${saSecondaryBtn} ${saFocus}`}
-                        >
-                          Crear el primero
-                        </button>
-                      </span>
+
+        {filteredCoupons.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-zinc-400">
+            {coupons.length === 0 ? (
+              <span className="inline-flex flex-col items-center gap-3">
+                <span>Aún no hay cupones.</span>
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  className={`${saSecondaryBtn} ${saFocus}`}
+                >
+                  Crear el primero
+                </button>
+              </span>
+            ) : (
+              <span className="inline-flex flex-col items-center gap-3">
+                <span>Ningún cupón coincide con el filtro.</span>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className={`${saSecondaryBtn} ${saFocus}`}
+                >
+                  Ver todos
+                </button>
+              </span>
+            )}
+          </div>
+        ) : (
+          <>
+            <ul className="divide-y divide-white/[0.04] md:hidden">
+              {filteredCoupons.map((coupon) => {
+                const editing = editingId === coupon.id;
+                return (
+                  <li key={coupon.id} className="space-y-3 p-4">
+                    {!editing ? (
+                      <CouponSummaryFacts coupon={coupon} />
                     ) : (
-                      <span className="inline-flex flex-col items-center gap-3">
-                        <span>Ningún cupón coincide con el filtro.</span>
-                        <button
-                          type="button"
-                          onClick={() => setStatusFilter("all")}
-                          className={`${saSecondaryBtn} ${saFocus}`}
-                        >
-                          Ver todos
-                        </button>
-                      </span>
+                      <p className="font-mono text-sm font-medium text-white">
+                        {coupon.code}
+                      </p>
                     )}
-                  </td>
-                </tr>
-              ) : (
-                filteredCoupons.map((coupon) => {
-                  const busy = busyId === coupon.id;
-                  const editing = editingId === coupon.id;
-                  return (
-                    <tr key={coupon.id} className="align-top hover:bg-white/[0.02]">
-                      <td className="px-4 py-3.5">
-                        <p className="font-mono text-sm font-medium text-white">
-                          {coupon.code}
-                        </p>
-                        {editing ? (
-                          <input
-                            value={editDescription}
-                            onChange={(e) => setEditDescription(e.target.value)}
-                            className={`${fieldClassName} mt-2`}
-                            placeholder="Descripción"
-                            disabled={busy}
-                            maxLength={255}
-                          />
-                        ) : coupon.description ? (
-                          <p className="mt-1 text-xs text-zinc-400">
-                            {coupon.description}
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {editing ? (
-                          <select
-                            className={selectClassName}
-                            value={editPlan}
-                            onChange={(e) =>
-                              setEditPlan(e.target.value as SuperAdminPlan)
-                            }
-                            disabled={busy}
-                          >
-                            <option value="PRO">Pro</option>
-                            <option value="BASIC">Básico</option>
-                          </select>
-                        ) : (
-                          <span className="text-xs font-medium text-zinc-300">
-                            {coupon.grantsPlan === "PRO" ? "Pro" : "Básico"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {editing ? (
-                          <input
-                            type="number"
-                            min={1}
-                            value={editMax}
-                            onChange={(e) => setEditMax(e.target.value)}
-                            placeholder="Ilimitado"
-                            className={`${fieldClassName} max-w-[7rem]`}
-                            disabled={busy}
-                          />
-                        ) : (
-                          <span className="font-mono text-xs text-zinc-400">
-                            {formatUsages(coupon)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {editing ? (
-                          <input
-                            type="datetime-local"
-                            value={editExpires}
-                            onChange={(e) => setEditExpires(e.target.value)}
-                            className={fieldClassName}
-                            disabled={busy}
-                          />
-                        ) : (
-                          <span className="text-xs text-zinc-400">
-                            {formatExpires(coupon.expiresAt)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span
-                          className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                            coupon.active ? "text-emerald-300" : "text-zinc-400"
+                    {editing ? (
+                      editFieldsFor(coupon)
+                    ) : (
+                      <CouponRowActions
+                        coupon={coupon}
+                        disabled={busyId != null}
+                        onEdit={() => startEdit(coupon)}
+                        onToggle={() => {
+                          setDialogError(null);
+                          setPendingToggle(coupon);
+                        }}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs font-medium tracking-wide text-zinc-400">
+                  <tr>
+                    <th className="px-4 py-3">Código</th>
+                    <th className="px-4 py-3">Plan</th>
+                    <th className="px-4 py-3">Usos</th>
+                    <th className="px-4 py-3">Expira</th>
+                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {filteredCoupons.map((coupon) => {
+                    const editing = editingId === coupon.id;
+                    return (
+                      <Fragment key={coupon.id}>
+                        <tr
+                          className={`align-top hover:bg-white/[0.02] ${
+                            editing ? "bg-white/[0.03]" : ""
                           }`}
                         >
-                          <span
-                            className={`size-1.5 rounded-full ${
-                              coupon.active ? "bg-emerald-400" : "bg-zinc-600"
-                            }`}
-                            aria-hidden
-                          />
-                          {coupon.active ? "Activo" : "Inactivo"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                          {editing ? (
-                            <>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void saveEdit(coupon.id)}
-                                className={`${saPrimaryBtn} px-3 text-xs ${saFocus}`}
-                              >
-                                Guardar
-                              </button>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => setEditingId(null)}
-                                className={`${saSecondaryBtn} ${saFocus}`}
-                              >
-                                Cancelar
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                disabled={busyId != null}
-                                onClick={() => startEdit(coupon)}
-                                className={`${saSecondaryBtn} ${saFocus}`}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                disabled={busyId != null}
-                                onClick={() => {
-                                  setDialogError(null);
-                                  setPendingToggle(coupon);
-                                }}
-                                className={`${
-                                  coupon.active ? saDangerBtn : saSoftSuccessBtn
-                                } ${saFocus}`}
-                              >
-                                {coupon.active ? "Desactivar" : "Activar"}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                          <td className="px-4 py-3.5">
+                            <CouponSummaryFacts
+                              coupon={coupon}
+                              showMeta={false}
+                            />
+                          </td>
+                          <td className="px-4 py-3.5 text-xs font-medium text-zinc-300">
+                            {planGrantLabel(coupon.grantsPlan)}
+                          </td>
+                          <td className="px-4 py-3.5 font-mono text-xs text-zinc-400">
+                            {formatCouponUsages(coupon)}
+                          </td>
+                          <td className="px-4 py-3.5 text-xs text-zinc-400">
+                            {formatCouponExpires(coupon.expiresAt)}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <CouponActiveBadge active={coupon.active} />
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex justify-end">
+                              {editing ? (
+                                <button
+                                  type="button"
+                                  disabled={busyId === coupon.id}
+                                  onClick={() => setEditingId(null)}
+                                  className={`${saSecondaryBtn} ${saFocus}`}
+                                >
+                                  Cerrar
+                                </button>
+                              ) : (
+                                <CouponRowActions
+                                  coupon={coupon}
+                                  disabled={busyId != null}
+                                  onEdit={() => startEdit(coupon)}
+                                  onToggle={() => {
+                                    setDialogError(null);
+                                    setPendingToggle(coupon);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {editing ? (
+                          <tr className="bg-white/[0.02]">
+                            <td colSpan={6} className="px-4 py-4">
+                              {editFieldsFor(coupon)}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
+
+      {pendingCreate ? (
+        <SuperAdminConfirmDialog
+          open
+          title={`¿Crear cupón ${pendingCreate.code}?`}
+          description="Revisa el resumen. Al confirmar, el código queda fijo y podrá usarse en registros nuevos."
+          detail={createReviewDetail}
+          confirmLabel="Crear cupón"
+          busyLabel="Creando…"
+          tone="neutral"
+          busy={busyId === "create"}
+          error={dialogError}
+          onConfirm={() => void confirmCreate()}
+          onCancel={() => {
+            if (busyId === "create") return;
+            setPendingCreate(null);
+            setDialogError(null);
+          }}
+        />
+      ) : null}
+
+      {pendingEdit ? (
+        <SuperAdminConfirmDialog
+          open
+          title={`¿Guardar cambios en ${pendingEdit.coupon.code}?`}
+          description="Solo se aplican los campos que cambian. Los canjes ya hechos no se revierten."
+          detail={editReviewDetail}
+          confirmLabel="Guardar cambios"
+          busyLabel="Guardando…"
+          tone="neutral"
+          busy={busyId === pendingEdit.coupon.id}
+          error={dialogError}
+          onConfirm={() => void confirmEdit()}
+          onCancel={() => {
+            if (busyId === pendingEdit.coupon.id) return;
+            setPendingEdit(null);
+            setDialogError(null);
+          }}
+        />
+      ) : null}
 
       {pendingToggle ? (
         <SuperAdminConfirmDialog
@@ -624,6 +875,18 @@ export function SuperAdminCouponsPanel({
             pendingToggle.active
               ? `El cupón ${pendingToggle.code} dejará de aceptarse en registros nuevos. Los canjes ya hechos no se revierten.`
               : `El cupón ${pendingToggle.code} volverá a poder canjearse (sujeto a usos y expiración).`
+          }
+          detail={
+            <MutationReviewDetail
+              rows={[
+                {
+                  label: "Estado",
+                  from: pendingToggle.active ? "Activo" : "Inactivo",
+                  to: pendingToggle.active ? "Inactivo" : "Activo",
+                },
+              ]}
+              note={pendingToggle.code}
+            />
           }
           confirmLabel={pendingToggle.active ? "Desactivar cupón" : "Reactivar"}
           busyLabel={

@@ -18,6 +18,8 @@ export interface UseModalFocusTrapOptions {
   escapeEnabled?: boolean;
   /** Optional element to focus first (falls back to first focusable). */
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /** Lock document scroll while open. Default true (modals). */
+  lockScroll?: boolean;
 }
 
 export function useModalFocusTrap({
@@ -25,6 +27,7 @@ export function useModalFocusTrap({
   onEscape,
   escapeEnabled = true,
   initialFocusRef,
+  lockScroll = true,
 }: UseModalFocusTrapOptions): RefObject<HTMLDivElement | null> {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const onEscapeRef = useRef(onEscape);
@@ -51,7 +54,9 @@ export function useModalFocusTrap({
     });
 
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (lockScroll) {
+      document.body.style.overflow = "hidden";
+    }
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -87,13 +92,15 @@ export function useModalFocusTrap({
     window.addEventListener("keydown", onKey, true);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      if (lockScroll) {
+        document.body.style.overflow = previousOverflow;
+      }
       window.removeEventListener("keydown", onKey, true);
       if (previouslyFocused?.isConnected) {
         previouslyFocused.focus();
       }
     };
-  }, [open, initialFocusRef]);
+  }, [open, initialFocusRef, lockScroll]);
 
   return containerRef;
 }

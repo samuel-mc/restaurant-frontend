@@ -27,6 +27,7 @@ import { downloadMenuExcelTemplate } from "@/services/adminMenuImportService";
 import { getAdminErrorMessage } from "@/lib/admin-error";
 import {
   BASIC_MAX_PRODUCTS,
+  BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE,
   isProPlan,
   type SubscriptionPlan,
 } from "@/lib/subscription-plan";
@@ -118,13 +119,19 @@ export function MenuManager({
 
   function openCreateProduct() {
     if (atProductLimit) {
-      showBanner(
-        `El Plan Básico permite hasta ${BASIC_MAX_PRODUCTS} platillos. Actualiza a Pro para menú ilimitado.`,
-      );
+      showBanner(BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE);
       return;
     }
     setFormError(null);
     setModal({ open: true, mode: "create", product: null });
+  }
+
+  function openImportMenu() {
+    if (atProductLimit) {
+      showBanner(BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE);
+      return;
+    }
+    setImportOpen(true);
   }
 
   async function handleDownloadTemplate() {
@@ -278,6 +285,10 @@ export function MenuManager({
 
     try {
       if (modal.mode === "create") {
+        if (atProductLimit) {
+          setFormError(BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE);
+          return;
+        }
         const created = await createProductWithForm(payload, tenantSlug);
         startTransition(() => {
           setProducts((prev) =>
@@ -469,8 +480,11 @@ export function MenuManager({
             </button>
             <button
               type="button"
-              onClick={() => setImportOpen(true)}
+              onClick={openImportMenu}
               disabled={atProductLimit}
+              title={
+                atProductLimit ? BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE : undefined
+              }
               className={`${btnSecondary} disabled:opacity-40`}
             >
               <Upload className="size-4 shrink-0" aria-hidden />
@@ -480,6 +494,9 @@ export function MenuManager({
               type="button"
               onClick={openCreateProduct}
               disabled={!canCreateProduct}
+              title={
+                atProductLimit ? BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE : undefined
+              }
               className={`${btnPrimary} disabled:opacity-40`}
             >
               Nuevo platillo
@@ -493,7 +510,7 @@ export function MenuManager({
           >
             Plan Básico: {products.length}/{BASIC_MAX_PRODUCTS} platillos
             {atProductLimit
-              ? " · Límite alcanzado. Pasa a Pro para continuar."
+              ? " · Límite alcanzado. Actualiza al Plan Pro para agregar o importar más."
               : "."}
           </p>
         ) : null}
@@ -577,7 +594,7 @@ export function MenuManager({
               title="Sin platillos en esta categoría"
               description={
                 atProductLimit
-                  ? `Alcanzaste el límite de ${BASIC_MAX_PRODUCTS} platillos del Plan Básico.`
+                  ? BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE
                   : "Agrega el primer platillo o selecciona otra categoría."
               }
               actionLabel="Agregar platillo"
@@ -618,6 +635,11 @@ export function MenuManager({
         open={importOpen}
         tenantSlug={tenantSlug}
         busy={false}
+        remainingSlots={
+          isProPlan(plan)
+            ? null
+            : Math.max(0, BASIC_MAX_PRODUCTS - products.length)
+        }
         onClose={() => setImportOpen(false)}
         onImported={handleMenuImported}
       />

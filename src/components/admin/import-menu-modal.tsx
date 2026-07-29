@@ -15,6 +15,8 @@ interface ImportMenuModalProps {
   open: boolean;
   tenantSlug: string;
   busy: boolean;
+  /** Cupos restantes en Plan Básico; null = Pro / ilimitado. */
+  remainingSlots?: number | null;
   onClose: () => void;
   onImported: (result: MenuImportResult) => void;
 }
@@ -26,6 +28,7 @@ export function ImportMenuModal({
   open,
   tenantSlug,
   busy,
+  remainingSlots = null,
   onClose,
   onImported,
 }: ImportMenuModalProps) {
@@ -132,6 +135,18 @@ export function ImportMenuModal({
             <p className="mt-0.5 text-sm text-muted-foreground">
               Usa la plantilla oficial. Las categorías se crean solas si no
               existen.
+              {remainingSlots != null ? (
+                <>
+                  {" "}
+                  Plan Básico: puedes importar hasta{" "}
+                  <span className="font-semibold text-foreground">
+                    {remainingSlots}
+                  </span>{" "}
+                  platillo{remainingSlots === 1 ? "" : "s"} más. Si el archivo
+                  supera ese cupo, la importación se rechaza; actualiza al Plan
+                  Pro para menú ilimitado.
+                </>
+              ) : null}
             </p>
           </div>
           <button

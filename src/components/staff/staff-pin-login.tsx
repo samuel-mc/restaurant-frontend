@@ -435,9 +435,16 @@ export function StaffPinLogin({
 
 function StaffAccessHelp() {
   return (
-    <p className="shrink-0 pb-2 text-center text-sm leading-snug text-muted-foreground">
-      ¿No aparece tu nombre? Pide al encargado que te agregue.
-    </p>
+    <div className="shrink-0 space-y-2 pb-2 text-center text-sm leading-snug">
+      <p className="text-muted-foreground">
+        ¿No aparece tu nombre? Pide al encargado que te agregue.
+      </p>
+      <p>
+        <Link href="/admin/login" className={linkClass}>
+          Iniciar como administrador
+        </Link>
+      </p>
+    </div>
   );
 }
 

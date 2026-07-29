@@ -117,6 +117,10 @@ export function SettingsForm({
     profile.plan,
     profile.paymentStatus,
   );
+  const websiteFieldsEditable = canPublishWebsite(
+    profile.plan,
+    profile.paymentStatus,
+  );
 
   function handleImageChange(
     kind: "logo" | "banner",
@@ -383,7 +387,7 @@ export function SettingsForm({
 
         <Section
           title="Información comercial"
-          description="Datos que verán tus comensales en el sitio y el menú."
+          description="Datos de contacto y presentación usados en el menú, seguimiento de pedidos y ayuda al personal."
         >
           <Field label="Nombre comercial" error={errors.name} htmlFor="name">
             <input
@@ -412,11 +416,47 @@ export function SettingsForm({
             />
           </Field>
 
-          <Field label="Dirección" htmlFor="address" className="mt-4">
+          <Field
+            label="WhatsApp de atención"
+            htmlFor="whatsapp"
+            className="mt-4"
+          >
+            <input
+              id="whatsapp"
+              value={whatsapp}
+              disabled={submitting}
+              onChange={(e) => setWhatsapp(e.target.value)}
+              className={inputClass(false)}
+              placeholder="5215512345678"
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Se muestra en el menú, el tracking del pedido y los logins de
+              ayuda.
+            </p>
+          </Field>
+        </Section>
+
+        <Section
+          title="Sitio web (Pro)"
+          description={
+            websiteFieldsEditable
+              ? "Estos datos aparecen en tu landing institucional cuando el sitio está publicado."
+              : "Principalmente para la landing Pro. Se editan con Plan Pro y pago activo."
+          }
+        >
+          {!websiteFieldsEditable ? (
+            <p className="mb-4 rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+              Dirección, mapa y horarios alimentan el{" "}
+              <span className="font-semibold text-foreground">sitio web</span>.
+              Actualiza a Plan Pro con pago activo para editarlos.
+            </p>
+          ) : null}
+
+          <Field label="Dirección" htmlFor="address">
             <input
               id="address"
               value={address}
-              disabled={submitting}
+              disabled={submitting || !websiteFieldsEditable}
               onChange={(e) => setAddress(e.target.value)}
               className={inputClass(false)}
               placeholder="Calle, colonia, ciudad"
@@ -432,35 +472,23 @@ export function SettingsForm({
             <input
               id="maps"
               value={googleMapsUrl}
-              disabled={submitting}
+              disabled={submitting || !websiteFieldsEditable}
               onChange={(e) => setGoogleMapsUrl(e.target.value)}
               className={inputClass(Boolean(errors.googleMapsUrl))}
               placeholder="https://maps.google.com/…"
             />
           </Field>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="WhatsApp de atención" htmlFor="whatsapp">
-              <input
-                id="whatsapp"
-                value={whatsapp}
-                disabled={submitting}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                className={inputClass(false)}
-                placeholder="5215512345678"
-              />
-            </Field>
-            <Field label="Horarios" htmlFor="hours">
-              <input
-                id="hours"
-                value={businessHours}
-                disabled={submitting}
-                onChange={(e) => setBusinessHours(e.target.value)}
-                className={inputClass(false)}
-                placeholder="Lun–Dom 12:00–22:00"
-              />
-            </Field>
-          </div>
+          <Field label="Horarios" htmlFor="hours" className="mt-4">
+            <input
+              id="hours"
+              value={businessHours}
+              disabled={submitting || !websiteFieldsEditable}
+              onChange={(e) => setBusinessHours(e.target.value)}
+              className={inputClass(false)}
+              placeholder="Lun–Dom 12:00–22:00"
+            />
+          </Field>
         </Section>
 
         <Section

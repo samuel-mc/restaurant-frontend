@@ -28,6 +28,7 @@ import { getAdminErrorMessage } from "@/lib/admin-error";
 import {
   BASIC_MAX_PRODUCTS,
   BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE,
+  basicProductOverLimitMessage,
   isProPlan,
   type SubscriptionPlan,
 } from "@/lib/subscription-plan";
@@ -509,9 +510,11 @@ export function MenuManager({
             className="mt-4 rounded-xl border border-warn/25 bg-warn-muted px-4 py-2.5 text-sm text-warn-ink"
           >
             Plan Básico: {products.length}/{BASIC_MAX_PRODUCTS} platillos
-            {atProductLimit
-              ? " · Límite alcanzado. Actualiza al Plan Pro para agregar o importar más."
-              : "."}
+            {products.length > BASIC_MAX_PRODUCTS
+              ? ` · ${basicProductOverLimitMessage(products.length)}`
+              : atProductLimit
+                ? " · Límite alcanzado. Actualiza al Plan Pro para agregar o importar más."
+                : "."}
           </p>
         ) : null}
         {banner ? (

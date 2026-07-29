@@ -10,6 +10,14 @@ export const BASIC_MAX_PRODUCTS = 30;
 export const BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE =
   `El Plan Básico permite hasta ${BASIC_MAX_PRODUCTS} platillos. Actualiza al Plan Pro para menú ilimitado.`;
 
+/** Banner cuando el inventario supera el tope del menú público (p. ej. tras un downgrade). */
+export function basicProductOverLimitMessage(currentCount: number): string {
+  return (
+    `El menú público solo muestra los primeros ${BASIC_MAX_PRODUCTS} de ${currentCount}. ` +
+    `Actualiza al Plan Pro para publicar todos, o elimina platillos hasta quedar en ${BASIC_MAX_PRODUCTS}.`
+  );
+}
+
 export function basicImportWouldExceedMessage(
   currentCount: number,
   fileRowCount: number,

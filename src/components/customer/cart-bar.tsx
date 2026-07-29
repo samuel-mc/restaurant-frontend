@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
 import { formatTableLabel } from "@/lib/table-session";
 import {
+  CART_ITEM_NOTES_MAX,
   useCartCount,
   useCartStore,
   useCartSubtotal,
@@ -184,6 +185,7 @@ export function CartBar({
   const sessionName = useCartStore((state) => state.customerName);
   const addItem = useCartStore((state) => state.addItem);
   const decrementItem = useCartStore((state) => state.decrementItem);
+  const setLineNotes = useCartStore((state) => state.setLineNotes);
   const clearCart = useCartStore((state) => state.clear);
   const setActiveOrderSession = useCartStore(
     (state) => state.setActiveOrderSession,
@@ -429,9 +431,10 @@ export function CartBar({
     setIsSubmitting(true);
 
     const orderData: CreateOrderDTO = {
-      items: orderedLines.map(({ product, quantity }) => ({
+      items: orderedLines.map(({ product, quantity, notes }) => ({
         productId: product.uuid,
         quantity,
+        notes: notes?.trim() ? notes.trim().slice(0, CART_ITEM_NOTES_MAX) : null,
       })),
       tableNumber:
         effectiveType === "IN_TABLE"
@@ -772,7 +775,7 @@ export function CartBar({
                       {itemLabel} en el carrito · puedes vaciarlo abajo
                     </p>
                     <ul className="divide-y divide-border/60">
-                      {orderedLines.map(({ product, quantity }) => (
+                      {orderedLines.map(({ product, quantity, notes }) => (
                         <li
                           key={product.uuid}
                           className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
@@ -784,6 +787,11 @@ export function CartBar({
                             >
                               {product.name}
                             </p>
+                            {notes ? (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                {notes}
+                              </p>
+                            ) : null}
                           </div>
                           <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
                             ×{quantity}
@@ -859,34 +867,61 @@ export function CartBar({
                   </div>
 
                   <ul className="divide-y divide-border/60">
-                    {orderedLines.map(({ product, quantity }) => (
+                    {orderedLines.map(({ product, quantity, notes }) => (
                       <li
                         key={product.uuid}
-                        className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
+                        className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0"
                       >
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className="truncate text-sm font-medium tracking-tight text-foreground"
-                            title={product.name}
-                          >
-                            {product.name}
-                          </p>
-                          <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-                            {formatCurrency(product.price * quantity)}
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="truncate text-sm font-medium tracking-tight text-foreground"
+                              title={product.name}
+                            >
+                              {product.name}
+                            </p>
+                            <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                              {formatCurrency(product.price * quantity)}
+                            </p>
+                            {!showLineSteppers && notes ? (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                Nota: {notes}
+                              </p>
+                            ) : null}
+                          </div>
+                          {showLineSteppers ? (
+                            <QuantityStepper
+                              quantity={quantity}
+                              label={product.name}
+                              onIncrement={() => addItem(product)}
+                              onDecrement={() => decrementItem(product.uuid)}
+                            />
+                          ) : (
+                            <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                              ×{quantity}
+                            </span>
+                          )}
                         </div>
                         {showLineSteppers ? (
-                          <QuantityStepper
-                            quantity={quantity}
-                            label={product.name}
-                            onIncrement={() => addItem(product)}
-                            onDecrement={() => decrementItem(product.uuid)}
-                          />
-                        ) : (
-                          <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                            ×{quantity}
-                          </span>
-                        )}
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[0.65rem] font-medium text-muted-foreground">
+                              Notas (opcional)
+                            </span>
+                            <input
+                              type="text"
+                              name={`notes-${product.uuid}`}
+                              maxLength={CART_ITEM_NOTES_MAX}
+                              placeholder="Ej. sin cebolla…"
+                              value={notes ?? ""}
+                              disabled={isSubmitting}
+                              onChange={(event) =>
+                                setLineNotes(product.uuid, event.target.value)
+                              }
+                              className={fieldClass}
+                              aria-label={`Notas para ${product.name}`}
+                            />
+                          </label>
+                        ) : null}
                       </li>
                     ))}
                   </ul>

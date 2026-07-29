@@ -3,6 +3,7 @@
 /**
  * Fila de producto del menú del comensal (mobile-first).
  * Descripción larga: 2 líneas en móvil / 3 en sm+; tap para expandir.
+ * «Agregar» abre sheet con notas opcionales; el stepper suma cantidad.
  */
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -10,6 +11,7 @@ import { UtensilsCrossed } from "lucide-react";
 import type { Product } from "@/types/api";
 import { useCartStore, useProductQuantity } from "@/store/cartStore";
 import { QuantityStepper } from "@/components/customer/quantity-stepper";
+import { ProductAddSheet } from "@/components/customer/product-add-sheet";
 
 interface ProductCardProps {
   product: Product;
@@ -135,9 +137,13 @@ export function ProductCard({
   const quantity = useProductQuantity(product.uuid);
   const addItem = useCartStore((state) => state.addItem);
   const decrementItem = useCartStore((state) => state.decrementItem);
+  const lineNotes = useCartStore(
+    (state) => state.lines[product.uuid]?.notes ?? null,
+  );
   const unavailable = !product.isAvailable;
   const prevQuantityRef = useRef(quantity);
   const [stepperEnter, setStepperEnter] = useState(false);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
 
   useEffect(() => {
     if (prevQuantityRef.current === 0 && quantity === 1) {
@@ -149,72 +155,86 @@ export function ProductCard({
     prevQuantityRef.current = quantity;
   }, [quantity]);
 
-  function handleAdd() {
-    addItem(product);
+  function handleConfirmAdd(notes: string | null) {
+    addItem(product, { notes });
+    setAddSheetOpen(false);
   }
 
   return (
-    <article className="flex gap-3 p-3.5">
-      <div
-        className={
-          unavailable
-            ? "opacity-55 grayscale-[0.35]"
-            : undefined
-        }
-      >
-        <ProductImage src={product.imageUrl} alt={product.name} />
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-start justify-between gap-2">
-          <h3
-            className="min-w-0 line-clamp-2 text-sm font-semibold leading-snug tracking-tight break-words text-foreground"
-            title={product.name}
-          >
-            {product.name}
-          </h3>
-          {unavailable ? (
-            <span className="shrink-0 rounded-lg bg-secondary px-2 py-0.5 text-xs font-bold text-foreground">
-              Agotado
-            </span>
-          ) : null}
+    <>
+      <article className="flex gap-3 p-3.5">
+        <div
+          className={
+            unavailable ? "opacity-55 grayscale-[0.35]" : undefined
+          }
+        >
+          <ProductImage src={product.imageUrl} alt={product.name} />
         </div>
 
-        {product.description ? (
-          <ProductDescription
-            text={product.description}
-            productName={product.name}
-          />
-        ) : null}
-
-        <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
-          <span className="text-base font-bold tabular-nums tracking-tight">
-            {product.formattedPrice}
-          </span>
-
-          {!orderingEnabled || unavailable ? null : quantity > 0 ? (
-            <div className={stepperEnter ? "stepper-enter" : undefined}>
-              <QuantityStepper
-                quantity={quantity}
-                label={product.name}
-                onIncrement={() => addItem(product)}
-                onDecrement={() => decrementItem(product.uuid)}
-              />
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleAdd}
-              className={`${focusRing} inline-flex min-h-11 items-center gap-1 rounded-xl bg-[var(--menu-accent)] px-3.5 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.97]`}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-start justify-between gap-2">
+            <h3
+              className="min-w-0 line-clamp-2 text-sm font-semibold leading-snug tracking-tight break-words text-foreground"
+              title={product.name}
             >
-              <span className="text-base leading-none" aria-hidden>
-                +
+              {product.name}
+            </h3>
+            {unavailable ? (
+              <span className="shrink-0 rounded-lg bg-secondary px-2 py-0.5 text-xs font-bold text-foreground">
+                Agotado
               </span>
-              Agregar
-            </button>
-          )}
+            ) : null}
+          </div>
+
+          {product.description ? (
+            <ProductDescription
+              text={product.description}
+              productName={product.name}
+            />
+          ) : null}
+
+          {quantity > 0 && lineNotes ? (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+              Nota: {lineNotes}
+            </p>
+          ) : null}
+
+          <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
+            <span className="text-base font-bold tabular-nums tracking-tight">
+              {product.formattedPrice}
+            </span>
+
+            {!orderingEnabled || unavailable ? null : quantity > 0 ? (
+              <div className={stepperEnter ? "stepper-enter" : undefined}>
+                <QuantityStepper
+                  quantity={quantity}
+                  label={product.name}
+                  onIncrement={() => addItem(product)}
+                  onDecrement={() => decrementItem(product.uuid)}
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddSheetOpen(true)}
+                className={`${focusRing} inline-flex min-h-11 items-center gap-1 rounded-xl bg-[var(--menu-accent)] px-3.5 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.97]`}
+              >
+                <span className="text-base leading-none" aria-hidden>
+                  +
+                </span>
+                Agregar
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+
+      <ProductAddSheet
+        product={product}
+        open={addSheetOpen}
+        onClose={() => setAddSheetOpen(false)}
+        onConfirm={handleConfirmAdd}
+      />
+    </>
   );
 }

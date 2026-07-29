@@ -9,10 +9,12 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Product } from "@/types/api";
 
-/** Línea del carrito: el producto y su cantidad. */
+/** Línea del carrito: producto, cantidad y notas opcionales del comensal. */
 export interface CartLine {
   product: Product;
   quantity: number;
+  /** Anotaciones para cocina (ej. sin cebolla). */
+  notes: string | null;
 }
 
 /** Sesión de mesa: permite enviar adiciones al mismo ticket. */
@@ -32,9 +34,14 @@ interface CartState {
   /** Token del QR (?t=); requerido para abrir/consultar cuenta IN_TABLE. */
   tableToken: string | null;
   customerName: string | null;
-  addItem: (product: Product) => void;
+  /**
+   * Suma 1 al producto. En el primer alta, `notes` queda en la línea;
+   * en incrementos posteriores se conserva la nota existente salvo que se pase otra.
+   */
+  addItem: (product: Product, options?: { notes?: string | null }) => void;
   decrementItem: (uuid: string) => void;
   removeItem: (uuid: string) => void;
+  setLineNotes: (uuid: string, notes: string | null) => void;
   clear: () => void;
   setActiveOrderSession: (session: ActiveOrderSession) => void;
   clearActiveOrderSession: () => void;
@@ -58,6 +65,22 @@ const emptySession = {
   customerName: null as string | null,
 };
 
+/** Notas de ítem: trim + tope alineado con VARCHAR(255) del backend. */
+export const CART_ITEM_NOTES_MAX = 255;
+
+function normalizeNotes(notes: string | null | undefined): string | null {
+  if (notes == null) return null;
+  const trimmed = notes.trim().slice(0, CART_ITEM_NOTES_MAX);
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Conserva espacios al escribir; solo limita longitud. */
+function coerceNotesInput(notes: string | null | undefined): string | null {
+  if (notes == null) return null;
+  const sliced = notes.slice(0, CART_ITEM_NOTES_MAX);
+  return sliced.length > 0 ? sliced : null;
+}
+
 function hasCartContent(state: {
   lines: Record<string, CartLine>;
   activeOrderId: string | null;
@@ -76,15 +99,20 @@ export const useCartStore = create<CartState>()(
       tenantSlug: null,
       ...emptySession,
 
-      addItem: (product) =>
+      addItem: (product, options) =>
         set((state) => {
           const existing = state.lines[product.uuid];
+          const nextNotes =
+            options && "notes" in options
+              ? normalizeNotes(options.notes)
+              : (existing?.notes ?? null);
           return {
             lines: {
               ...state.lines,
               [product.uuid]: {
                 product,
                 quantity: (existing?.quantity ?? 0) + 1,
+                notes: nextNotes,
               },
             },
           };
@@ -110,6 +138,21 @@ export const useCartStore = create<CartState>()(
           const nextLines = { ...state.lines };
           delete nextLines[uuid];
           return { lines: nextLines };
+        }),
+
+      setLineNotes: (uuid, notes) =>
+        set((state) => {
+          const existing = state.lines[uuid];
+          if (!existing) return state;
+          return {
+            lines: {
+              ...state.lines,
+              [uuid]: {
+                ...existing,
+                notes: coerceNotesInput(notes),
+              },
+            },
+          };
         }),
 
       clear: () => set({ lines: {} }),

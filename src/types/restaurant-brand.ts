@@ -29,7 +29,7 @@ export const DEFAULT_RESTAURANT_BRAND: RestaurantBrand = {
   primaryColor: "#1A3D2B",
   secondaryColor: "#C9612A",
   hasDelivery: false,
-  hasPickup: true,
+  hasPickup: false,
   hasReservations: false,
   orderingEnabled: true,
 };

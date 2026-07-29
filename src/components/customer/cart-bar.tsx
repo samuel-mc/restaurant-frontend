@@ -82,7 +82,7 @@ function resolveOrderTypes(
   }
 
   const options: OrderTypeOption[] = [];
-  if (modules?.hasPickup ?? true) {
+  if (modules?.hasPickup) {
     options.push({ value: "PICKUP", label: "Para llevar" });
   }
   if (modules?.hasDelivery) {

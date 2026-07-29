@@ -7,6 +7,12 @@ import {
   setSuperAdminToken,
 } from "@/services/superadminService";
 import { ApiError } from "@/services/apiClient";
+import {
+  saAlertError,
+  saField,
+  saFocusOnSurface,
+  saPrimaryBtn,
+} from "@/components/superadmin/superadmin-ui";
 
 export function SuperAdminLoginForm() {
   const router = useRouter();
@@ -28,8 +34,9 @@ export function SuperAdminLoginForm() {
     } catch (err) {
       setError(
         err instanceof ApiError
-          ? err.message || "Credenciales inválidas."
-          : "No se pudo iniciar sesión.",
+          ? err.message ||
+              "Correo o contraseña incorrectos. Verifica e inténtalo de nuevo."
+          : "No se pudo iniciar sesión. Revisa tu conexión e inténtalo de nuevo.",
       );
     } finally {
       setSubmitting(false);
@@ -39,17 +46,17 @@ export function SuperAdminLoginForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full max-w-sm space-y-4 rounded-2xl border border-white/[0.08] bg-[#111113] p-6 shadow-2xl shadow-black/40"
+      className="relative z-10 w-full max-w-sm space-y-4 rounded-2xl border border-white/[0.08] bg-[#111113] p-6 shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
     >
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
           PlatoListo
         </p>
         <h1 className="mt-2 text-xl font-semibold tracking-tight text-white">
           SuperAdmin
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Backoffice global de la plataforma
+          Acceso del equipo PlatoListo a restaurantes, planes y cupones
         </p>
       </div>
 
@@ -64,8 +71,8 @@ export function SuperAdminLoginForm() {
           disabled={submitting}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
-          placeholder="superadmin@platolisto.com"
+          className={`${saField} ${saFocusOnSurface}`}
+          placeholder="tu@platolisto.com"
         />
       </label>
 
@@ -80,15 +87,12 @@ export function SuperAdminLoginForm() {
           disabled={submitting}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+          className={`${saField} ${saFocusOnSurface}`}
         />
       </label>
 
       {error ? (
-        <p
-          role="alert"
-          className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-300"
-        >
+        <p role="alert" className={saAlertError}>
           {error}
         </p>
       ) : null}
@@ -96,9 +100,9 @@ export function SuperAdminLoginForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-60"
+        className={`w-full ${saPrimaryBtn} ${saFocusOnSurface}`}
       >
-        {submitting ? "Entrando…" : "Entrar"}
+        {submitting ? "Entrando…" : "Entrar a SuperAdmin"}
       </button>
     </form>
   );

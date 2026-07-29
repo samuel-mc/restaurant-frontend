@@ -4,7 +4,7 @@ import { getSuperAdminTenantsServer } from "@/services/superadminQueries";
 import { ApiError } from "@/services/apiClient";
 
 export const metadata = {
-  title: "SuperAdmin · Tenants | PlatoListo",
+  title: "SuperAdmin · Restaurantes | PlatoListo",
 };
 
 export default async function SuperAdminTenantsPage() {
@@ -18,17 +18,17 @@ export default async function SuperAdminTenantsPage() {
     error =
       err instanceof ApiError
         ? err.message
-        : "No se pudo cargar el directorio de tenants.";
+        : "No se pudo cargar el directorio de restaurantes. Revisa la conexión o vuelve a iniciar sesión.";
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight text-white">
-          Tenants
+          Restaurantes
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Directorio global de restaurantes registrados en la plataforma.
+          Plan, cobro, suspensión e ingreso al panel de cada local.
         </p>
       </header>
 

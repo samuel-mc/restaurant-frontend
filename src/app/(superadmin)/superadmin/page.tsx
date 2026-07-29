@@ -4,7 +4,7 @@ import { getSuperAdminMetricsServer } from "@/services/superadminQueries";
 import { ApiError } from "@/services/apiClient";
 
 export const metadata = {
-  title: "SuperAdmin · Dashboard | PlatoListo",
+  title: "SuperAdmin · Panel | PlatoListo",
 };
 
 export default async function SuperAdminDashboardPage() {
@@ -18,17 +18,18 @@ export default async function SuperAdminDashboardPage() {
     error =
       err instanceof ApiError
         ? err.message
-        : "No se pudieron cargar las métricas globales.";
+        : "No se pudieron cargar las métricas. Revisa la conexión o vuelve a iniciar sesión.";
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight text-white">
-          Métricas globales
+          Panel
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Salud del SaaS: ingresos estimados, tenants y crecimiento.
+          Vista rápida de ingresos estimados, restaurantes activos y altas
+          recientes.
         </p>
       </header>
 

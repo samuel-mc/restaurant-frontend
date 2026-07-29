@@ -20,6 +20,7 @@ import { getAdminErrorMessage } from "@/lib/admin-error";
 import { redeemCoupon } from "@/services/adminBillingService";
 import {
   canPublishWebsite,
+  canUsePickupAndDelivery,
   isProPlan,
   paymentStatusLabel,
   planLabel,
@@ -73,8 +74,16 @@ export function SettingsForm({
   const [businessHours, setBusinessHours] = useState(
     initialProfile.businessHours ?? "",
   );
-  const [hasDelivery, setHasDelivery] = useState(initialProfile.hasDelivery);
-  const [hasPickup, setHasPickup] = useState(initialProfile.hasPickup);
+  const [hasDelivery, setHasDelivery] = useState(
+    canUsePickupAndDelivery(initialProfile.plan, initialProfile.paymentStatus)
+      ? initialProfile.hasDelivery
+      : false,
+  );
+  const [hasPickup, setHasPickup] = useState(
+    canUsePickupAndDelivery(initialProfile.plan, initialProfile.paymentStatus)
+      ? initialProfile.hasPickup
+      : false,
+  );
   const [hasReservations, setHasReservations] = useState(
     initialProfile.hasReservations,
   );
@@ -102,6 +111,10 @@ export function SettingsForm({
   const [couponBusy, setCouponBusy] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const landingDelivered = hasTenantLanding(tenantSlug);
+  const pickupDeliveryAllowed = canUsePickupAndDelivery(
+    profile.plan,
+    profile.paymentStatus,
+  );
 
   function handleImageChange(
     kind: "logo" | "banner",
@@ -199,8 +212,8 @@ export function SettingsForm({
       googleMapsUrl: maps,
       whatsapp: whatsapp.trim(),
       businessHours: businessHours.trim(),
-      hasDelivery,
-      hasPickup,
+      hasDelivery: pickupDeliveryAllowed ? hasDelivery : false,
+      hasPickup: pickupDeliveryAllowed ? hasPickup : false,
       hasReservations,
       orderingEnabled,
       websitePublished,
@@ -572,16 +585,28 @@ export function SettingsForm({
             />
             <ModuleSwitch
               label="A domicilio"
-              description="Pedidos con entrega a domicilio"
-              checked={hasDelivery}
-              disabled={submitting || !orderingEnabled}
+              description={
+                pickupDeliveryAllowed
+                  ? "Pedidos con entrega a domicilio"
+                  : "Disponible solo en Plan Pro con pago activo."
+              }
+              checked={pickupDeliveryAllowed && hasDelivery}
+              disabled={
+                submitting || !orderingEnabled || !pickupDeliveryAllowed
+              }
               onChange={setHasDelivery}
             />
             <ModuleSwitch
               label="Para llevar"
-              description="Pedidos para recoger en el local"
-              checked={hasPickup}
-              disabled={submitting || !orderingEnabled}
+              description={
+                pickupDeliveryAllowed
+                  ? "Pedidos para recoger en el local"
+                  : "Disponible solo en Plan Pro con pago activo."
+              }
+              checked={pickupDeliveryAllowed && hasPickup}
+              disabled={
+                submitting || !orderingEnabled || !pickupDeliveryAllowed
+              }
               onChange={setHasPickup}
             />
             <ModuleSwitch

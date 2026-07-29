@@ -342,7 +342,7 @@ export function MenuView({
   const exploreOrdersUnavailable =
     !tableLockedFromQr &&
     Boolean(modules) &&
-    !(modules?.hasPickup ?? true) &&
+    !modules?.hasPickup &&
     !modules?.hasDelivery;
   /** Sin QR ni canales: solo consulta (no Agregar). */
   const canAddToCart = orderingEnabled && !exploreOrdersUnavailable;

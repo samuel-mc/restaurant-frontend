@@ -22,6 +22,14 @@ export function canPublishWebsite(
   return isProPlan(plan) && isPaymentActive(paymentStatus);
 }
 
+/** Pickup / delivery: solo Plan Pro con pago activo. */
+export function canUsePickupAndDelivery(
+  plan: string | null | undefined,
+  paymentStatus: string | null | undefined,
+): boolean {
+  return isProPlan(plan) && isPaymentActive(paymentStatus);
+}
+
 export function planLabel(plan: string | null | undefined): string {
   if (plan === "PRO") return "Plan Pro";
   return "Plan Básico";

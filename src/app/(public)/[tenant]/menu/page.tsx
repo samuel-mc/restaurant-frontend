@@ -129,7 +129,7 @@ export default async function TenantMenuPage({
             orderingEnabled={profile.orderingEnabled !== false}
             modules={{
               hasDelivery: profile.hasDelivery ?? false,
-              hasPickup: profile.hasPickup ?? true,
+              hasPickup: profile.hasPickup ?? false,
             }}
           />
         ) : (

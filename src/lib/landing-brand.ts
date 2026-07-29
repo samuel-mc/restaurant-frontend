@@ -22,7 +22,7 @@ export function buildLandingBrand(
     whatsapp: profile?.whatsapp ?? null,
     businessHours: profile?.businessHours ?? null,
     hasDelivery: profile?.hasDelivery ?? false,
-    hasPickup: profile?.hasPickup ?? true,
+    hasPickup: profile?.hasPickup ?? false,
     hasReservations: profile?.hasReservations ?? false,
     orderingEnabled: profile?.orderingEnabled !== false,
   };

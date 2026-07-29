@@ -4,7 +4,7 @@
  * CRUD de cupones para SuperAdmin (Billing).
  */
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type {
   SuperAdminCoupon,
@@ -15,12 +15,19 @@ import {
   updateSuperAdminCoupon,
 } from "@/services/superadminService";
 import { ApiError } from "@/services/apiClient";
+import { SuperAdminConfirmDialog } from "@/components/superadmin/superadmin-confirm-dialog";
+import {
+  saAlertError,
+  saAlertSuccess,
+  saField,
+  saFocus,
+  saPrimaryBtn,
+  saSecondaryBtn,
+  saSelect,
+} from "@/components/superadmin/superadmin-ui";
 
-const fieldClassName =
-  "w-full rounded-xl border border-white/[0.08] bg-[#0c0c0e] px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50";
-
-const selectClassName =
-  "rounded-lg border border-white/10 bg-[#0c0c0e] px-2 py-1.5 text-xs font-medium text-zinc-200 outline-none focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50";
+const fieldClassName = saField;
+const selectClassName = saSelect;
 
 function formatUsages(coupon: SuperAdminCoupon): string {
   if (coupon.maxRedemptions == null) {
@@ -64,7 +71,12 @@ export function SuperAdminCouponsPanel({
   const router = useRouter();
   const [coupons, setCoupons] = useState(initialCoupons);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | "create" | null>(null);
+  const [pendingToggle, setPendingToggle] = useState<SuperAdminCoupon | null>(
+    null,
+  );
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const [code, setCode] = useState("");
@@ -79,8 +91,19 @@ export function SuperAdminCouponsPanel({
   const [editMax, setEditMax] = useState("");
   const [editExpires, setEditExpires] = useState("");
 
+  useEffect(() => {
+    if (!success) return;
+    const t = window.setTimeout(() => setSuccess(null), 4500);
+    return () => window.clearTimeout(t);
+  }, [success]);
+
   function refresh() {
     startTransition(() => router.refresh());
+  }
+
+  function flashSuccess(message: string) {
+    setSuccess(message);
+    setError(null);
   }
 
   async function handleCreate(e: FormEvent) {
@@ -110,6 +133,7 @@ export function SuperAdminCouponsPanel({
       setGrantsPlan("PRO");
       setMaxRedemptions("");
       setExpiresLocal("");
+      flashSuccess(`Cupón ${created.code} creado.`);
       refresh();
     } catch (err) {
       setError(
@@ -117,7 +141,7 @@ export function SuperAdminCouponsPanel({
           ? err.message
           : err instanceof Error
             ? err.message
-            : "No se pudo crear el cupón.",
+            : "No se pudo crear el cupón. Revisa el código e inténtalo de nuevo.",
       );
     } finally {
       setBusyId(null);
@@ -158,6 +182,7 @@ export function SuperAdminCouponsPanel({
         prev.map((c) => (c.id === updated.id ? updated : c)),
       );
       setEditingId(null);
+      flashSuccess(`Cupón ${updated.code} actualizado.`);
       refresh();
     } catch (err) {
       setError(
@@ -165,16 +190,17 @@ export function SuperAdminCouponsPanel({
           ? err.message
           : err instanceof Error
             ? err.message
-            : "No se pudo actualizar el cupón.",
+            : "No se pudo actualizar el cupón. Revisa los campos e inténtalo de nuevo.",
       );
     } finally {
       setBusyId(null);
     }
   }
 
-  async function toggleActive(coupon: SuperAdminCoupon) {
-    if (busyId != null) return;
+  async function applyToggleActive(coupon: SuperAdminCoupon) {
+    if (busyId === coupon.id) return;
     setBusyId(coupon.id);
+    setDialogError(null);
     setError(null);
     try {
       const updated = await updateSuperAdminCoupon(coupon.id, {
@@ -183,12 +209,18 @@ export function SuperAdminCouponsPanel({
       setCoupons((prev) =>
         prev.map((c) => (c.id === updated.id ? updated : c)),
       );
+      setPendingToggle(null);
+      flashSuccess(
+        updated.active
+          ? `Cupón ${updated.code} reactivado.`
+          : `Cupón ${updated.code} desactivado. Ya no se puede canjear.`,
+      );
       refresh();
     } catch (err) {
-      setError(
+      setDialogError(
         err instanceof ApiError
           ? err.message
-          : "No se pudo cambiar el estado del cupón.",
+          : "No se pudo cambiar el estado del cupón. Revisa la conexión e inténtalo de nuevo.",
       );
     } finally {
       setBusyId(null);
@@ -198,19 +230,22 @@ export function SuperAdminCouponsPanel({
   return (
     <div className="space-y-8">
       {error ? (
-        <p
-          role="alert"
-          className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
-        >
+        <p role="alert" className={saAlertError}>
           {error}
+        </p>
+      ) : null}
+
+      {success ? (
+        <p role="status" className={saAlertSuccess}>
+          {success}
         </p>
       ) : null}
 
       <section className="rounded-2xl border border-white/[0.06] bg-[#111113] p-5">
         <h2 className="text-sm font-semibold text-white">Crear cupón</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          El código no se puede cambiar después. Usa desactivar para retirar un
-          cupón.
+          El código queda fijo al crearlo. Para retirarlo del registro, usa
+          Desactivar (no se borra el historial de canjes).
         </p>
         <form
           onSubmit={(e) => void handleCreate(e)}
@@ -284,7 +319,7 @@ export function SuperAdminCouponsPanel({
             <button
               type="submit"
               disabled={busyId != null || code.trim().length < 3}
-              className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+              className={`${saPrimaryBtn} ${saFocus}`}
             >
               {busyId === "create" ? "Creando…" : "Crear cupón"}
             </button>
@@ -294,9 +329,11 @@ export function SuperAdminCouponsPanel({
 
       <section className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111113]">
         <div className="border-b border-white/[0.06] px-5 py-4">
-          <h2 className="text-sm font-semibold text-white">Cupones</h2>
+          <h2 className="text-sm font-semibold text-white">Cupones activos</h2>
           <p className="mt-0.5 text-xs text-zinc-500">
-            {coupons.length} cupón{coupons.length === 1 ? "" : "es"}
+            {coupons.length === 0
+              ? "Ninguno todavía"
+              : `${coupons.length} cupón${coupons.length === 1 ? "" : "es"} en total`}
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -318,7 +355,8 @@ export function SuperAdminCouponsPanel({
                     colSpan={6}
                     className="px-4 py-10 text-center text-sm text-zinc-500"
                   >
-                    Aún no hay cupones.
+                    Aún no hay cupones. Usa el formulario de arriba para crear
+                    el primero.
                   </td>
                 </tr>
               ) : (
@@ -419,7 +457,7 @@ export function SuperAdminCouponsPanel({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => void saveEdit(coupon.id)}
-                                className="rounded-lg bg-emerald-500/90 px-2.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-40"
+                                className={`rounded-lg bg-[#047857] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#065F46] disabled:opacity-40 ${saFocus}`}
                               >
                                 Guardar
                               </button>
@@ -427,7 +465,7 @@ export function SuperAdminCouponsPanel({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => setEditingId(null)}
-                                className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-white/[0.06] disabled:opacity-40"
+                                className={`${saSecondaryBtn} ${saFocus}`}
                               >
                                 Cancelar
                               </button>
@@ -438,15 +476,18 @@ export function SuperAdminCouponsPanel({
                                 type="button"
                                 disabled={busyId != null}
                                 onClick={() => startEdit(coupon)}
-                                className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-white/[0.08] disabled:opacity-40"
+                                className={`${saSecondaryBtn} ${saFocus}`}
                               >
                                 Editar
                               </button>
                               <button
                                 type="button"
                                 disabled={busyId != null}
-                                onClick={() => void toggleActive(coupon)}
-                                className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-white/[0.08] disabled:opacity-40"
+                                onClick={() => {
+                                  setDialogError(null);
+                                  setPendingToggle(coupon);
+                                }}
+                                className={`${saSecondaryBtn} ${saFocus}`}
                               >
                                 {coupon.active ? "Desactivar" : "Activar"}
                               </button>
@@ -462,6 +503,36 @@ export function SuperAdminCouponsPanel({
           </table>
         </div>
       </section>
+
+      {pendingToggle ? (
+        <SuperAdminConfirmDialog
+          open
+          title={
+            pendingToggle.active
+              ? `¿Desactivar ${pendingToggle.code}?`
+              : `¿Reactivar ${pendingToggle.code}?`
+          }
+          description={
+            pendingToggle.active
+              ? `El cupón ${pendingToggle.code} dejará de aceptarse en registros nuevos. Los canjes ya hechos no se revierten.`
+              : `El cupón ${pendingToggle.code} volverá a poder canjearse (sujeto a usos y expiración).`
+          }
+          confirmLabel={pendingToggle.active ? "Desactivar cupón" : "Reactivar"}
+          busyLabel={
+            pendingToggle.active ? "Desactivando…" : "Reactivando…"
+          }
+          tone={pendingToggle.active ? "danger" : "neutral"}
+          challenge={pendingToggle.active ? pendingToggle.code : null}
+          busy={busyId === pendingToggle.id}
+          error={dialogError}
+          onConfirm={() => void applyToggleActive(pendingToggle)}
+          onCancel={() => {
+            if (busyId === pendingToggle.id) return;
+            setPendingToggle(null);
+            setDialogError(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

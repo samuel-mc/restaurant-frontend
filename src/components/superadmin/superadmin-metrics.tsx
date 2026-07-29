@@ -12,12 +12,23 @@ import type { SuperAdminMetrics } from "@/types/superadmin";
 import { buildAttentionQueue } from "@/lib/superadmin-attention";
 import { saFocus, saFocusOnSurface } from "@/components/superadmin/superadmin-ui";
 
-function formatMrr(value: number): string {
+function formatMrr(value: number, currency = "MXN"): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
+    currency,
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function mrrHint(metrics: SuperAdminMetrics): string {
+  const disclaimer =
+    metrics.estimatedMrrDisclaimerEs?.trim() ||
+    "Según métricas del servidor · no es facturación cerrada";
+  const label = metrics.estimatedMrrLabelEs?.trim();
+  if (label) {
+    return `${label} · ${disclaimer}`;
+  }
+  return disclaimer;
 }
 
 function monthLabel(month: string): string {
@@ -45,8 +56,11 @@ export function SuperAdminMetricsGrid({
   const metricsRow: MetricLink[] = [
     {
       label: "Ingreso mensual estimado",
-      value: formatMrr(metrics.estimatedMrr),
-      hint: "Según métricas del servidor · no es facturación cerrada",
+      value: formatMrr(
+        metrics.estimatedMrr,
+        metrics.estimatedMrrCurrency ?? "MXN",
+      ),
+      hint: mrrHint(metrics),
       href: "/superadmin/tenants",
     },
     {

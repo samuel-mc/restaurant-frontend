@@ -28,7 +28,17 @@ export interface SuperAdminMetrics {
   suspendedTenants: number;
   proTenants: number;
   basicTenants: number;
+  /** MRR estimado en pesos (unidad del servidor; no centavos). */
   estimatedMrr: number;
+  /** ISO 4217, p.ej. MXN — solo para formateo. */
+  estimatedMrrCurrency?: string;
+  estimatedMrrAsOf?: string;
+  estimatedMrrPeriod?: string;
+  estimatedMrrMethod?: string;
+  estimatedMrrLabelEs?: string;
+  estimatedMrrDisclaimerEs?: string;
+  estimatedMrrUnitPriceMxn?: number | null;
+  estimatedMrrProActiveCount?: number;
   churnRate: number;
   registrationGrowth: Array<{ month: string; count: number }>;
   /** Restaurantes con cobro pendiente. */

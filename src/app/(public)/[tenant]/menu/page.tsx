@@ -6,33 +6,34 @@ import { ApiError } from "@/services/apiClient";
 import type { Product, RestaurantProfile } from "@/types/api";
 import { MenuView } from "@/components/customer/menu-view";
 import { CustomerBrandHeader } from "@/components/customer/customer-brand-header";
+import { TenantUnavailable } from "@/components/customer/tenant-unavailable";
 import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
 import { brandFromProfile } from "@/lib/menu-brand";
+import { prettifyTenantSlug } from "@/lib/tenant-sites";
 
 type TenantMenuPageProps = {
   params: Promise<{ tenant: string }>;
   searchParams: Promise<{ m?: string | string[] }>;
 };
 
-function prettifyTenant(slug: string): string {
-  return slug
-    .split("-")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
 export async function generateMetadata({
   params,
 }: TenantMenuPageProps): Promise<Metadata> {
   const { tenant } = await params;
   const profile = await getPublicRestaurantProfileOrNull(tenant);
-  const name = profile?.name ?? prettifyTenant(tenant);
+  const name = profile?.name ?? prettifyTenantSlug(tenant);
+  if (!profile) {
+    return buildTenantPageMetadata({
+      title: `${name} · No disponible`,
+      description: `El restaurante ${name} no está disponible en este momento.`,
+      profile: null,
+    });
+  }
   return buildTenantPageMetadata({
     title: `${name} · Menú digital`,
     description:
-      profile?.description?.trim() ||
-      (profile?.orderingEnabled === false
+      profile.description?.trim() ||
+      (profile.orderingEnabled === false
         ? `Consulta el menú de ${name}.`
         : `Explora el menú de ${name} y arma tu pedido.`),
     profile,
@@ -83,12 +84,18 @@ export default async function TenantMenuPage({
         ? rawM[0]
         : null;
 
-  const [menu, profile] = await Promise.all([
-    loadMenu(tenant),
-    getPublicRestaurantProfileOrNull(tenant),
-  ]);
+  const profile = await getPublicRestaurantProfileOrNull(tenant);
+  const restaurantName = profile?.name ?? prettifyTenantSlug(tenant);
 
-  const restaurantName = profile?.name ?? prettifyTenant(tenant);
+  // TenantFilter 404 → perfil null (suspendido o inexistente).
+  if (!profile) {
+    return (
+      <TenantUnavailable tenantSlug={tenant} restaurantName={restaurantName} />
+    );
+  }
+
+  const menu = await loadMenu(tenant);
+
   const brand = brandFromProfile(profile);
   const hasBrandFill = Boolean(brand.accent);
   const supportLine = headerSupport(profile);
@@ -100,7 +107,7 @@ export default async function TenantMenuPage({
     >
       <CustomerBrandHeader
         restaurantName={restaurantName}
-        logoUrl={profile?.logoUrl}
+        logoUrl={profile.logoUrl}
         supportLine={supportLine}
         hasBrandFill={hasBrandFill}
       />
@@ -111,10 +118,10 @@ export default async function TenantMenuPage({
             products={menu.products}
             tenantSlug={tenant}
             tableFromQuery={tableFromQuery}
-            orderingEnabled={profile?.orderingEnabled !== false}
+            orderingEnabled={profile.orderingEnabled !== false}
             modules={{
-              hasDelivery: profile?.hasDelivery ?? false,
-              hasPickup: profile?.hasPickup ?? true,
+              hasDelivery: profile.hasDelivery ?? false,
+              hasPickup: profile.hasPickup ?? true,
             }}
           />
         ) : (
@@ -132,11 +139,11 @@ export default async function TenantMenuPage({
   );
 }
 
-function headerSupport(profile: RestaurantProfile | null): string | null {
-  if (profile?.orderingEnabled === false) {
+function headerSupport(profile: RestaurantProfile): string | null {
+  if (profile.orderingEnabled === false) {
     return "Solo consulta · pedidos desactivados";
   }
-  const description = profile?.description?.trim();
+  const description = profile.description?.trim();
   if (description) return description;
   return null;
 }

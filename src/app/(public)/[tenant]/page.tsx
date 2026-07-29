@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SiteInProgress } from "@/components/customer/site-in-progress";
 import { SiteNotCreated } from "@/components/customer/site-not-created";
+import { TenantUnavailable } from "@/components/customer/tenant-unavailable";
 import { buildLandingBrand } from "@/lib/landing-brand";
 import { getTenantLanding } from "@/lib/tenant-landings";
 import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
@@ -27,7 +28,10 @@ export async function generateMetadata({
   let title: string;
   let description: string;
 
-  if (!site) {
+  if (!profile) {
+    title = `${name} · No disponible`;
+    description = `El restaurante ${name} no está disponible en este momento.`;
+  } else if (!site) {
     title = `${name} · Sitio no publicado`;
     description = `El website de ${name} aún no ha sido publicado.`;
   } else if (!site.hasCustomLanding) {
@@ -36,7 +40,7 @@ export async function generateMetadata({
   } else {
     title = `${name} · Sitio oficial`;
     description =
-      profile?.description?.trim() ||
+      profile.description?.trim() ||
       `Conoce ${name}: menú, reservaciones, ubicación y más.`;
   }
 
@@ -57,6 +61,7 @@ async function loadCatalog(tenant: string): Promise<Product[]> {
 
 /**
  * Website institucional: landing **custom por tenant** (fee de setup).
+ * - Suspendido / inexistente → TenantUnavailable
  * - No publicado → SiteNotCreated
  * - Publicado sin componente registrado → SiteInProgress
  * - Publicado + registro → landing dedicada
@@ -65,13 +70,17 @@ export default async function TenantWebsitePage({
   params,
 }: TenantWebsitePageProps) {
   const { tenant } = await params;
-  const [profile, products] = await Promise.all([
-    getPublicRestaurantProfileOrNull(tenant),
-    loadCatalog(tenant),
-  ]);
-  const site = resolveTenantSite(tenant, profile);
+  const profile = await getPublicRestaurantProfileOrNull(tenant);
   const restaurantName = profile?.name ?? prettifyTenantSlug(tenant);
 
+  // Perfil null → tenant inexistente o suspendido (TenantFilter 404).
+  if (!profile) {
+    return (
+      <TenantUnavailable tenantSlug={tenant} restaurantName={restaurantName} />
+    );
+  }
+
+  const site = resolveTenantSite(tenant, profile);
   if (!site) {
     return (
       <SiteNotCreated tenantSlug={tenant} restaurantName={restaurantName} />
@@ -85,6 +94,7 @@ export default async function TenantWebsitePage({
     );
   }
 
+  const products = await loadCatalog(tenant);
   const brand = buildLandingBrand(site, profile);
   return <Landing brand={brand} products={products} />;
 }

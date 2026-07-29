@@ -38,9 +38,9 @@ export async function getMenuByTenant(tenantSlug: string): Promise<Product[]> {
 
   const catalog = await apiClient.get<ProductResponse[]>(MENU_CATALOG_PATH, {
     headers: { [TENANT_HEADER]: slug },
-    // El menú cambia con poca frecuencia: cacheamos y etiquetamos por tenant
-    // para poder revalidar de forma selectiva desde la gestión de menú.
-    next: { revalidate: 60, tags: [`menu:${slug}`] },
+    // Sin caché: un tenant suspendido (isActive=false) debe dejar de servir
+    // catálogo de inmediato; el perfil público ya usa no-store.
+    cache: "no-store",
   });
 
   return catalog.map(toProduct);

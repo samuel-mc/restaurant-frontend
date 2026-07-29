@@ -26,6 +26,7 @@ import {
   setToken,
 } from "@/services/authService";
 import { homePathForRole } from "@/lib/jwt-payload";
+import { STAFF_PIN_LENGTH } from "@/lib/staff-pin";
 import type { PublicStaffMember, StaffRole } from "@/types/api";
 
 const focusRing =
@@ -301,7 +302,7 @@ export function StaffPinLogin({
     }
 
     setPin((prev) => {
-      if (prev.length >= 6) return prev;
+      if (prev.length >= STAFF_PIN_LENGTH) return prev;
       return prev + key;
     });
   }, []);
@@ -309,7 +310,7 @@ export function StaffPinLogin({
   // Dispara el login cuando el PIN llega a 6 dígitos (fuera del updater de estado).
   useEffect(() => {
     const member = selectedRef.current;
-    if (!member || pin.length !== 6 || submittingRef.current) return;
+    if (!member || pin.length !== STAFF_PIN_LENGTH || submittingRef.current) return;
     void submitPin(pin, member);
   }, [pin, submitPin]);
 
@@ -825,10 +826,12 @@ function PinPad({
     ? "Comprobando PIN…"
     : showFailedDots
       ? "Ese PIN no coincide. Inténtalo de nuevo."
-      : `PIN: ${pin.length} de 6`;
+      : `PIN: ${pin.length} de ${STAFF_PIN_LENGTH}`;
   // Hint bajo el pad solo cuando no hay banner/alert que ya diga lo mismo.
   const statusHint =
-    busy || error || offline ? null : "Al completar 6 dígitos entras";
+    busy || error || offline
+      ? null
+      : `Al completar ${STAFF_PIN_LENGTH} dígitos entras`;
 
   return (
     <div className="w-full">

@@ -224,11 +224,11 @@ export function QrGenerator({
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Tarjetas para menú general o mesas. Cada mesa lleva un token de
-            acceso en la URL (
+            acceso con caducidad en la URL (
             <span className="font-semibold text-foreground">
               {tenantSlug}.{rootDomain}/menu?m=…&amp;t=…
             </span>
-            ). Reimprime los QR antiguos.
+            ). Reimprime los QR antiguos antes de que expiren.
           </p>
         </div>
       </header>

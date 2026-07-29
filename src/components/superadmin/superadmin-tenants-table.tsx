@@ -553,8 +553,14 @@ export function SuperAdminTenantsTable({
     setError(null);
     try {
       const result = await impersonateTenant(tenant.id);
-      const base = buildTenantAdminUrl(result.tenantSlug, "/admin/impersonate");
-      const url = `${base}#${encodeURIComponent(result.token)}`;
+      if (!result.code?.trim()) {
+        setDialogError("El servidor no devolvió un código de impersonación.");
+        return;
+      }
+      const url = buildTenantAdminUrl(
+        result.tenantSlug,
+        `/admin/impersonate?code=${encodeURIComponent(result.code.trim())}`,
+      );
       const supportTab = window.open(url, "_blank", "noopener,noreferrer");
       if (!supportTab) {
         setDialogError(

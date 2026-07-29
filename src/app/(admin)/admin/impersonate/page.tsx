@@ -2,37 +2,81 @@
 
 /**
  * Handoff de impersonación en el subdominio del tenant.
- * El JWT viaja en el hash (no se envía al servidor ni queda en logs de Next).
+ * Recibe un código de un solo uso (?code=) y lo canjea por cookie HttpOnly.
+ * El JWT no viaja en el hash ni queda expuesto a scripts de la página.
  */
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { setToken } from "@/services/authService";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AdminImpersonatePage() {
+const EXCHANGE_PATH = "/api/auth/impersonate";
+
+function tenantSlugFromHost(): string | null {
+  if (typeof window === "undefined") return null;
+  const hostname = window.location.hostname.toLowerCase();
+  if (hostname.endsWith(".localhost")) {
+    const sub = hostname.slice(0, -".localhost".length);
+    return sub && sub !== "www" && sub !== "app" ? sub : null;
+  }
+  const root = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "").toLowerCase();
+  if (root && hostname.endsWith(`.${root}`)) {
+    const sub = hostname.slice(0, -(root.length + 1));
+    return sub && sub !== "www" && sub !== "app" ? sub : null;
+  }
+  return null;
+}
+
+function ImpersonateHandoff() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const raw = window.location.hash.replace(/^#/, "").trim();
-    const token = decodeURIComponent(raw);
+    const code = searchParams.get("code")?.trim() ?? "";
     window.history.replaceState(null, "", window.location.pathname);
 
-    if (!token) {
-      setError("Falta el token de impersonación.");
+    if (!code) {
+      setError("Falta el código de impersonación.");
+      return;
+    }
+
+    const tenantSlug = tenantSlugFromHost();
+    if (!tenantSlug) {
+      setError("No se pudo identificar el restaurante en este dominio.");
       return;
     }
 
     let cancelled = false;
     void (async () => {
       try {
-        await setToken(token);
+        const response = await fetch(EXCHANGE_PATH, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "x-tenant-slug": tenantSlug,
+          },
+          body: JSON.stringify({ code }),
+          credentials: "same-origin",
+        });
+        if (!response.ok) {
+          const data = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(
+            data?.error || "No se pudo establecer la sesión de soporte.",
+          );
+        }
         if (cancelled) return;
         router.replace("/admin/dashboard");
         router.refresh();
-      } catch {
+      } catch (err) {
         if (!cancelled) {
-          setError("No se pudo establecer la sesión de soporte.");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "No se pudo establecer la sesión de soporte.",
+          );
         }
       }
     })();
@@ -40,7 +84,7 @@ export default function AdminImpersonatePage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, searchParams]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 text-center">
@@ -58,5 +102,19 @@ export default function AdminImpersonatePage() {
         <p className="text-sm text-zinc-400">Preparando sesión de soporte…</p>
       )}
     </div>
+  );
+}
+
+export default function AdminImpersonatePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 text-center">
+          <p className="text-sm text-zinc-400">Preparando sesión de soporte…</p>
+        </div>
+      }
+    >
+      <ImpersonateHandoff />
+    </Suspense>
   );
 }

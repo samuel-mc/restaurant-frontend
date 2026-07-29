@@ -7,6 +7,8 @@ import { ApiError } from "@/services/apiClient";
 export interface TableQrLink {
   tableNumber: string;
   tableToken: string;
+  /** ISO-8601 UTC de caducidad (tokens v2). */
+  expiresAt?: string | null;
 }
 
 function tenantHeaders(tenantSlug: string): HeadersInit {

@@ -11,6 +11,11 @@ import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { getAdminErrorMessage } from "@/lib/admin-error";
 import { setAdminLeaveBlocker } from "@/lib/admin-leave-guard";
 import {
+  STAFF_PIN_LENGTH,
+  isStaffPinFormat,
+  staffPinCreateError,
+} from "@/lib/staff-pin";
+import {
   createTeamMember,
   deactivateTeamMember,
   updateTeamMember,
@@ -134,36 +139,7 @@ function statusBadge(active: boolean): { label: string; className: string } {
 }
 
 function normalizePin(value: string): string {
-  return value.replace(/\D/g, "").slice(0, 6);
-}
-
-const WEAK_PIN_MESSAGE =
-  "Ese PIN es muy fácil de adivinar. Elige 6 dígitos que no sean consecutivos ni repetidos.";
-
-/** PINs triviales en tablet a la vista (000000, 123456, secuencias). */
-function isWeakPin(pin: string): boolean {
-  if (!/^\d{6}$/.test(pin)) return false;
-  if (/^(\d)\1{5}$/.test(pin)) return true;
-  if (
-    pin === "123456" ||
-    pin === "654321" ||
-    pin === "012345" ||
-    pin === "987654" ||
-    pin === "112233" ||
-    pin === "121212" ||
-    pin === "123123" ||
-    pin === "111222"
-  ) {
-    return true;
-  }
-  const digits = [...pin].map((d) => Number(d));
-  let ascending = true;
-  let descending = true;
-  for (let i = 1; i < digits.length; i++) {
-    if (digits[i] !== digits[i - 1] + 1) ascending = false;
-    if (digits[i] !== digits[i - 1] - 1) descending = false;
-  }
-  return ascending || descending;
+  return value.replace(/\D/g, "").slice(0, STAFF_PIN_LENGTH);
 }
 
 function namesMatch(a: string, b: string): boolean {
@@ -1643,7 +1619,7 @@ function MemberFormModal({
   const [discardOpen, setDiscardOpen] = useState(false);
 
   const reviewDirty =
-    step === "review" && name.trim().length > 0 && /^\d{6}$/.test(pin);
+    step === "review" && name.trim().length > 0 && isStaffPinFormat(pin);
 
   function requestClose() {
     if (busy) return;
@@ -1699,12 +1675,9 @@ function MemberFormModal({
       );
       return;
     }
-    if (!/^\d{6}$/.test(pin)) {
-      setLocalError("El PIN debe ser exactamente 6 dígitos.");
-      return;
-    }
-    if (isWeakPin(pin)) {
-      setLocalError(WEAK_PIN_MESSAGE);
+    const pinError = staffPinCreateError(pin);
+    if (pinError) {
+      setLocalError(pinError);
       return;
     }
     if (pin !== pinConfirm) {
@@ -1982,7 +1955,7 @@ function PinFormModal({
   const [discardOpen, setDiscardOpen] = useState(false);
 
   /** Ready-to-deliver PIN: confirm before discarding a mistap close. */
-  const pinReady = /^\d{6}$/.test(pin);
+  const pinReady = isStaffPinFormat(pin);
 
   function requestClose() {
     if (busy) return;
@@ -2020,12 +1993,9 @@ function PinFormModal({
 
   function submitPin(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^\d{6}$/.test(pin)) {
-      setLocalError("El PIN debe ser exactamente 6 dígitos.");
-      return;
-    }
-    if (isWeakPin(pin)) {
-      setLocalError(WEAK_PIN_MESSAGE);
+    const pinError = staffPinCreateError(pin);
+    if (pinError) {
+      setLocalError(pinError);
       return;
     }
     setLocalError(null);
@@ -2103,7 +2073,7 @@ function PinFormModal({
                 autoComplete="new-password"
                 autoFocus
                 disabled={busy}
-                aria-invalid={!!localError && localError.includes("6 dígitos")}
+                aria-invalid={!!localError && localError.includes("dígitos")}
                 className={pinInputClass}
               />
             </label>

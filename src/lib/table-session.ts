@@ -24,12 +24,19 @@ export function normalizeTableParam(raw: string | null | undefined): string | nu
   return trimmed.slice(0, 10);
 }
 
-/** Token opaco del QR (?t=): hex 32 chars. */
+/** Token opaco del QR (?t=): v2 `{expires}.{hmacHex}` o legacy hex 32. */
 export function normalizeTableToken(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim().toLowerCase();
-  if (!/^[a-f0-9]{32}$/.test(trimmed)) return null;
-  return trimmed;
+  // v2: epochSeconds.hmac (hmac = 32 hex)
+  if (/^\d{9,12}\.[a-f0-9]{32}$/.test(trimmed)) {
+    return trimmed;
+  }
+  // legacy v1
+  if (/^[a-f0-9]{32}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return null;
 }
 
 export function readStoredTableSession(tenantSlug: string): StoredTableSession | null {

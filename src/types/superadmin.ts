@@ -72,10 +72,12 @@ export type SuperAdminMetricsApi = Omit<
   >;
 
 export interface ImpersonateResult {
-  token: string;
+  /** Código de un solo uso (no es el JWT). */
+  code: string;
   tenantSlug: string;
   restaurantName: string;
   loginPath: string;
+  handoffExpiresInSeconds?: number;
   expiresInSeconds?: number;
   impersonatedBy?: string;
   impersonatedAs?: string;

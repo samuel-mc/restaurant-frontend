@@ -77,10 +77,9 @@ export function extractRoleFromToken(token: string): JwtPanelRole | null {
 
 export function isTokenExpired(token: string): boolean {
   const payload = decodeJwtPayload(token);
-  // Si no podemos leer el claim, no lo tratamos como expirado (evita bucles
-  // de redirect al login de staff por un decode fallido en el edge).
+  // Sin exp legible → tratar como expirado (no aceptar tokens incompletos/forjados).
   if (!payload || typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
-    return false;
+    return true;
   }
   const now = Math.floor(Date.now() / 1000);
   return payload.exp <= now;

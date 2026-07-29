@@ -16,6 +16,15 @@ import {
 const ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "").toLowerCase();
 
 /**
+ * Solo confiar en `x-forwarded-host` cuando el reverse proxy lo sobrescribe.
+ * Sin esto, un cliente podría falsificar el tenant vía cabecera.
+ * En Render/Vercel/nginx: TRUST_FORWARDED_HOST=true
+ */
+const TRUST_FORWARDED_HOST =
+  process.env.TRUST_FORWARDED_HOST === "true" ||
+  process.env.TRUST_FORWARDED_HOST === "1";
+
+/**
  * Cabecera interna con la que el proxy propaga el tenant resuelto a los
  * Server Components (leíble con `headers()` desde `src/app/(admin)/**`).
  * No confundir con `X-Tenant`, que es la cabecera hacia el backend Spring Boot.
@@ -48,6 +57,20 @@ function extractSubdomain(host: string): string | null {
   return null;
 }
 
+/** Host efectivo: `Host` por defecto; `x-forwarded-host` solo si se confía en el proxy. */
+function resolveRequestHost(request: NextRequest): string {
+  const hostHeader = request.headers.get("host") ?? "";
+  if (!TRUST_FORWARDED_HOST) {
+    return hostHeader;
+  }
+  const forwarded = request.headers.get("x-forwarded-host");
+  if (!forwarded) {
+    return hostHeader;
+  }
+  // Proxies pueden enviar lista; tomamos el primero.
+  return forwarded.split(",")[0]?.trim() || hostHeader;
+}
+
 function clearAdminCookie(response: NextResponse): void {
   response.cookies.set({
     name: ADMIN_TOKEN_COOKIE,
@@ -68,12 +91,7 @@ export function proxy(request: NextRequest): NextResponse {
     return NextResponse.next();
   }
 
-  // En producción (Render/Vercel) el host real llega en `x-forwarded-host`;
-  // `host` sirve como fallback en desarrollo o tras proxies simples.
-  const host =
-    request.headers.get("x-forwarded-host") ??
-    request.headers.get("host") ??
-    "";
+  const host = resolveRequestHost(request);
   const subdomain = extractSubdomain(host);
 
   // Dominio principal (localhost / tusass.com): landing global de `(marketing)`.

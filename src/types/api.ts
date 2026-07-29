@@ -167,10 +167,10 @@ export interface RestaurantProfileResponse {
   orderingEnabled: boolean;
   /** Website institucional visible al público. */
   websitePublished: boolean;
-  /** Plan comercial: BASIC | PRO. */
-  plan: string;
-  /** ACTIVE | PENDING_PAYMENT */
-  paymentStatus: string;
+  /** Plan comercial: BASIC | PRO (omitido en perfil público). */
+  plan?: string | null;
+  /** ACTIVE | PENDING_PAYMENT (omitido en perfil público). */
+  paymentStatus?: string | null;
   updatedAt: string;
 }
 

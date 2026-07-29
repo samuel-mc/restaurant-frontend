@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import {
   mapsEmbedSrc,
+  mapsExternalHref,
   telHref,
   whatsappChatUrl,
 } from "@/lib/contact-links";
@@ -1877,6 +1878,7 @@ function Opiniones() {
 function Ubicacion() {
   const brand = useBrand();
   const embed = mapsEmbedSrc(brand.googleMapsUrl);
+  const mapsHref = mapsExternalHref(brand.googleMapsUrl);
   const address = brand.address?.trim() || "Dirección por confirmar";
   const hours = brand.businessHours?.trim() || "Horario por confirmar";
   const wa = whatsappChatUrl(brand.whatsapp);
@@ -1914,9 +1916,9 @@ function Ubicacion() {
                 </p>
               </div>
             </div>
-            {brand.googleMapsUrl ? (
+            {mapsHref ? (
               <a
-                href={brand.googleMapsUrl}
+                href={mapsHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 font-nunito-sans text-xs tracking-widest uppercase text-accent border border-accent px-5 py-3 rounded-sm hover:bg-accent hover:text-white transition-colors motion-reduce:transition-none min-h-11"
@@ -1977,7 +1979,7 @@ function Ubicacion() {
             ) : (
               <div className="flex h-full min-h-72 items-center justify-center px-6 text-center">
                 <p className="font-nunito-sans text-sm text-muted-foreground max-w-sm">
-                  {brand.googleMapsUrl
+                  {mapsHref
                     ? "Usa el enlace de Google Maps para ver la ubicación."
                     : "La ubicación se publicará pronto. Escríbenos por WhatsApp si necesitas indicaciones."}
                 </p>

@@ -10,15 +10,10 @@ export function isSameOriginRequest(request: Request): boolean {
 
   const origin = request.headers.get("origin");
   const host = request.headers.get("host");
+
+  // POST de sesión: exigir Origin o Sec-Fetch-Site same-origin (anti CSRF).
   if (!origin) {
-    // Navegadores modernos envían Origin en POST cross-origin;
-    // sin Origin + same-origin/none/null Sec-Fetch-Site → permitir.
-    return (
-      secFetchSite == null ||
-      secFetchSite === "same-origin" ||
-      secFetchSite === "same-site" ||
-      secFetchSite === "none"
-    );
+    return secFetchSite === "same-origin" || secFetchSite === "same-site";
   }
 
   if (!host) {

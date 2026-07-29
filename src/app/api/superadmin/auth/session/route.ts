@@ -3,7 +3,10 @@ import {
   ADMIN_TOKEN_MAX_AGE_SECONDS,
   SUPERADMIN_TOKEN_COOKIE,
 } from "@/lib/auth-cookie";
-import { isTokenExpired } from "@/lib/jwt-payload";
+import {
+  cookieMaxAgeSecondsForToken,
+  isTokenExpired,
+} from "@/lib/jwt-payload";
 import { isSameOriginRequest, looksLikeJwt } from "@/lib/same-origin";
 
 type SessionBody = {
@@ -31,6 +34,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const maxAge = cookieMaxAgeSecondsForToken(
+    token,
+    ADMIN_TOKEN_MAX_AGE_SECONDS,
+  );
+  if (maxAge <= 0) {
+    return NextResponse.json(
+      { error: "Se requiere un token válido." },
+      { status: 400 },
+    );
+  }
+
   const response = NextResponse.json({ ok: true });
   response.cookies.set({
     name: SUPERADMIN_TOKEN_COOKIE,
@@ -39,7 +53,7 @@ export async function POST(request: Request) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: ADMIN_TOKEN_MAX_AGE_SECONDS,
+    maxAge,
   });
   return response;
 }

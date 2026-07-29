@@ -25,6 +25,7 @@ import {
   paymentStatusLabel,
   planLabel,
 } from "@/lib/subscription-plan";
+import { isAllowedGoogleMapsUrl } from "@/lib/contact-links";
 import { hasTenantLanding } from "@/lib/tenant-landings";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -198,12 +199,9 @@ export function SettingsForm({
     }
 
     const maps = googleMapsUrl.trim();
-    if (maps) {
-      try {
-        void new URL(maps);
-      } catch {
-        nextErrors.googleMapsUrl = "URL de Google Maps inválida.";
-      }
+    if (maps && !isAllowedGoogleMapsUrl(maps)) {
+      nextErrors.googleMapsUrl =
+        "Usa un link de Google Maps (maps.google.com, maps.app.goo.gl…).";
     }
 
     setErrors(nextErrors);

@@ -441,7 +441,7 @@ function StaffAccessHelp() {
       </p>
       <p>
         <Link href="/admin/login" className={linkClass}>
-          Iniciar como administrador
+          Acceso para el administrador
         </Link>
       </p>
     </div>

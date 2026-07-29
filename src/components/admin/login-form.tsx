@@ -338,36 +338,21 @@ export function LoginForm({
       </form>
 
       <div className="flex flex-col gap-4 border-t border-border pt-5 text-sm leading-snug sm:text-left">
-        <p className="text-center text-muted-foreground sm:text-left">
-          ¿Sin acceso? Pídeselo al administrador del local
-          {helpWhatsApp ? (
-            <>
-              {" "}
-              ·{" "}
-              <a
-                href={helpWhatsApp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`rounded-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`}
-              >
-                WhatsApp
-              </a>
-            </>
-          ) : null}
-          {" · "}
-          <Link
-            href="/staff/login"
-            className={`rounded-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`}
-          >
-            Acceso con PIN
-          </Link>
-          {" · "}
+        <p className="text-center text-muted-foreground">
+          ¿Sin acceso? Pídeselo al administrador del local <br />
           <a
             href={supportMailto}
             className={`rounded-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`}
           >
             Soporte
           </a>
+          {" · "}
+          <Link
+            href="/staff/login"
+            className={`rounded-sm font-semibold text-live-ink underline-offset-2 hover:underline ${focusRing}`}
+          >
+            Acceso para el equipo
+          </Link>
         </p>
 
         <details className="group text-left text-muted-foreground">

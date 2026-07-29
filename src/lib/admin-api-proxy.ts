@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { getAdminAccessToken } from "@/lib/auth-server";
+import { decodeJwtPayload } from "@/lib/jwt-payload";
 
 function resolveApiBase(): string | null {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
@@ -16,6 +17,37 @@ function extractTenantSlug(request: Request): string {
     request.headers.get("x-tenant-slug")?.trim() ||
     request.headers.get("X-Tenant")?.trim() ||
     ""
+  );
+}
+
+function isReadSafeMethod(method: string): boolean {
+  const m = method.toUpperCase();
+  return m === "GET" || m === "HEAD" || m === "OPTIONS";
+}
+
+function isImpersonationAllowedWrite(method: string, upstreamPath: string): boolean {
+  if (method.toUpperCase() !== "POST") return false;
+  const path = upstreamPath.startsWith("/") ? upstreamPath : `/${upstreamPath}`;
+  return path === "/api/v1/admin/ws-ticket";
+}
+
+/** Bloquea mutaciones en sesión de soporte (el backend también lo hace). */
+function rejectIfImpersonationWrite(
+  token: string,
+  method: string,
+  upstreamPath: string,
+): NextResponse | null {
+  const tokenType = decodeJwtPayload(token)?.tokenType?.trim();
+  if (tokenType !== "impersonation") return null;
+  if (isReadSafeMethod(method) || isImpersonationAllowedWrite(method, upstreamPath)) {
+    return null;
+  }
+  return NextResponse.json(
+    {
+      error:
+        "Sesión de soporte en solo lectura. No se pueden guardar cambios.",
+    },
+    { status: 403 },
   );
 }
 
@@ -95,6 +127,9 @@ export async function proxyAdminRequest(
     ? upstreamPath
     : `/${upstreamPath}`;
 
+  const blocked = rejectIfImpersonationWrite(ctx.token, options.method, path);
+  if (blocked) return blocked;
+
   const upstream = await fetch(`${ctx.apiUrl}${path}`, {
     method: options.method,
     headers: {
@@ -157,6 +192,9 @@ export async function proxyAdminMultipart(
   const path = upstreamPath.startsWith("/")
     ? upstreamPath
     : `/${upstreamPath}`;
+
+  const blocked = rejectIfImpersonationWrite(ctx.token, method, path);
+  if (blocked) return blocked;
 
   let formData: FormData;
   try {

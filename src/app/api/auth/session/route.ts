@@ -3,6 +3,7 @@ import {
   ADMIN_TOKEN_COOKIE,
   ADMIN_TOKEN_MAX_AGE_SECONDS,
 } from "@/lib/auth-cookie";
+import { getAdminAccessToken } from "@/lib/auth-server";
 import {
   cookieMaxAgeSecondsForToken,
   isTokenExpired,
@@ -61,10 +62,34 @@ export async function POST(request: Request) {
   return response;
 }
 
-/** Cierra la sesión admin eliminando la cookie del JWT. */
+/** Revoca el JWT en el backend y elimina la cookie. */
 export async function DELETE(request: Request) {
   if (!isSameOriginRequest(request)) {
     return NextResponse.json({ error: "Origen no permitido." }, { status: 403 });
+  }
+
+  const token = await getAdminAccessToken();
+  if (token) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+    if (apiUrl) {
+      const tenantSlug =
+        request.headers.get("x-tenant-slug")?.trim() ||
+        request.headers.get("X-Tenant")?.trim() ||
+        "";
+      try {
+        await fetch(`${apiUrl}/api/v1/auth/logout`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            ...(tenantSlug ? { "X-Tenant": tenantSlug } : {}),
+          },
+          cache: "no-store",
+        });
+      } catch {
+        // Seguimos limpiando la cookie aunque el backend no responda.
+      }
+    }
   }
 
   const response = NextResponse.json({ ok: true });

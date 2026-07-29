@@ -28,8 +28,10 @@ interface AdminShellProps {
   tenantSlug: string;
   /** Rol del JWT (`OWNER` | `ADMIN` | `MESERO` | `COCINA`…). */
   accessRole?: string | null;
-  /** `staff` cuando el JWT viene del login por PIN. */
+  /** `staff` cuando el JWT viene del login por PIN; `impersonation` en soporte. */
   tokenType?: string | null;
+  /** Email del SuperAdmin en sesión de soporte. */
+  impersonatedBy?: string | null;
   children: ReactNode;
 }
 
@@ -41,6 +43,7 @@ export function AdminShell({
   tenantSlug,
   accessRole = null,
   tokenType = null,
+  impersonatedBy = null,
   children,
 }: AdminShellProps) {
   const pathname = usePathname();
@@ -51,6 +54,7 @@ export function AdminShell({
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const navItems = navItemsForRole(accessRole);
+  const isSupportSession = tokenType === "impersonation";
   const isStaffShift =
     tokenType === "staff" ||
     accessRole === "MESERO" ||
@@ -164,6 +168,21 @@ export function AdminShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {isSupportSession ? (
+          <div
+            role="status"
+            className="border-b border-amber-700/30 bg-amber-100 px-4 py-2.5 text-sm text-amber-950 print:hidden"
+          >
+            <p className="font-semibold tracking-tight">
+              Sesión de soporte · solo lectura
+            </p>
+            <p className="mt-0.5 text-xs text-amber-950/80">
+              {impersonatedBy
+                ? `Entraste como soporte (${impersonatedBy}). No puedes guardar cambios en este local.`
+                : "Entraste como soporte. No puedes guardar cambios en este local."}
+            </p>
+          </div>
+        ) : null}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 print:hidden md:hidden">
           <div className="min-w-0">
             <p className="truncate text-sm font-bold tracking-tight">

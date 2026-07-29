@@ -8,6 +8,7 @@ import {
   isTokenExpired,
 } from "@/lib/jwt-payload";
 import { isSameOriginRequest, looksLikeJwt } from "@/lib/same-origin";
+import { getSuperAdminAccessToken } from "@/lib/superadmin-auth-server";
 
 type SessionBody = {
   token?: unknown;
@@ -61,6 +62,25 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   if (!isSameOriginRequest(request)) {
     return NextResponse.json({ error: "Origen no permitido." }, { status: 403 });
+  }
+
+  const token = await getSuperAdminAccessToken();
+  if (token) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+    if (apiUrl) {
+      try {
+        await fetch(`${apiUrl}/api/v1/auth/logout`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+          cache: "no-store",
+        });
+      } catch {
+        // Limpiamos cookie igual.
+      }
+    }
   }
 
   const response = NextResponse.json({ ok: true });

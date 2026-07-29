@@ -20,12 +20,15 @@ export default async function AdminDashboardLayout({
   let restaurantName = fallbackName;
   let accessRole: string | null = null;
   let tokenType: string | null = null;
+  let impersonatedBy: string | null = null;
 
   if (tenantSlug) {
     const token = await getAdminAccessToken();
     if (token) {
       accessRole = extractRoleFromToken(token);
-      tokenType = decodeJwtPayload(token)?.tokenType?.trim() ?? null;
+      const payload = decodeJwtPayload(token);
+      tokenType = payload?.tokenType?.trim() ?? null;
+      impersonatedBy = payload?.impersonatedBy?.trim() || null;
       try {
         const profile = await getRestaurantProfile(tenantSlug);
         const name = profile.name?.trim();
@@ -42,6 +45,7 @@ export default async function AdminDashboardLayout({
       restaurantName={restaurantName}
       accessRole={accessRole}
       tokenType={tokenType}
+      impersonatedBy={impersonatedBy}
     >
       {children}
     </AdminShell>

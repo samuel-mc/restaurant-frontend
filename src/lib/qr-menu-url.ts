@@ -45,22 +45,62 @@ export function tableDisplayLabel(tableNumber: string | number): string {
   return `Mesa ${n}`;
 }
 
+export type BuildPublicMenuUrlOptions = {
+  tableNumber?: string | number | null;
+  /** Token firmado del QR (?t=). Obligatorio para pedir en mesa. */
+  tableToken?: string | null;
+};
+
 /**
  * URL del menú público.
  * - Sin mesa: `https://{slug}.{domain}/menu`
- * - Con mesa: `https://{slug}.{domain}/menu?m=4`
+ * - Con mesa + token: `https://{slug}.{domain}/menu?m=4&t=...`
  */
 export function buildPublicMenuUrl(
   tenantSlug: string,
-  tableNumber?: string | number | null,
+  tableNumberOrOptions?: string | number | null | BuildPublicMenuUrlOptions,
+  tableTokenArg?: string | null,
 ): string {
   const slug = tenantSlug.trim().toLowerCase();
   const domain = getPublicRootDomain();
   const base = `https://${slug}.${domain}/menu`;
+
+  let tableNumber: string | number | null | undefined;
+  let tableToken: string | null | undefined;
+
+  if (
+    tableNumberOrOptions != null &&
+    typeof tableNumberOrOptions === "object" &&
+    !Array.isArray(tableNumberOrOptions)
+  ) {
+    tableNumber = tableNumberOrOptions.tableNumber;
+    tableToken = tableNumberOrOptions.tableToken;
+  } else {
+    tableNumber = tableNumberOrOptions as string | number | null | undefined;
+    tableToken = tableTokenArg;
+  }
+
   if (tableNumber == null || String(tableNumber).trim() === "") return base;
   const param = toQrTableParam(tableNumber);
   if (!param) return base;
-  return `${base}?m=${encodeURIComponent(param)}`;
+
+  const params = new URLSearchParams();
+  params.set("m", param);
+  const token = tableToken?.trim();
+  if (token) params.set("t", token);
+  return `${base}?${params.toString()}`;
+}
+
+/** Path relativo del menú (mismo host del tenant). */
+export function buildMenuPath(
+  tableNumber?: string | null,
+  tableToken?: string | null,
+): string {
+  if (!tableNumber?.trim()) return "/menu";
+  const params = new URLSearchParams();
+  params.set("m", tableNumber.trim());
+  if (tableToken?.trim()) params.set("t", tableToken.trim());
+  return `/menu?${params.toString()}`;
 }
 
 /** Nombre de archivo PNG seguro. */

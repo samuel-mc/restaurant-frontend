@@ -28,8 +28,9 @@ import {
   TRACKING_STEPS,
 } from "@/lib/order-status";
 import { maxBatchNumber } from "@/lib/order-mapper";
-import { whatsappChatUrl } from "@/lib/contact-links";
+import { buildMenuPath } from "@/lib/qr-menu-url";
 import { useCartStore } from "@/store/cartStore";
+import { whatsappChatUrl } from "@/lib/contact-links";
 import { CustomerBrandHeader } from "@/components/customer/customer-brand-header";
 import { getOrderByUuid } from "@/services/orderService";
 import {
@@ -339,9 +340,10 @@ export function OrderTracker({
   const sinceLabel =
     disconnectedSince != null ? formatClock(disconnectedSince) : null;
   const isInTable = order.orderType === "IN_TABLE";
+  const tableToken = useCartStore((s) => s.tableToken);
   const menuHref =
     isInTable && order.tableNumber?.trim()
-      ? `/menu?m=${encodeURIComponent(order.tableNumber.trim())}`
+      ? buildMenuPath(order.tableNumber.trim(), tableToken)
       : "/menu";
   const primaryAction =
     !isOrderingDone && isInTable

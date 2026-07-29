@@ -41,6 +41,7 @@ function toOrderRequest(orderData: CreateOrderDTO): OrderRequest {
     orderData.customerName?.trim() || DEFAULT_CUSTOMER_NAME;
   const tableNumber = orderData.tableNumber?.trim() || null;
   const activeOrderUuid = orderData.activeOrderUuid?.trim() || null;
+  const tableToken = orderData.tableToken?.trim() || null;
 
   return {
     customerName,
@@ -49,6 +50,7 @@ function toOrderRequest(orderData: CreateOrderDTO): OrderRequest {
     tableNumber,
     deliveryAddress: orderData.deliveryAddress?.trim() || null,
     activeOrderUuid,
+    tableToken,
     details: orderData.items.map((item) => ({
       productUuid: item.productId,
       quantity: item.quantity,
@@ -150,20 +152,24 @@ export interface ActiveSessionResult {
 
 /**
  * Consulta si la mesa ya tiene una cuenta abierta (adiciones).
+ * Requiere token del QR; sin él el backend no revela la sesión (204).
  * 204 → sin sesión; 200 → orden activa.
  */
 export async function getActiveOrderSession(
   tableNumber: string,
   tenantSlug?: string | null,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; tableToken?: string | null },
 ): Promise<ActiveSessionResult> {
   const table = tableNumber.trim();
-  if (!table) {
+  const token = options?.tableToken?.trim() || "";
+  if (!table || !token) {
     return { hasActiveOrder: false, order: null };
   }
 
   const slug = requireTenantSlug(tenantSlug, `${ORDERS_PATH}/active-session`);
-  const path = `${ORDERS_PATH}/active-session?tableNumber=${encodeURIComponent(table)}`;
+  const path =
+    `${ORDERS_PATH}/active-session?tableNumber=${encodeURIComponent(table)}` +
+    `&tableToken=${encodeURIComponent(token)}`;
 
   const payload = await apiClient.get<{
     hasActiveOrder?: boolean;

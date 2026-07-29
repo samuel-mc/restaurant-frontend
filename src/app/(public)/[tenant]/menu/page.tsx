@@ -13,7 +13,7 @@ import { prettifyTenantSlug } from "@/lib/tenant-sites";
 
 type TenantMenuPageProps = {
   params: Promise<{ tenant: string }>;
-  searchParams: Promise<{ m?: string | string[] }>;
+  searchParams: Promise<{ m?: string | string[]; t?: string | string[] }>;
 };
 
 export async function generateMetadata({
@@ -83,6 +83,13 @@ export default async function TenantMenuPage({
       : Array.isArray(rawM)
         ? rawM[0]
         : null;
+  const rawT = query.t;
+  const tableTokenFromQuery =
+    typeof rawT === "string"
+      ? rawT
+      : Array.isArray(rawT)
+        ? rawT[0]
+        : null;
 
   const profile = await getPublicRestaurantProfileOrNull(tenant);
   const restaurantName = profile?.name ?? prettifyTenantSlug(tenant);
@@ -118,6 +125,7 @@ export default async function TenantMenuPage({
             products={menu.products}
             tenantSlug={tenant}
             tableFromQuery={tableFromQuery}
+            tableTokenFromQuery={tableTokenFromQuery}
             orderingEnabled={profile.orderingEnabled !== false}
             modules={{
               hasDelivery: profile.hasDelivery ?? false,

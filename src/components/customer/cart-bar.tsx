@@ -180,6 +180,7 @@ export function CartBar({
   const lines = useCartStore((state) => state.lines);
   const activeOrderId = useCartStore((state) => state.activeOrderId);
   const sessionTable = useCartStore((state) => state.tableNumber);
+  const sessionTableToken = useCartStore((state) => state.tableToken);
   const sessionName = useCartStore((state) => state.customerName);
   const addItem = useCartStore((state) => state.addItem);
   const decrementItem = useCartStore((state) => state.decrementItem);
@@ -385,6 +386,16 @@ export function CartBar({
       setErrorMessage("Escribe el número de mesa.");
       return;
     }
+    if (
+      effectiveType === "IN_TABLE" &&
+      !isAddition &&
+      !(sessionTableToken || "").trim()
+    ) {
+      setErrorMessage(
+        "Escanea el código QR de tu mesa para pedir. El enlace debe incluir el token de acceso.",
+      );
+      return;
+    }
     if (isAddition && !activeOrderId) {
       setErrorMessage("No hay un pedido de la mesa para sumar platillos.");
       return;
@@ -433,6 +444,8 @@ export function CartBar({
       total: subtotal,
       orderType: effectiveType,
       activeOrderUuid: isAddition ? activeOrderId : null,
+      tableToken:
+        effectiveType === "IN_TABLE" ? sessionTableToken || null : null,
     };
 
     try {
@@ -442,6 +455,7 @@ export function CartBar({
           activeOrderId: order.uuid,
           tableNumber: order.tableNumber,
           customerName: order.customerName,
+          tableToken: sessionTableToken,
         });
       }
       clearCart();

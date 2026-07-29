@@ -1,8 +1,18 @@
 /**
- * Persistencia de mesa anclada por QR (?m=).
+ * Persistencia de mesa anclada por QR (?m= + ?t=).
  */
 
+export interface StoredTableSession {
+  tableNumber: string;
+  tableToken: string | null;
+}
+
 export function tableStorageKey(tenantSlug: string): string {
+  return `platolisto_table_session_${tenantSlug.trim().toLowerCase()}`;
+}
+
+/** @deprecated clave antigua solo con número de mesa */
+function legacyTableStorageKey(tenantSlug: string): string {
   return `platolisto_table_number_${tenantSlug.trim().toLowerCase()}`;
 }
 
@@ -14,30 +24,73 @@ export function normalizeTableParam(raw: string | null | undefined): string | nu
   return trimmed.slice(0, 10);
 }
 
-export function readStoredTable(tenantSlug: string): string | null {
+/** Token opaco del QR (?t=): hex 32 chars. */
+export function normalizeTableToken(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim().toLowerCase();
+  if (!/^[a-f0-9]{32}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+export function readStoredTableSession(tenantSlug: string): StoredTableSession | null {
   if (typeof window === "undefined") return null;
   try {
-    return normalizeTableParam(window.localStorage.getItem(tableStorageKey(tenantSlug)));
+    const raw = window.localStorage.getItem(tableStorageKey(tenantSlug));
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<StoredTableSession>;
+      const tableNumber = normalizeTableParam(parsed.tableNumber ?? null);
+      if (!tableNumber) return null;
+      return {
+        tableNumber,
+        tableToken: normalizeTableToken(parsed.tableToken ?? null),
+      };
+    }
+    // Migración suave desde clave legacy (sin token).
+    const legacy = normalizeTableParam(
+      window.localStorage.getItem(legacyTableStorageKey(tenantSlug)),
+    );
+    if (legacy) {
+      return { tableNumber: legacy, tableToken: null };
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-export function writeStoredTable(tenantSlug: string, tableNumber: string): void {
+/** @deprecated prefer readStoredTableSession */
+export function readStoredTable(tenantSlug: string): string | null {
+  return readStoredTableSession(tenantSlug)?.tableNumber ?? null;
+}
+
+export function writeStoredTableSession(
+  tenantSlug: string,
+  tableNumber: string,
+  tableToken: string | null,
+): void {
   if (typeof window === "undefined") return;
   const value = normalizeTableParam(tableNumber);
   if (!value) return;
+  const token = normalizeTableToken(tableToken);
   try {
-    window.localStorage.setItem(tableStorageKey(tenantSlug), value);
+    const payload: StoredTableSession = { tableNumber: value, tableToken: token };
+    window.localStorage.setItem(tableStorageKey(tenantSlug), JSON.stringify(payload));
+    window.localStorage.removeItem(legacyTableStorageKey(tenantSlug));
   } catch {
     // ignore quota / private mode
   }
+}
+
+/** @deprecated prefer writeStoredTableSession */
+export function writeStoredTable(tenantSlug: string, tableNumber: string): void {
+  writeStoredTableSession(tenantSlug, tableNumber, null);
 }
 
 export function clearStoredTable(tenantSlug: string): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(tableStorageKey(tenantSlug));
+    window.localStorage.removeItem(legacyTableStorageKey(tenantSlug));
   } catch {
     // ignore
   }

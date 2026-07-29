@@ -23,7 +23,8 @@ import {
   clearStoredTable,
   formatTableLabel,
   normalizeTableParam,
-  writeStoredTable,
+  normalizeTableToken,
+  writeStoredTableSession,
 } from "@/lib/table-session";
 import { formatCurrency } from "@/lib/format";
 
@@ -40,6 +41,8 @@ interface MenuViewProps {
   orderingEnabled?: boolean;
   /** Valor de ?m= desde la URL (Server Component). */
   tableFromQuery?: string | null;
+  /** Valor de ?t= (token firmado del QR). */
+  tableTokenFromQuery?: string | null;
 }
 
 export function MenuView({
@@ -48,6 +51,7 @@ export function MenuView({
   modules,
   orderingEnabled = true,
   tableFromQuery = null,
+  tableTokenFromQuery = null,
 }: MenuViewProps) {
   const router = useRouter();
   const sections = useMemo<MenuSection[]>(() => {
@@ -99,8 +103,9 @@ export function MenuView({
   const setActiveOrderSession = useCartStore((s) => s.setActiveOrderSession);
   const clearActiveOrderSession = useCartStore((s) => s.clearActiveOrderSession);
   const releaseActiveOrder = useCartStore((s) => s.releaseActiveOrder);
-  const setCartTable = useCartStore((s) => s.setTableNumber);
+  const setTableAnchor = useCartStore((s) => s.setTableAnchor);
   const cartTable = useCartStore((s) => s.tableNumber);
+  const cartTableToken = useCartStore((s) => s.tableToken);
   const activeOrderId = useCartStore((s) => s.activeOrderId);
   const cartCount = useCartCount();
   const hasOpenAccount = Boolean(sessionOrder) || Boolean(activeOrderId);
@@ -129,14 +134,15 @@ export function MenuView({
     }
   }, [cartHydrated, tenantSlug, ensureTenant]);
 
-  // Anclaje de mesa: solo con ?m= en la URL.
-  // Sin ?m= → exploración / pickup (no heredar mesa de localStorage).
+  // Anclaje de mesa: solo con ?m= + ?t= válidos en la URL (QR firmado).
+  // Sin token → exploración / pickup (no heredar mesa adivinable).
   useEffect(() => {
     const fromQuery = normalizeTableParam(tableFromQuery);
-    if (fromQuery) {
-      writeStoredTable(tenantSlug, fromQuery);
+    const tokenFromQuery = normalizeTableToken(tableTokenFromQuery);
+    if (fromQuery && tokenFromQuery) {
+      writeStoredTableSession(tenantSlug, fromQuery, tokenFromQuery);
       setTableLockedFromQr(true);
-      setCartTable(fromQuery);
+      setTableAnchor(fromQuery, tokenFromQuery);
       setIsEditingTable(false);
       setTableEditError(null);
       setPendingTableChange(null);
@@ -146,27 +152,36 @@ export function MenuView({
 
     clearStoredTable(tenantSlug);
     setTableLockedFromQr(false);
-    setCartTable(null);
+    setTableAnchor(null, null);
     setIsEditingTable(false);
     setTableEditError(null);
     setPendingTableChange(null);
     releaseActiveOrder();
     setSessionOrder(null);
+
+    // ?m= sin ?t=: QR viejo o enlace incompleto.
+    if (fromQuery && !tokenFromQuery) {
+      setSessionError(
+        "Este código QR es incompleto o antiguo. Pide al mesero el QR actualizado de tu mesa.",
+      );
+    }
   }, [
     tableFromQuery,
+    tableTokenFromQuery,
     tenantSlug,
-    setCartTable,
+    setTableAnchor,
     releaseActiveOrder,
   ]);
 
-  // Consulta sesión activa de la mesa
+  // Consulta sesión activa de la mesa (solo con token del QR).
   useEffect(() => {
     if (!cartHydrated) return;
     const table = cartTable?.trim();
-    if (!orderingEnabled || !table || isEditingTable) {
-      if (!table) {
+    const token = cartTableToken?.trim();
+    if (!orderingEnabled || !table || !token || isEditingTable) {
+      if (!table || !token) {
         setSessionOrder(null);
-        setSessionError(null);
+        if (!table) setSessionError(null);
       }
       return;
     }
@@ -179,6 +194,7 @@ export function MenuView({
       try {
         const session = await getActiveOrderSession(table, tenantSlug, {
           signal: controller.signal,
+          tableToken: token,
         });
         if (controller.signal.aborted) return;
         if (session.hasActiveOrder && session.order) {
@@ -188,12 +204,12 @@ export function MenuView({
             useCartStore.getState().activeOrderId === session.order.uuid;
           if (!alreadyJoined) {
             releaseActiveOrder();
-            setCartTable(session.order.tableNumber ?? table);
+            setTableAnchor(session.order.tableNumber ?? table, token);
           }
         } else {
           setSessionOrder(null);
           releaseActiveOrder();
-          setCartTable(table);
+          setTableAnchor(table, token);
         }
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -210,10 +226,11 @@ export function MenuView({
     return () => {
       controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reconsultar al cambiar mesa
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reconsultar al cambiar mesa/token
   }, [
     cartHydrated,
     cartTable,
+    cartTableToken,
     tenantSlug,
     orderingEnabled,
     isEditingTable,
@@ -263,21 +280,18 @@ export function MenuView({
     }, 600);
   }
 
-  /** Corregir número de mesa (solo con ítems en carrito → sheet). */
+  /** Corregir mesa: salir del QR y escanear el correcto. */
   function handleChangeTable() {
-    setDraftTable(cartTable ?? normalizeTableParam(tableFromQuery) ?? "");
-    setTableEditError(null);
-    setPendingTableChange(null);
-    setIsEditingTable(true);
+    handleLeaveWrongTable();
   }
 
-  /** Salir del QR (libera ?m=); conserva platillos del carrito. */
+  /** Salir del QR (libera ?m=&t=); conserva platillos del carrito. */
   function handleLeaveWrongTable() {
     clearStoredTable(tenantSlug);
     clearActiveOrderSession();
     setSessionOrder(null);
     setSessionError(null);
-    setCartTable(null);
+    setTableAnchor(null, null);
     setTableLockedFromQr(false);
     setIsEditingTable(false);
     setPendingTableChange(null);
@@ -292,47 +306,8 @@ export function MenuView({
     setPendingTableChange(null);
   }
 
-  function applyTableChange(next: string) {
-    clearActiveOrderSession();
-    setSessionOrder(null);
-    setSessionError(null);
-    writeStoredTable(tenantSlug, next);
-    setCartTable(next);
-    setTableLockedFromQr(true);
-    setIsEditingTable(false);
-    setPendingTableChange(null);
-    setTableEditError(null);
-    router.replace(`/menu?m=${encodeURIComponent(next)}`);
-  }
-
   function handleConfirmTableEdit() {
-    if (pendingTableChange) {
-      applyTableChange(pendingTableChange);
-      return;
-    }
-
-    const next = normalizeTableParam(draftTable);
-    if (!next) {
-      setTableEditError("Escribe el número de mesa.");
-      return;
-    }
-
-    const current = normalizeTableParam(cartTable ?? tableFromQuery);
-    if (current && current === next) {
-      setIsEditingTable(false);
-      setTableEditError(null);
-      setPendingTableChange(null);
-      return;
-    }
-
-    // Con pedido de la mesa: pedir confirmación antes de desligar.
-    if (hasOpenAccount) {
-      setPendingTableChange(next);
-      setTableEditError(null);
-      return;
-    }
-
-    applyTableChange(next);
+    handleLeaveWrongTable();
   }
 
   function handleCancelPendingTableChange() {
@@ -350,6 +325,7 @@ export function MenuView({
       activeOrderId: sessionOrder.uuid,
       tableNumber: table,
       customerName: sessionOrder.customerName,
+      tableToken: cartTableToken,
     });
   }
 

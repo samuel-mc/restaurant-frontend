@@ -20,6 +20,7 @@ export interface ActiveOrderSession {
   activeOrderId: string;
   tableNumber: string;
   customerName: string;
+  tableToken?: string | null;
 }
 
 interface CartState {
@@ -28,6 +29,8 @@ interface CartState {
   lines: Record<string, CartLine>;
   activeOrderId: string | null;
   tableNumber: string | null;
+  /** Token del QR (?t=); requerido para abrir/consultar cuenta IN_TABLE. */
+  tableToken: string | null;
   customerName: string | null;
   addItem: (product: Product) => void;
   decrementItem: (uuid: string) => void;
@@ -38,6 +41,8 @@ interface CartState {
   /** Libera el ticket activo pero conserva la mesa anclada (QR). */
   releaseActiveOrder: () => void;
   setTableNumber: (tableNumber: string | null) => void;
+  setTableToken: (tableToken: string | null) => void;
+  setTableAnchor: (tableNumber: string | null, tableToken: string | null) => void;
   /**
    * Ata el carrito al tenant actual.
    * Si había otro tenant con contenido, vacía líneas/sesión y devuelve true.
@@ -49,6 +54,7 @@ const emptySession = {
   lines: {} as Record<string, CartLine>,
   activeOrderId: null as string | null,
   tableNumber: null as string | null,
+  tableToken: null as string | null,
   customerName: null as string | null,
 };
 
@@ -113,12 +119,17 @@ export const useCartStore = create<CartState>()(
           activeOrderId: session.activeOrderId,
           tableNumber: session.tableNumber,
           customerName: session.customerName,
+          tableToken:
+            session.tableToken !== undefined
+              ? session.tableToken
+              : get().tableToken,
         }),
 
       clearActiveOrderSession: () =>
         set({
           activeOrderId: null,
           tableNumber: null,
+          tableToken: null,
           customerName: null,
         }),
 
@@ -128,7 +139,16 @@ export const useCartStore = create<CartState>()(
           customerName: null,
         }),
 
-      setTableNumber: (tableNumber) => set({ tableNumber }),
+      setTableNumber: (tableNumber) =>
+        set({
+          tableNumber,
+          ...(tableNumber == null ? { tableToken: null } : {}),
+        }),
+
+      setTableToken: (tableToken) => set({ tableToken }),
+
+      setTableAnchor: (tableNumber, tableToken) =>
+        set({ tableNumber, tableToken }),
 
       ensureTenant: (slug) => {
         const normalized = slug.trim().toLowerCase();
@@ -158,6 +178,7 @@ export const useCartStore = create<CartState>()(
         lines: state.lines,
         activeOrderId: state.activeOrderId,
         tableNumber: state.tableNumber,
+        tableToken: state.tableToken,
         customerName: state.customerName,
       }),
     },

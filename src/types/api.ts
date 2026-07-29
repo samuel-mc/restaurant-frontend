@@ -209,6 +209,8 @@ export interface OrderRequest {
   tableNumber?: string | null;
   deliveryAddress?: string | null;
   activeOrderUuid?: string | null;
+  /** Token del QR de mesa (?t=). */
+  tableToken?: string | null;
   details: OrderDetailRequest[];
 }
 
@@ -238,6 +240,8 @@ export interface CreateOrderDTO {
   customerPhone?: string | null;
   /** UUID de orden activa para enviar adición (misma cuenta). */
   activeOrderUuid?: string | null;
+  /** Token del QR de mesa (?t=). */
+  tableToken?: string | null;
 }
 
 /** Respuesta cruda de una línea de pedido (`OrderDetailResponse.java`). */

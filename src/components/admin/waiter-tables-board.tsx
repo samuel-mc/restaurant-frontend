@@ -65,9 +65,7 @@ function orderTitle(order: Order): string {
 }
 
 function additionHref(order: Order): string {
-  if (order.orderType === "IN_TABLE" && order.tableNumber?.trim()) {
-    return `/menu?m=${encodeURIComponent(order.tableNumber.trim())}`;
-  }
+  // Mesero: abre cocina/detalle; el menú público exige token de QR del comensal.
   return `/admin/dashboard/kitchen?order=${encodeURIComponent(order.uuid)}`;
 }
 

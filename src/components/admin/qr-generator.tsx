@@ -2,10 +2,12 @@
 
 /**
  * Generador de códigos QR (menú general, mesa específica, masivo).
+ * Las mesas incluyen token firmado (?t=) desde el backend.
  */
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -22,6 +24,8 @@ import {
   tableDisplayLabel,
   toQrTableParam,
 } from "@/lib/qr-menu-url";
+import { signTableQrLinks } from "@/services/adminTableQrService";
+import { ApiError } from "@/services/apiClient";
 
 type QrMode = "general" | "table" | "bulk";
 
@@ -97,57 +101,92 @@ export function QrGenerator({
   const [bulkTo, setBulkTo] = useState(12);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [targets, setTargets] = useState<QrTarget[]>([]);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const printSheetRef = useRef<HTMLDivElement | null>(null);
+  const signRequestRef = useRef(0);
 
   const rootDomain = getPublicRootDomain();
 
-  const targets = useMemo<QrTarget[]>(() => {
+  const bulkTooLarge =
+    mode === "bulk" && Math.abs(bulkTo - bulkFrom) + 1 > 48;
+
+  const tableNumbersToSign = useMemo(() => {
+    if (mode === "general") return [] as string[];
+    if (mode === "table") {
+      const n = toQrTableParam(tableNumber);
+      return n ? [n] : [];
+    }
+    if (bulkTooLarge) return [];
+    const from = Math.min(bulkFrom, bulkTo);
+    const to = Math.max(bulkFrom, bulkTo);
+    const list: string[] = [];
+    for (let n = from; n <= to; n += 1) list.push(String(n));
+    return list;
+  }, [mode, tableNumber, bulkFrom, bulkTo, bulkTooLarge]);
+
+  useEffect(() => {
     if (mode === "general") {
-      return [
+      setTargets([
         {
           id: "general",
           headline: "Pide desde tu lugar",
           tableNumber: null,
           menuUrl: buildPublicMenuUrl(tenantSlug),
         },
-      ];
+      ]);
+      setSigning(false);
+      setError(null);
+      return;
     }
 
-    if (mode === "table") {
-      const n = toQrTableParam(tableNumber);
-      if (!n) return [];
-      return [
-        {
-          id: `table-${slugifyId(n)}`,
-          headline: tableDisplayLabel(n),
-          tableNumber: n,
-          menuUrl: buildPublicMenuUrl(tenantSlug, n),
-        },
-      ];
+    if (tableNumbersToSign.length === 0) {
+      setTargets([]);
+      setSigning(false);
+      return;
     }
 
-    const from = Math.min(bulkFrom, bulkTo);
-    const to = Math.max(bulkFrom, bulkTo);
-    const span = to - from + 1;
-    if (span > 48) return [];
+    const requestId = ++signRequestRef.current;
+    setSigning(true);
+    setError(null);
 
-    const list: QrTarget[] = [];
-    for (let n = from; n <= to; n += 1) {
-      const num = String(n);
-      list.push({
-        id: `mesa-${n}`,
-        headline: tableDisplayLabel(num),
-        tableNumber: num,
-        menuUrl: buildPublicMenuUrl(tenantSlug, num),
-      });
-    }
-    return list;
-  }, [mode, tableNumber, bulkFrom, bulkTo, tenantSlug]);
+    void (async () => {
+      try {
+        const links = await signTableQrLinks(tenantSlug, tableNumbersToSign);
+        if (requestId !== signRequestRef.current) return;
+        const byTable = new Map(
+          links.map((l) => [l.tableNumber, l.tableToken] as const),
+        );
+        setTargets(
+          tableNumbersToSign.map((num) => {
+            const token = byTable.get(num) ?? "";
+            return {
+              id: `mesa-${slugifyId(num)}`,
+              headline: tableDisplayLabel(num),
+              tableNumber: num,
+              menuUrl: buildPublicMenuUrl(tenantSlug, {
+                tableNumber: num,
+                tableToken: token,
+              }),
+            };
+          }),
+        );
+      } catch (err) {
+        if (requestId !== signRequestRef.current) return;
+        setTargets([]);
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "No se pudieron firmar los QR. Revisa tu sesión e intenta de nuevo.",
+        );
+      } finally {
+        if (requestId === signRequestRef.current) setSigning(false);
+      }
+    })();
+  }, [mode, tableNumbersToSign, tenantSlug]);
 
   const preview = targets[0] ?? null;
-  const bulkTooLarge =
-    mode === "bulk" && Math.abs(bulkTo - bulkFrom) + 1 > 48;
 
   const handleDownloadPng = useCallback(async () => {
     if (!preview || !previewRef.current) return;
@@ -184,11 +223,12 @@ export function QrGenerator({
             Códigos QR
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Tarjetas para menú general o mesas. La URL apunta a{" "}
+            Tarjetas para menú general o mesas. Cada mesa lleva un token de
+            acceso en la URL (
             <span className="font-semibold text-foreground">
-              {tenantSlug}.{rootDomain}/menu
+              {tenantSlug}.{rootDomain}/menu?m=…&amp;t=…
             </span>
-            .
+            ). Reimprime los QR antiguos.
           </p>
         </div>
       </header>
@@ -258,7 +298,7 @@ export function QrGenerator({
                 />
               </div>
               <span className="mt-2 block truncate text-xs text-muted-foreground">
-                URL: {preview?.menuUrl ?? "—"}
+                URL: {signing ? "Firmando…" : (preview?.menuUrl ?? "—")}
               </span>
             </div>
           ) : null}
@@ -299,6 +339,7 @@ export function QrGenerator({
               </div>
               <p className="text-xs text-muted-foreground">
                 Se generarán {targets.length || 0} tarjetas (máx. 48 por lote).
+                {signing ? " Firmando tokens…" : ""}
               </p>
               {bulkTooLarge ? (
                 <p className="text-xs font-medium text-destructive" role="alert">
@@ -317,7 +358,7 @@ export function QrGenerator({
           <div className="mt-6 flex flex-col gap-2">
             <button
               type="button"
-              disabled={!preview || busy}
+              disabled={!preview || busy || signing}
               onClick={() => void handleDownloadPng()}
               className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 ${focusRing}`}
             >
@@ -326,7 +367,7 @@ export function QrGenerator({
             </button>
             <button
               type="button"
-              disabled={targets.length === 0 || bulkTooLarge}
+              disabled={targets.length === 0 || bulkTooLarge || signing}
               onClick={handlePrint}
               className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-live px-4 text-sm font-semibold text-live-foreground hover:brightness-110 disabled:opacity-50 ${focusRing}`}
             >
@@ -360,7 +401,11 @@ export function QrGenerator({
             ) : null}
           </div>
 
-          {preview ? (
+          {signing && !preview ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
+              Firmando códigos de mesa…
+            </div>
+          ) : preview ? (
             <div className="mx-auto w-full max-w-sm">
               <div className="rounded-2xl bg-secondary p-6">
                 <QrCard

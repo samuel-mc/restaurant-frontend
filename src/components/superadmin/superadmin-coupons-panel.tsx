@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * CRUD de cupones para SuperAdmin (Billing).
+ * CRUD de cupones para SuperAdmin.
  */
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type {
   SuperAdminCoupon,
@@ -19,19 +19,26 @@ import { SuperAdminConfirmDialog } from "@/components/superadmin/superadmin-conf
 import {
   saAlertError,
   saAlertSuccess,
+  saChip,
+  saChipOff,
+  saChipOn,
+  saDangerBtn,
   saField,
   saFocus,
   saPrimaryBtn,
   saSecondaryBtn,
   saSelect,
+  saSoftSuccessBtn,
 } from "@/components/superadmin/superadmin-ui";
 
 const fieldClassName = saField;
 const selectClassName = saSelect;
 
+type CouponFilter = "all" | "active" | "inactive";
+
 function formatUsages(coupon: SuperAdminCoupon): string {
   if (coupon.maxRedemptions == null) {
-    return `${coupon.redemptionCount} / ∞`;
+    return `${coupon.redemptionCount} / ilimitado`;
   }
   return `${coupon.redemptionCount} / ${coupon.maxRedemptions}`;
 }
@@ -90,12 +97,34 @@ export function SuperAdminCouponsPanel({
   const [editPlan, setEditPlan] = useState<SuperAdminPlan>("PRO");
   const [editMax, setEditMax] = useState("");
   const [editExpires, setEditExpires] = useState("");
+  const [statusFilter, setStatusFilter] = useState<CouponFilter>("all");
+  const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    setCoupons(initialCoupons);
+  }, [initialCoupons]);
 
   useEffect(() => {
     if (!success) return;
     const t = window.setTimeout(() => setSuccess(null), 4500);
     return () => window.clearTimeout(t);
   }, [success]);
+
+  const filterCounts = useMemo(() => {
+    let active = 0;
+    let inactive = 0;
+    for (const c of coupons) {
+      if (c.active) active += 1;
+      else inactive += 1;
+    }
+    return { all: coupons.length, active, inactive };
+  }, [coupons]);
+
+  const filteredCoupons = useMemo(() => {
+    if (statusFilter === "active") return coupons.filter((c) => c.active);
+    if (statusFilter === "inactive") return coupons.filter((c) => !c.active);
+    return coupons;
+  }, [coupons, statusFilter]);
 
   function refresh() {
     startTransition(() => router.refresh());
@@ -133,6 +162,7 @@ export function SuperAdminCouponsPanel({
       setGrantsPlan("PRO");
       setMaxRedemptions("");
       setExpiresLocal("");
+      setCreateOpen(false);
       flashSuccess(`Cupón ${created.code} creado.`);
       refresh();
     } catch (err) {
@@ -241,126 +271,201 @@ export function SuperAdminCouponsPanel({
         </p>
       ) : null}
 
-      <section className="rounded-2xl border border-white/[0.06] bg-[#111113] p-5">
-        <h2 className="text-sm font-semibold text-white">Crear cupón</h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          El código queda fijo al crearlo. Para retirarlo del registro, usa
-          Desactivar (no se borra el historial de canjes).
-        </p>
-        <form
-          onSubmit={(e) => void handleCreate(e)}
-          className="mt-4 grid gap-3 sm:grid-cols-2"
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          aria-expanded={createOpen}
+          aria-controls="create-coupon-panel"
+          onClick={() => setCreateOpen((o) => !o)}
+          className={`${saPrimaryBtn} ${saFocus} w-full sm:w-auto`}
         >
-          <label className="block space-y-1.5 sm:col-span-1">
-            <span className="text-xs font-medium text-zinc-400">Código</span>
-            <input
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="PRO-DEMO-2026"
-              className={`${fieldClassName} font-mono`}
-              disabled={busyId != null}
-              maxLength={40}
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-zinc-400">
-              Plan que otorga
-            </span>
-            <select
-              className={`${fieldClassName}`}
-              value={grantsPlan}
-              onChange={(e) => setGrantsPlan(e.target.value as SuperAdminPlan)}
-              disabled={busyId != null}
-            >
-              <option value="PRO">Pro</option>
-              <option value="BASIC">Básico</option>
-            </select>
-          </label>
-          <label className="block space-y-1.5 sm:col-span-2">
-            <span className="text-xs font-medium text-zinc-400">
-              Descripción (opcional)
-            </span>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Pago en efectivo / early access"
-              className={fieldClassName}
-              disabled={busyId != null}
-              maxLength={255}
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-zinc-400">
-              Máx. usos (vacío = ilimitado)
-            </span>
-            <input
-              type="number"
-              min={1}
-              value={maxRedemptions}
-              onChange={(e) => setMaxRedemptions(e.target.value)}
-              className={fieldClassName}
-              disabled={busyId != null}
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-zinc-400">
-              Expira (opcional)
-            </span>
-            <input
-              type="datetime-local"
-              value={expiresLocal}
-              onChange={(e) => setExpiresLocal(e.target.value)}
-              className={fieldClassName}
-              disabled={busyId != null}
-            />
-          </label>
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={busyId != null || code.trim().length < 3}
-              className={`${saPrimaryBtn} ${saFocus}`}
-            >
-              {busyId === "create" ? "Creando…" : "Crear cupón"}
-            </button>
-          </div>
-        </form>
-      </section>
+          {createOpen ? "Cerrar formulario" : "Nuevo cupón"}
+        </button>
+        <div
+          className="flex flex-wrap gap-1.5"
+          role="group"
+          aria-label="Filtrar cupones por estado"
+        >
+          {(
+            [
+              { id: "all", label: "Todos", count: filterCounts.all },
+              { id: "active", label: "Activos", count: filterCounts.active },
+              {
+                id: "inactive",
+                label: "Inactivos",
+                count: filterCounts.inactive,
+              },
+            ] as const
+          ).map((chip) => {
+            const selected = statusFilter === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setStatusFilter(chip.id)}
+                className={`${saChip} ${saFocus} ${
+                  selected ? saChipOn : saChipOff
+                }`}
+              >
+                {chip.label}
+                <span className="tabular-nums opacity-70">{chip.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {createOpen ? (
+        <section
+          id="create-coupon-panel"
+          className="rounded-2xl border border-white/[0.06] bg-[#111113] p-5"
+        >
+          <h2 className="text-sm font-semibold text-white">Crear cupón</h2>
+          <p className="mt-1 text-xs text-zinc-400">
+            El código queda fijo al crearlo. Para retirarlo del registro, usa
+            Desactivar (no se borra el historial de canjes).
+          </p>
+          <form
+            onSubmit={(e) => void handleCreate(e)}
+            className="mt-4 grid gap-3 sm:grid-cols-2"
+          >
+            <label className="block space-y-1.5 sm:col-span-1">
+              <span className="text-xs font-medium text-zinc-400">Código</span>
+              <input
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="PRO-DEMO-2026"
+                className={`${fieldClassName} font-mono`}
+                disabled={busyId != null}
+                maxLength={40}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-zinc-400">
+                Plan que otorga
+              </span>
+              <select
+                className={`${fieldClassName}`}
+                value={grantsPlan}
+                onChange={(e) =>
+                  setGrantsPlan(e.target.value as SuperAdminPlan)
+                }
+                disabled={busyId != null}
+              >
+                <option value="PRO">Pro</option>
+                <option value="BASIC">Básico</option>
+              </select>
+            </label>
+            <label className="block space-y-1.5 sm:col-span-2">
+              <span className="text-xs font-medium text-zinc-400">
+                Descripción (opcional)
+              </span>
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Pago en efectivo / early access"
+                className={fieldClassName}
+                disabled={busyId != null}
+                maxLength={255}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-zinc-400">
+                Máx. usos (vacío = ilimitado)
+              </span>
+              <input
+                type="number"
+                min={1}
+                value={maxRedemptions}
+                onChange={(e) => setMaxRedemptions(e.target.value)}
+                className={fieldClassName}
+                disabled={busyId != null}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-zinc-400">
+                Expira (opcional)
+              </span>
+              <input
+                type="datetime-local"
+                value={expiresLocal}
+                onChange={(e) => setExpiresLocal(e.target.value)}
+                className={fieldClassName}
+                disabled={busyId != null}
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                disabled={busyId != null || code.trim().length < 3}
+                className={`${saPrimaryBtn} ${saFocus}`}
+              >
+                {busyId === "create" ? "Creando…" : "Crear cupón"}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111113]">
         <div className="border-b border-white/[0.06] px-5 py-4">
-          <h2 className="text-sm font-semibold text-white">Cupones activos</h2>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            {coupons.length === 0
-              ? "Ninguno todavía"
-              : `${coupons.length} cupón${coupons.length === 1 ? "" : "es"} en total`}
+          <h2 className="text-sm font-semibold text-white">Todos los cupones</h2>
+          <p className="mt-0.5 text-xs text-zinc-400">
+            {filteredCoupons.length === 0
+              ? statusFilter === "all"
+                ? "Ninguno todavía"
+                : "Ninguno con este filtro"
+              : `${filteredCoupons.length} visibles · ${coupons.length} en total`}
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs uppercase tracking-wider text-zinc-500">
+            <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs font-medium tracking-wide text-zinc-400">
               <tr>
-                <th className="px-4 py-3 font-medium">Código</th>
-                <th className="px-4 py-3 font-medium">Plan</th>
-                <th className="px-4 py-3 font-medium">Usos</th>
-                <th className="px-4 py-3 font-medium">Expira</th>
-                <th className="px-4 py-3 font-medium">Estado</th>
-                <th className="px-4 py-3 font-medium text-right">Acciones</th>
+                <th className="px-4 py-3">Código</th>
+                <th className="px-4 py-3">Plan</th>
+                <th className="px-4 py-3">Usos</th>
+                <th className="px-4 py-3">Expira</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {coupons.length === 0 ? (
+              {filteredCoupons.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-10 text-center text-sm text-zinc-500"
+                    className="px-4 py-10 text-center text-sm text-zinc-400"
                   >
-                    Aún no hay cupones. Usa el formulario de arriba para crear
-                    el primero.
+                    {coupons.length === 0 ? (
+                      <span className="inline-flex flex-col items-center gap-3">
+                        <span>Aún no hay cupones.</span>
+                        <button
+                          type="button"
+                          onClick={() => setCreateOpen(true)}
+                          className={`${saSecondaryBtn} ${saFocus}`}
+                        >
+                          Crear el primero
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="inline-flex flex-col items-center gap-3">
+                        <span>Ningún cupón coincide con el filtro.</span>
+                        <button
+                          type="button"
+                          onClick={() => setStatusFilter("all")}
+                          className={`${saSecondaryBtn} ${saFocus}`}
+                        >
+                          Ver todos
+                        </button>
+                      </span>
+                    )}
                   </td>
                 </tr>
               ) : (
-                coupons.map((coupon) => {
+                filteredCoupons.map((coupon) => {
                   const busy = busyId === coupon.id;
                   const editing = editingId === coupon.id;
                   return (
@@ -379,7 +484,7 @@ export function SuperAdminCouponsPanel({
                             maxLength={255}
                           />
                         ) : coupon.description ? (
-                          <p className="mt-1 text-xs text-zinc-500">
+                          <p className="mt-1 text-xs text-zinc-400">
                             {coupon.description}
                           </p>
                         ) : null}
@@ -410,7 +515,7 @@ export function SuperAdminCouponsPanel({
                             min={1}
                             value={editMax}
                             onChange={(e) => setEditMax(e.target.value)}
-                            placeholder="∞"
+                            placeholder="Ilimitado"
                             className={`${fieldClassName} max-w-[7rem]`}
                             disabled={busy}
                           />
@@ -438,13 +543,14 @@ export function SuperAdminCouponsPanel({
                       <td className="px-4 py-3.5">
                         <span
                           className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                            coupon.active ? "text-emerald-300" : "text-zinc-500"
+                            coupon.active ? "text-emerald-300" : "text-zinc-400"
                           }`}
                         >
                           <span
                             className={`size-1.5 rounded-full ${
                               coupon.active ? "bg-emerald-400" : "bg-zinc-600"
                             }`}
+                            aria-hidden
                           />
                           {coupon.active ? "Activo" : "Inactivo"}
                         </span>
@@ -457,7 +563,7 @@ export function SuperAdminCouponsPanel({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => void saveEdit(coupon.id)}
-                                className={`rounded-lg bg-[#047857] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#065F46] disabled:opacity-40 ${saFocus}`}
+                                className={`${saPrimaryBtn} px-3 text-xs ${saFocus}`}
                               >
                                 Guardar
                               </button>
@@ -487,7 +593,9 @@ export function SuperAdminCouponsPanel({
                                   setDialogError(null);
                                   setPendingToggle(coupon);
                                 }}
-                                className={`${saSecondaryBtn} ${saFocus}`}
+                                className={`${
+                                  coupon.active ? saDangerBtn : saSoftSuccessBtn
+                                } ${saFocus}`}
                               >
                                 {coupon.active ? "Desactivar" : "Activar"}
                               </button>

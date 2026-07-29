@@ -2,10 +2,11 @@
 
 /**
  * Confirmación modal del SuperAdmin (canvas oscuro).
- * Misma API de foco/Escape que el ConfirmDialog del admin de tenant.
+ * Portal a body + shell inert para aislar AT del fondo.
  */
 
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import {
   saAlertError,
@@ -32,6 +33,7 @@ interface SuperAdminConfirmDialogProps {
 }
 
 const focusRing = saFocusOnSurface;
+const SHELL_ROOT_ID = "superadmin-root";
 
 export function SuperAdminConfirmDialog({
   open,
@@ -55,6 +57,11 @@ export function SuperAdminConfirmDialog({
   const errorId = useId();
   const challengeId = useId();
   const [typed, setTyped] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) setTyped("");
@@ -66,7 +73,20 @@ export function SuperAdminConfirmDialog({
     escapeEnabled: !busy,
   });
 
-  if (!open) return null;
+  // After focus-trap registration so cleanup removes inert *before* focus restore.
+  useEffect(() => {
+    if (!open) return;
+    const shell = document.getElementById(SHELL_ROOT_ID);
+    if (!shell) return;
+
+    const previousInert = shell.inert;
+    shell.inert = true;
+    return () => {
+      shell.inert = previousInert;
+    };
+  }, [open]);
+
+  if (!open || !mounted) return null;
 
   const challengeOk =
     challenge == null || challenge.trim() === "" || typed.trim() === challenge;
@@ -77,6 +97,8 @@ export function SuperAdminConfirmDialog({
       ? "bg-red-600 text-white hover:bg-red-500 disabled:opacity-40"
       : "bg-[#047857] text-white hover:bg-[#065F46] disabled:opacity-40";
 
+  const dialogRole = tone === "danger" ? "alertdialog" : "dialog";
+
   const describedBy = [
     descId,
     detail ? detailId : null,
@@ -86,7 +108,7 @@ export function SuperAdminConfirmDialog({
     .filter(Boolean)
     .join(" ");
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
       role="presentation"
@@ -96,7 +118,7 @@ export function SuperAdminConfirmDialog({
     >
       <div
         ref={panelRef}
-        role="alertdialog"
+        role={dialogRole}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={describedBy}
@@ -159,6 +181,7 @@ export function SuperAdminConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

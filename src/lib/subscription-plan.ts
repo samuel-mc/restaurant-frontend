@@ -7,6 +7,20 @@ export type PaymentStatus = "ACTIVE" | "PENDING_PAYMENT";
 
 export const BASIC_MAX_PRODUCTS = 30;
 
+export const BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE =
+  `El Plan Básico permite hasta ${BASIC_MAX_PRODUCTS} platillos. Actualiza al Plan Pro para menú ilimitado.`;
+
+export function basicImportWouldExceedMessage(
+  currentCount: number,
+  fileRowCount: number,
+): string {
+  return (
+    `El Plan Básico permite hasta ${BASIC_MAX_PRODUCTS} platillos. ` +
+    `Ya tienes ${currentCount} y el archivo trae ${fileRowCount}. ` +
+    `Actualiza al Plan Pro para menú ilimitado.`
+  );
+}
+
 export function isProPlan(plan: string | null | undefined): boolean {
   return plan === "PRO";
 }

@@ -1,36 +1,36 @@
-import { Suspense } from "react";
 import Link from "next/link";
-import { SuperAdminTenantsTable } from "@/components/superadmin/superadmin-tenants-table";
 import { requireSuperAdminSession } from "@/lib/superadmin-session";
-import { getSuperAdminTenantsServer } from "@/services/superadminQueries";
+import { getSuperAdminCouponsServer } from "@/services/superadminQueries";
+import { SuperAdminCouponsPanel } from "@/components/superadmin/superadmin-coupons-panel";
 import { ApiError } from "@/services/apiClient";
 
 export const metadata = {
-  title: "SuperAdmin · Restaurantes | PlatoListo",
+  title: "SuperAdmin · Cupones | PlatoListo",
 };
 
-export default async function SuperAdminTenantsPage() {
+export default async function SuperAdminCouponsPage() {
   await requireSuperAdminSession();
 
-  let tenants = null;
+  let coupons = null;
   let error: string | null = null;
   try {
-    tenants = await getSuperAdminTenantsServer();
+    coupons = await getSuperAdminCouponsServer();
   } catch (err) {
     error =
       err instanceof ApiError
         ? err.message
-        : "No se pudo cargar el directorio de restaurantes. Revisa la conexión o vuelve a iniciar sesión.";
+        : "No se pudo cargar la lista de cupones. Revisa la conexión o vuelve a iniciar sesión.";
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight text-white">
-          Restaurantes
+          Cupones
         </h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Plan, cobro, suspensión e ingreso al panel de cada local.
+          Códigos para activar un plan al registrar un restaurante. Si el local
+          ya existe, cambia el plan en Restaurantes.
         </p>
       </header>
 
@@ -47,16 +47,8 @@ export default async function SuperAdminTenantsPage() {
             Volver a iniciar sesión
           </Link>
         </div>
-      ) : tenants ? (
-        <Suspense
-          fallback={
-            <p className="text-sm text-zinc-400" aria-live="polite">
-              Cargando directorio…
-            </p>
-          }
-        >
-          <SuperAdminTenantsTable initialTenants={tenants} />
-        </Suspense>
+      ) : coupons ? (
+        <SuperAdminCouponsPanel initialCoupons={coupons} />
       ) : null}
     </div>
   );

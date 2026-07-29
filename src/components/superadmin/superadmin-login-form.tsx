@@ -49,13 +49,13 @@ export function SuperAdminLoginForm() {
       className="relative z-10 w-full max-w-sm space-y-4 rounded-2xl border border-white/[0.08] bg-[#111113] p-6 shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
     >
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
           PlatoListo
         </p>
         <h1 className="mt-2 text-xl font-semibold tracking-tight text-white">
           SuperAdmin
         </h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-zinc-400">
           Acceso del equipo PlatoListo a restaurantes, planes y cupones
         </p>
       </div>

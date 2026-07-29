@@ -2,6 +2,7 @@ import { SuperAdminMetricsGrid } from "@/components/superadmin/superadmin-metric
 import { requireSuperAdminSession } from "@/lib/superadmin-session";
 import { getSuperAdminMetricsServer } from "@/services/superadminQueries";
 import { ApiError } from "@/services/apiClient";
+import Link from "next/link";
 
 export const metadata = {
   title: "SuperAdmin · Panel | PlatoListo",
@@ -22,23 +23,29 @@ export default async function SuperAdminDashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <header>
+    <div className="mx-auto max-w-6xl space-y-8">
+      <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-white">
           Panel
         </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Vista rápida de ingresos estimados, restaurantes activos y altas
-          recientes.
+        <p className="max-w-2xl text-sm text-zinc-400">
+          Empieza por lo que requiere acción. Las métricas debajo abren el
+          directorio ya filtrado.
         </p>
       </header>
 
       {error ? (
         <div
           role="alert"
-          className="rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-200"
+          className="space-y-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-200"
         >
-          {error}
+          <p>{error}</p>
+          <Link
+            href="/superadmin/login"
+            className="inline-flex min-h-11 items-center font-semibold text-red-100 underline-offset-2 hover:underline"
+          >
+            Volver a iniciar sesión
+          </Link>
         </div>
       ) : metrics ? (
         <SuperAdminMetricsGrid metrics={metrics} />

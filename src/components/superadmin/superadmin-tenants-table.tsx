@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Tabla global de tenants + plan/pago + suspender/activar + impersonación.
- * Acciones de alto riesgo pasan por SuperAdminConfirmDialog.
+ * Directorio de restaurantes — filas destiladas:
+ * resumen + «Gestionar»; mutaciones en panel expandido.
  */
 
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { ExternalLink, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition, Fragment } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ChevronDown, ExternalLink, Search, X } from "lucide-react";
 import type {
   SuperAdminPaymentStatus,
   SuperAdminPlan,
@@ -23,9 +23,14 @@ import { SuperAdminConfirmDialog } from "@/components/superadmin/superadmin-conf
 import {
   saAlertError,
   saAlertSuccess,
+  saChip,
+  saChipOff,
+  saChipOn,
+  saDangerBtn,
   saFocus,
   saSecondaryBtn,
   saSelect,
+  saSoftSuccessBtn,
 } from "@/components/superadmin/superadmin-ui";
 
 function buildTenantAdminUrl(slug: string, path: string): string {
@@ -62,9 +67,18 @@ function paymentLabel(status: SuperAdminPaymentStatus): string {
   return status === "PENDING_PAYMENT" ? "Pago pendiente" : "Al corriente";
 }
 
-const selectClassName = saSelect;
-
 type StatusFilter = "all" | "active" | "suspended" | "pending_payment";
+
+function parseStatusFilter(raw: string | null): StatusFilter {
+  if (
+    raw === "active" ||
+    raw === "suspended" ||
+    raw === "pending_payment"
+  ) {
+    return raw;
+  }
+  return "all";
+}
 
 type PendingAction =
   | { kind: "suspend"; tenant: SuperAdminTenant }
@@ -87,9 +101,14 @@ export function SuperAdminTenantsTable({
   initialTenants: SuperAdminTenant[];
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [tenants, setTenants] = useState(initialTenants);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    parseStatusFilter(searchParams.get("status")),
+  );
+  const [managingId, setManagingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -98,10 +117,35 @@ export function SuperAdminTenantsTable({
   const [, startTransition] = useTransition();
 
   useEffect(() => {
+    setTenants(initialTenants);
+  }, [initialTenants]);
+
+  useEffect(() => {
+    setStatusFilter(parseStatusFilter(searchParams.get("status")));
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!success) return;
     const t = window.setTimeout(() => setSuccess(null), 4500);
     return () => window.clearTimeout(t);
   }, [success]);
+
+  function applyStatusFilter(next: StatusFilter) {
+    setStatusFilter(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "all") {
+      params.delete("status");
+    } else {
+      params.set("status", next);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  function clearFilters() {
+    setQuery("");
+    applyStatusFilter("all");
+  }
 
   const filterCounts = useMemo(() => {
     let active = 0;
@@ -142,6 +186,10 @@ export function SuperAdminTenantsTable({
 
   function isRowBusy(tenantId: number): boolean {
     return busyId === tenantId;
+  }
+
+  function toggleManage(tenantId: number) {
+    setManagingId((prev) => (prev === tenantId ? null : tenantId));
   }
 
   async function applyActive(tenant: SuperAdminTenant, nextActive: boolean) {
@@ -228,13 +276,25 @@ export function SuperAdminTenantsTable({
     try {
       const result = await impersonateTenant(tenant.id);
       const base = buildTenantAdminUrl(result.tenantSlug, "/admin/impersonate");
-      window.location.assign(`${base}#${encodeURIComponent(result.token)}`);
+      const url = `${base}#${encodeURIComponent(result.token)}`;
+      const supportTab = window.open(url, "_blank", "noopener,noreferrer");
+      if (!supportTab) {
+        setDialogError(
+          "El navegador bloqueó la pestaña nueva. Permite ventanas emergentes para este sitio e inténtalo de nuevo.",
+        );
+        return;
+      }
+      setPending(null);
+      flashSuccess(
+        `Panel de ${tenant.name} abierto en otra pestaña. SuperAdmin sigue aquí.`,
+      );
     } catch (err) {
       const message =
         err instanceof ApiError
           ? err.message
           : "No se pudo abrir el panel del restaurante. Puede estar suspendido o falló el token de soporte.";
       setDialogError(message);
+    } finally {
       setBusyId(null);
     }
   }
@@ -277,6 +337,7 @@ export function SuperAdminTenantsTable({
     busyLabel: string;
     tone: "danger" | "neutral";
     challenge?: string;
+    detail?: string;
   } | null => {
     if (!pending) return null;
     const name = pending.tenant.name;
@@ -315,14 +376,18 @@ export function SuperAdminTenantsTable({
           busyLabel: "Guardando…",
           tone: "neutral",
         };
-      case "impersonate":
+      case "impersonate": {
+        const destination = buildTenantAdminUrl(slug, "/admin/dashboard");
         return {
           title: `¿Abrir el panel de ${name}?`,
-          description: `Saldrás de SuperAdmin y entrarás al panel de ${name} (${slug}) con un token de soporte. Cuando termines, cierra esa sesión; no hay regreso automático aquí.`,
-          confirmLabel: "Salir y abrir panel",
+          description: `Se abrirá el panel de ${name} en una pestaña nueva con un token de soporte. SuperAdmin permanece en esta pestaña. Escribe el subdominio para confirmar.`,
+          confirmLabel: "Abrir en pestaña nueva",
           busyLabel: "Abriendo…",
           tone: "danger",
+          challenge: slug,
+          detail: `Destino: ${destination}`,
         };
+      }
     }
   })();
 
@@ -331,7 +396,7 @@ export function SuperAdminTenantsTable({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full max-w-md">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500"
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400"
             aria-hidden
           />
           <input
@@ -345,7 +410,7 @@ export function SuperAdminTenantsTable({
             <button
               type="button"
               onClick={() => setQuery("")}
-              className={`absolute right-2 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100 ${saFocus}`}
+              className={`absolute right-2 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100 ${saFocus}`}
               aria-label="Limpiar búsqueda"
             >
               <X className="size-4" aria-hidden />
@@ -380,11 +445,9 @@ export function SuperAdminTenantsTable({
                 key={chip.id}
                 type="button"
                 aria-pressed={selected}
-                onClick={() => setStatusFilter(chip.id)}
-                className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition ${saFocus} ${
-                  selected
-                    ? "bg-emerald-500/15 text-emerald-200"
-                    : "bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200"
+                onClick={() => applyStatusFilter(chip.id)}
+                className={`${saChip} ${saFocus} ${
+                  selected ? saChipOn : saChipOff
                 }`}
               >
                 {chip.label}
@@ -410,13 +473,15 @@ export function SuperAdminTenantsTable({
       <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111113]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs font-medium tracking-wide text-zinc-500">
+            <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs font-medium tracking-wide text-zinc-400">
               <tr>
                 <th className="px-4 py-3">Restaurante</th>
                 <th className="px-4 py-3">Plan</th>
                 <th className="px-4 py-3">Cobro</th>
                 <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
+                <th className="px-4 py-3 text-right">
+                  <span className="sr-only">Gestionar</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -424,7 +489,7 @@ export function SuperAdminTenantsTable({
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-4 py-10 text-center text-sm text-zinc-500"
+                    className="px-4 py-10 text-center text-sm text-zinc-400"
                   >
                     {query.trim() || statusFilter !== "all" ? (
                       <span className="inline-flex flex-col items-center gap-3">
@@ -433,10 +498,7 @@ export function SuperAdminTenantsTable({
                         </span>
                         <button
                           type="button"
-                          onClick={() => {
-                            setQuery("");
-                            setStatusFilter("all");
-                          }}
+                          onClick={clearFilters}
                           className={`${saSecondaryBtn} ${saFocus}`}
                         >
                           Quitar filtros
@@ -450,6 +512,7 @@ export function SuperAdminTenantsTable({
               ) : (
                 filtered.map((tenant) => {
                   const busy = isRowBusy(tenant.id);
+                  const open = managingId === tenant.id;
                   const pendingPlan =
                     pending?.kind === "plan" && pending.tenant.id === tenant.id
                       ? pending.plan
@@ -459,149 +522,216 @@ export function SuperAdminTenantsTable({
                     pending.tenant.id === tenant.id
                       ? pending.paymentStatus
                       : null;
+                  const panelId = `tenant-manage-${tenant.id}`;
+
                   return (
-                    <tr key={tenant.id} className="hover:bg-white/[0.02]">
-                      <td className="max-w-[16rem] min-w-0 px-4 py-3.5">
-                        <p
-                          className="truncate font-medium text-white"
-                          title={tenant.name}
-                        >
-                          {tenant.name}
-                        </p>
-                        <p
-                          className="mt-0.5 truncate font-mono text-xs text-zinc-500"
-                          title={tenant.subdomain}
-                        >
-                          {tenant.subdomain}
-                        </p>
-                        {tenant.websitePublished ? (
-                          <p className="mt-1 text-xs text-emerald-400/80">
-                            Sitio publicado
+                    <Fragment key={tenant.id}>
+                      <tr
+                        className={
+                          open
+                            ? "bg-white/[0.03]"
+                            : "hover:bg-white/[0.02]"
+                        }
+                      >
+                        <td className="max-w-[16rem] min-w-0 px-4 py-3.5">
+                          <p
+                            className="truncate font-medium text-white"
+                            title={tenant.name}
+                          >
+                            {tenant.name}
                           </p>
-                        ) : (
-                          <p className="mt-1 text-xs text-zinc-600">
-                            Sitio no publicado
+                          <p
+                            className="mt-0.5 truncate font-mono text-xs text-zinc-400"
+                            title={tenant.subdomain}
+                          >
+                            {tenant.subdomain}
                           </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <select
-                          aria-label={`Plan de ${tenant.name}`}
-                          className={selectClassName}
-                          disabled={busy}
-                          value={pendingPlan ?? asPlan(tenant.plan)}
-                          onChange={(e) => {
-                            const plan = e.target.value as SuperAdminPlan;
-                            if (plan === asPlan(tenant.plan)) return;
-                            setDialogError(null);
-                            setPending({ kind: "plan", tenant, plan });
-                          }}
-                        >
-                          <option value="BASIC">Básico</option>
-                          <option value="PRO">Pro</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <select
-                          aria-label={`Cobro de ${tenant.name}`}
-                          className={selectClassName}
-                          disabled={busy}
-                          value={
-                            pendingPayment ?? asPayment(tenant.paymentStatus)
-                          }
-                          onChange={(e) => {
-                            const paymentStatus = e.target
-                              .value as SuperAdminPaymentStatus;
-                            if (
-                              paymentStatus === asPayment(tenant.paymentStatus)
-                            ) {
-                              return;
-                            }
-                            setDialogError(null);
-                            setPending({
-                              kind: "payment",
-                              tenant,
-                              paymentStatus,
-                            });
-                          }}
-                        >
-                          <option value="ACTIVE">Al corriente</option>
-                          <option value="PENDING_PAYMENT">
-                            Pago pendiente
-                          </option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span
-                          className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                            tenant.active ? "text-emerald-300" : "text-zinc-500"
-                          }`}
-                        >
+                          {tenant.websitePublished ? (
+                            <p className="mt-1 text-xs text-emerald-400/80">
+                              Sitio publicado
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-xs text-zinc-400">
+                              Sitio no publicado
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-xs font-medium text-zinc-300">
+                          {planLabel(asPlan(tenant.plan))}
+                        </td>
+                        <td className="px-4 py-3.5 text-xs font-medium text-zinc-300">
+                          {paymentLabel(asPayment(tenant.paymentStatus))}
+                        </td>
+                        <td className="px-4 py-3.5">
                           <span
-                            className={`size-1.5 rounded-full ${
-                              tenant.active ? "bg-emerald-400" : "bg-zinc-600"
+                            className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                              tenant.active
+                                ? "text-emerald-300"
+                                : "text-zinc-400"
                             }`}
-                            aria-hidden
-                          />
-                          {tenant.active ? "Activo" : "Suspendido"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                          <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-xs text-zinc-400">
-                            <span className="whitespace-nowrap">
-                              {tenant.active ? "Suspender" : "Activar"}
-                            </span>
-                            <input
-                              type="checkbox"
-                              role="switch"
-                              aria-checked={tenant.active}
-                              aria-label={
-                                tenant.active
-                                  ? `Suspender ${tenant.name}`
-                                  : `Activar ${tenant.name}`
-                              }
-                              checked={tenant.active}
-                              disabled={busy}
-                              onChange={() => {
-                                setDialogError(null);
-                                setPending({
-                                  kind: tenant.active ? "suspend" : "activate",
-                                  tenant,
-                                });
-                              }}
-                              className="peer sr-only"
-                            />
+                          >
                             <span
-                              className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                              className={`size-1.5 rounded-full ${
                                 tenant.active
-                                  ? "bg-emerald-500/80"
-                                  : "bg-zinc-700"
-                              } ${busy ? "opacity-50" : ""}`}
+                                  ? "bg-emerald-400"
+                                  : "bg-zinc-600"
+                              }`}
                               aria-hidden
-                            >
-                              <span
-                                className={`absolute top-0.5 left-0.5 size-4 rounded-full bg-white transition ${
-                                  tenant.active ? "translate-x-4" : ""
-                                }`}
-                              />
-                            </span>
-                          </label>
+                            />
+                            {tenant.active ? "Activo" : "Suspendido"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-right">
                           <button
                             type="button"
-                            disabled={busy || !tenant.active}
-                            onClick={() => {
-                              setDialogError(null);
-                              setPending({ kind: "impersonate", tenant });
-                            }}
-                            className={`${saSecondaryBtn} ${saFocus}`}
+                            aria-expanded={open}
+                            aria-controls={panelId}
+                            disabled={busy}
+                            onClick={() => toggleManage(tenant.id)}
+                            className={`${saSecondaryBtn} ${saFocus} ${
+                              open
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                                : ""
+                            }`}
                           >
-                            <ExternalLink className="size-3.5" aria-hidden />
-                            Abrir panel
+                            {open ? "Cerrar" : "Gestionar"}
+                            <ChevronDown
+                              className={`size-3.5 transition ${
+                                open ? "rotate-180" : ""
+                              }`}
+                              aria-hidden
+                            />
                           </button>
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                      {open ? (
+                        <tr className="bg-white/[0.02]">
+                          <td colSpan={5} className="px-4 py-4" id={panelId}>
+                            <div className="flex flex-col gap-4 rounded-xl border border-white/[0.06] bg-[#0c0c0e] p-4 md:flex-row md:items-end md:justify-between">
+                              <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
+                                <label className="block space-y-1.5">
+                                  <span className="text-xs font-medium text-zinc-400">
+                                    Plan
+                                  </span>
+                                  <select
+                                    aria-label={`Plan de ${tenant.name}`}
+                                    className={`${saSelect} w-full`}
+                                    disabled={busy}
+                                    value={pendingPlan ?? asPlan(tenant.plan)}
+                                    onChange={(e) => {
+                                      const plan = e.target
+                                        .value as SuperAdminPlan;
+                                      if (plan === asPlan(tenant.plan)) return;
+                                      setDialogError(null);
+                                      setPending({
+                                        kind: "plan",
+                                        tenant,
+                                        plan,
+                                      });
+                                    }}
+                                  >
+                                    <option value="BASIC">Básico</option>
+                                    <option value="PRO">Pro</option>
+                                  </select>
+                                </label>
+                                <label className="block space-y-1.5">
+                                  <span className="text-xs font-medium text-zinc-400">
+                                    Cobro
+                                  </span>
+                                  <select
+                                    aria-label={`Cobro de ${tenant.name}`}
+                                    className={`${saSelect} w-full`}
+                                    disabled={busy}
+                                    value={
+                                      pendingPayment ??
+                                      asPayment(tenant.paymentStatus)
+                                    }
+                                    onChange={(e) => {
+                                      const paymentStatus = e.target
+                                        .value as SuperAdminPaymentStatus;
+                                      if (
+                                        paymentStatus ===
+                                        asPayment(tenant.paymentStatus)
+                                      ) {
+                                        return;
+                                      }
+                                      setDialogError(null);
+                                      setPending({
+                                        kind: "payment",
+                                        tenant,
+                                        paymentStatus,
+                                      });
+                                    }}
+                                  >
+                                    <option value="ACTIVE">Al corriente</option>
+                                    <option value="PENDING_PAYMENT">
+                                      Pago pendiente
+                                    </option>
+                                  </select>
+                                </label>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                                {tenant.active ? (
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      setDialogError(null);
+                                      setPending({
+                                        kind: "suspend",
+                                        tenant,
+                                      });
+                                    }}
+                                    className={`${saDangerBtn} ${saFocus}`}
+                                  >
+                                    Suspender
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      setDialogError(null);
+                                      setPending({
+                                        kind: "activate",
+                                        tenant,
+                                      });
+                                    }}
+                                    className={`${saSoftSuccessBtn} ${saFocus}`}
+                                  >
+                                    Reactivar
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={busy || !tenant.active}
+                                  onClick={() => {
+                                    setDialogError(null);
+                                    setPending({
+                                      kind: "impersonate",
+                                      tenant,
+                                    });
+                                  }}
+                                  className={`${saSecondaryBtn} ${saFocus}`}
+                                >
+                                  <ExternalLink
+                                    className="size-3.5"
+                                    aria-hidden
+                                  />
+                                  Abrir panel
+                                </button>
+                              </div>
+                            </div>
+                            <p className="mt-2 text-xs text-zinc-400">
+                              Los cambios de plan, cobro y estado piden
+                              confirmación. Abrir panel usa otra pestaña;
+                              SuperAdmin no se cierra.
+                            </p>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })
               )}
@@ -609,7 +739,7 @@ export function SuperAdminTenantsTable({
           </table>
         </div>
       </div>
-      <p className="text-xs text-zinc-600">
+      <p className="text-xs text-zinc-400">
         {filtered.length} de {tenants.length} restaurantes
       </p>
 
@@ -618,6 +748,13 @@ export function SuperAdminTenantsTable({
           open
           title={dialogCopy.title}
           description={dialogCopy.description}
+          detail={
+            dialogCopy.detail ? (
+              <p className="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 font-mono text-xs break-all text-zinc-300">
+                {dialogCopy.detail}
+              </p>
+            ) : null
+          }
           confirmLabel={dialogCopy.confirmLabel}
           busyLabel={dialogCopy.busyLabel}
           tone={dialogCopy.tone}

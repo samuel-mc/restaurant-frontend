@@ -6,16 +6,17 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Building2,
-  CreditCard,
   LayoutDashboard,
   LogOut,
   Menu,
+  Ticket,
   X,
 } from "lucide-react";
 import { clearSuperAdminToken } from "@/services/superadminService";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { saFocus } from "@/components/superadmin/superadmin-ui";
 
 const NAV = [
@@ -27,9 +28,9 @@ const NAV = [
     exact: false,
   },
   {
-    href: "/superadmin/billing",
+    href: "/superadmin/coupons",
     label: "Cupones",
-    icon: CreditCard,
+    icon: Ticket,
     exact: false,
   },
 ] as const;
@@ -44,19 +45,16 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const mobileNavRef = useModalFocusTrap({
+    open: mobileOpen,
+    onEscape: () => setMobileOpen(false),
+  });
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    if (!mobileOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMobileOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [mobileOpen]);
 
   async function handleLogout() {
     if (loggingOut) return;
@@ -73,10 +71,19 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0A0A0B] text-zinc-100">
+    <div
+      id="superadmin-root"
+      className="flex min-h-screen bg-[#0A0A0B] text-zinc-100"
+    >
+      <a
+        href="#superadmin-main"
+        className={`sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[80] focus:rounded-xl focus:bg-[#047857] focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white ${saFocus}`}
+      >
+        Saltar al contenido
+      </a>
       <aside className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col border-r border-white/[0.06] bg-[#111113] md:flex">
         <div className="border-b border-white/[0.06] px-5 py-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
             PlatoListo
           </p>
           <h1 className="mt-1 text-sm font-semibold tracking-tight text-white">
@@ -123,12 +130,13 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-[#0A0A0B]/95 px-4 py-3 backdrop-blur md:hidden">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
               PlatoListo
             </p>
             <p className="text-sm font-semibold text-white">SuperAdmin</p>
           </div>
           <button
+            ref={menuButtonRef}
             type="button"
             aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={mobileOpen}
@@ -146,6 +154,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
 
         {mobileOpen ? (
           <div
+            ref={mobileNavRef}
             id="superadmin-mobile-nav"
             className="border-b border-white/[0.06] bg-[#111113] px-3 py-3 md:hidden"
           >
@@ -179,7 +188,10 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
 
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
+        <main
+          id="superadmin-main"
+          className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8"
+        >
           {children}
         </main>
       </div>

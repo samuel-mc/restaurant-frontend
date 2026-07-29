@@ -389,14 +389,22 @@ export function CartBar({
       setErrorMessage("No hay un pedido de la mesa para sumar platillos.");
       return;
     }
-    if (effectiveType === "PICKUP") {
+    if (effectiveType === "PICKUP" || effectiveType === "DELIVERY") {
       if (!name) {
-        setErrorMessage("Escribe tu nombre para el pedido para llevar.");
+        setErrorMessage(
+          effectiveType === "DELIVERY"
+            ? "Escribe tu nombre para el pedido a domicilio."
+            : "Escribe tu nombre para el pedido para llevar.",
+        );
         window.requestAnimationFrame(() => nameInputRef.current?.focus());
         return;
       }
       if (!phone) {
-        setErrorMessage("Escribe tu teléfono para avisarte cuando esté listo.");
+        setErrorMessage(
+          effectiveType === "DELIVERY"
+            ? "Escribe tu teléfono para coordinar la entrega."
+            : "Escribe tu teléfono para avisarte cuando esté listo.",
+        );
         window.requestAnimationFrame(() => phoneInputRef.current?.focus());
         return;
       }
@@ -1021,7 +1029,7 @@ export function CartBar({
                       <div className="space-y-2">
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            Nombre{isPickupFlow ? " *" : ""}
+                            Nombre *
                           </span>
                           <input
                             ref={nameInputRef}
@@ -1029,10 +1037,8 @@ export function CartBar({
                             name="customerName"
                             autoComplete="name"
                             maxLength={100}
-                            required={isPickupFlow}
-                            placeholder={
-                              isPickupFlow ? "Tu nombre" : "Opcional"
-                            }
+                            required
+                            placeholder="Tu nombre"
                             value={customerName}
                             disabled={isSubmitting}
                             onChange={(event) =>
@@ -1043,7 +1049,7 @@ export function CartBar({
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            Teléfono{isPickupFlow ? " *" : ""}
+                            Teléfono *
                           </span>
                           <input
                             ref={phoneInputRef}
@@ -1051,13 +1057,11 @@ export function CartBar({
                             name="customerPhone"
                             autoComplete="tel"
                             maxLength={20}
-                            required={isPickupFlow}
+                            required
                             placeholder={
-                              isPickupFlow
-                                ? "Para avisarte"
-                                : isDeliveryFlow
-                                  ? "Recomendado"
-                                  : "Opcional"
+                              isDeliveryFlow
+                                ? "Para coordinar la entrega"
+                                : "Para avisarte"
                             }
                             value={customerPhone}
                             disabled={isSubmitting}
@@ -1078,6 +1082,7 @@ export function CartBar({
                               name="deliveryAddress"
                               autoComplete="street-address"
                               maxLength={255}
+                              required
                               placeholder="Calle, número, colonia…"
                               value={deliveryAddress}
                               disabled={isSubmitting}

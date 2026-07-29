@@ -52,6 +52,12 @@ export function getRegisterErrorMessage(error: unknown): string {
         "Ese subdominio o correo ya está en uso. Prueba con otros datos."
       );
     }
+    if (error.status === 429) {
+      return (
+        error.message ||
+        "Demasiados intentos de registro. Espera un rato e inténtalo de nuevo."
+      );
+    }
     return (
       error.message ||
       "No pudimos crear tu restaurante en este momento. Intenta de nuevo en unos segundos."

@@ -4,7 +4,7 @@
  * Suscripción STOMP al canal de cocina/caja del tenant.
  * Topic: `/topic/admin/{tenantSlug}/orders`
  *
- * Requiere JWT (vía `/api/admin/ws-token`) en CONNECT.
+ * Requiere ticket WS de corta vida (vía `/api/admin/ws-token`) en cada CONNECT.
  * Reconexión con backoff exponencial para redes de restaurante inestables.
  */
 
@@ -29,7 +29,7 @@ interface UseKitchenOrdersSubscriptionOptions {
 
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
-const WS_TOKEN_PATH = "/api/admin/ws-token";
+const WS_TICKET_PATH = "/api/admin/ws-token";
 
 function parseOrderMessage(message: IMessage): Order | null {
   try {
@@ -51,18 +51,21 @@ function nextReconnectDelay(attempt: number): number {
   return Math.round(Math.min(RECONNECT_MAX_MS, jitter));
 }
 
-async function fetchWsToken(): Promise<string | null> {
+async function fetchWsTicket(tenantSlug: string): Promise<string | null> {
   try {
-    const response = await fetch(WS_TOKEN_PATH, {
+    const response = await fetch(WS_TICKET_PATH, {
       method: "GET",
       credentials: "same-origin",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "x-tenant-slug": tenantSlug.trim().toLowerCase(),
+      },
       cache: "no-store",
     });
     if (!response.ok) return null;
-    const body = (await response.json()) as { token?: unknown };
-    const token = typeof body.token === "string" ? body.token.trim() : "";
-    return token || null;
+    const body = (await response.json()) as { ticket?: unknown };
+    const ticket = typeof body.ticket === "string" ? body.ticket.trim() : "";
+    return ticket || null;
   } catch {
     return null;
   }
@@ -104,12 +107,12 @@ export function useKitchenOrdersSubscription({
         connectionTimeout: 8_000,
         beforeConnect: async () => {
           client.reconnectDelay = nextReconnectDelay(attempt);
-          const token = await fetchWsToken();
-          if (!token) {
-            throw new Error("No se pudo obtener token para WebSocket.");
+          const ticket = await fetchWsTicket(tenantSlug);
+          if (!ticket) {
+            throw new Error("No se pudo obtener ticket para WebSocket.");
           }
           client.connectHeaders = {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${ticket}`,
           };
         },
         onConnect: () => {

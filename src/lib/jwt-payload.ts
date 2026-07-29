@@ -20,6 +20,7 @@ export interface AdminJwtPayload {
   restaurantId?: number;
   tenantId?: number;
   tokenType?: string;
+  impersonatedBy?: string;
   exp?: number;
 }
 
@@ -83,6 +84,30 @@ export function isTokenExpired(token: string): boolean {
   }
   const now = Math.floor(Date.now() / 1000);
   return payload.exp <= now;
+}
+
+/**
+ * maxAge de cookie alineado al `exp` del JWT (p. ej. impersonación 30 min),
+ * sin superar el tope operativo de sesión admin.
+ */
+export function cookieMaxAgeSecondsForToken(
+  token: string,
+  maxCapSeconds: number,
+): number {
+  const payload = decodeJwtPayload(token);
+  const now = Math.floor(Date.now() / 1000);
+  if (
+    !payload ||
+    typeof payload.exp !== "number" ||
+    !Number.isFinite(payload.exp)
+  ) {
+    return maxCapSeconds;
+  }
+  const remaining = Math.floor(payload.exp - now);
+  if (remaining <= 0) {
+    return 0;
+  }
+  return Math.min(maxCapSeconds, remaining);
 }
 
 /** Login de selección de personal (subdominio → rewrite a `[tenant]/staff/login`). */

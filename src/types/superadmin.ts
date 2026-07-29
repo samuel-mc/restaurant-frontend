@@ -32,4 +32,7 @@ export interface ImpersonateResult {
   tenantSlug: string;
   restaurantName: string;
   loginPath: string;
+  expiresInSeconds?: number;
+  impersonatedBy?: string;
+  impersonatedAs?: string;
 }

@@ -928,6 +928,7 @@ export function KitchenDashboard({
 
       <div className="space-y-1.5 px-4 pt-2 md:px-6">
         <KitchenStatusRail
+          kdsMode={kdsMode}
           offline={actionsLocked}
           offlineMessage="Sin conexión · no se pueden avanzar ni cobrar hasta reconectar"
           banner={banner}
@@ -1281,6 +1282,7 @@ type StatusStrip = "offline" | "undo" | "review" | "urgent" | "banner";
  * (compacto/deshabilitado) para que review/urgent nunca vayan a overflow.
  */
 function KitchenStatusRail({
+  kdsMode = false,
   offline,
   offlineMessage,
   banner,
@@ -1295,6 +1297,7 @@ function KitchenStatusRail({
   onReviewed,
   onUndo,
 }: {
+  kdsMode?: boolean;
   offline: boolean;
   offlineMessage: string;
   banner: string | null;

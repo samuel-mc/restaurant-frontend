@@ -22,12 +22,20 @@ export function canPublishWebsite(
   return isProPlan(plan) && isPaymentActive(paymentStatus);
 }
 
-/** Pickup / delivery: solo Plan Pro con pago activo. */
-export function canUsePickupAndDelivery(
+/** Pickup / delivery / reservaciones: solo Plan Pro con pago activo. */
+export function canUseProServiceModules(
   plan: string | null | undefined,
   paymentStatus: string | null | undefined,
 ): boolean {
   return isProPlan(plan) && isPaymentActive(paymentStatus);
+}
+
+/** @deprecated Preferir {@link canUseProServiceModules}. */
+export function canUsePickupAndDelivery(
+  plan: string | null | undefined,
+  paymentStatus: string | null | undefined,
+): boolean {
+  return canUseProServiceModules(plan, paymentStatus);
 }
 
 export function planLabel(plan: string | null | undefined): string {

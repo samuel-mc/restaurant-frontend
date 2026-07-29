@@ -20,7 +20,7 @@ import { getAdminErrorMessage } from "@/lib/admin-error";
 import { redeemCoupon } from "@/services/adminBillingService";
 import {
   canPublishWebsite,
-  canUsePickupAndDelivery,
+  canUseProServiceModules,
   isProPlan,
   paymentStatusLabel,
   planLabel,
@@ -75,17 +75,19 @@ export function SettingsForm({
     initialProfile.businessHours ?? "",
   );
   const [hasDelivery, setHasDelivery] = useState(
-    canUsePickupAndDelivery(initialProfile.plan, initialProfile.paymentStatus)
+    canUseProServiceModules(initialProfile.plan, initialProfile.paymentStatus)
       ? initialProfile.hasDelivery
       : false,
   );
   const [hasPickup, setHasPickup] = useState(
-    canUsePickupAndDelivery(initialProfile.plan, initialProfile.paymentStatus)
+    canUseProServiceModules(initialProfile.plan, initialProfile.paymentStatus)
       ? initialProfile.hasPickup
       : false,
   );
   const [hasReservations, setHasReservations] = useState(
-    initialProfile.hasReservations,
+    canUseProServiceModules(initialProfile.plan, initialProfile.paymentStatus)
+      ? initialProfile.hasReservations
+      : false,
   );
   const [orderingEnabled, setOrderingEnabled] = useState(
     initialProfile.orderingEnabled,
@@ -111,7 +113,7 @@ export function SettingsForm({
   const [couponBusy, setCouponBusy] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const landingDelivered = hasTenantLanding(tenantSlug);
-  const pickupDeliveryAllowed = canUsePickupAndDelivery(
+  const proServiceModulesAllowed = canUseProServiceModules(
     profile.plan,
     profile.paymentStatus,
   );
@@ -212,9 +214,9 @@ export function SettingsForm({
       googleMapsUrl: maps,
       whatsapp: whatsapp.trim(),
       businessHours: businessHours.trim(),
-      hasDelivery: pickupDeliveryAllowed ? hasDelivery : false,
-      hasPickup: pickupDeliveryAllowed ? hasPickup : false,
-      hasReservations,
+      hasDelivery: proServiceModulesAllowed ? hasDelivery : false,
+      hasPickup: proServiceModulesAllowed ? hasPickup : false,
+      hasReservations: proServiceModulesAllowed ? hasReservations : false,
       orderingEnabled,
       websitePublished,
       logoFile,
@@ -586,34 +588,38 @@ export function SettingsForm({
             <ModuleSwitch
               label="A domicilio"
               description={
-                pickupDeliveryAllowed
+                proServiceModulesAllowed
                   ? "Pedidos con entrega a domicilio"
                   : "Disponible solo en Plan Pro con pago activo."
               }
-              checked={pickupDeliveryAllowed && hasDelivery}
+              checked={proServiceModulesAllowed && hasDelivery}
               disabled={
-                submitting || !orderingEnabled || !pickupDeliveryAllowed
+                submitting || !orderingEnabled || !proServiceModulesAllowed
               }
               onChange={setHasDelivery}
             />
             <ModuleSwitch
               label="Para llevar"
               description={
-                pickupDeliveryAllowed
+                proServiceModulesAllowed
                   ? "Pedidos para recoger en el local"
                   : "Disponible solo en Plan Pro con pago activo."
               }
-              checked={pickupDeliveryAllowed && hasPickup}
+              checked={proServiceModulesAllowed && hasPickup}
               disabled={
-                submitting || !orderingEnabled || !pickupDeliveryAllowed
+                submitting || !orderingEnabled || !proServiceModulesAllowed
               }
               onChange={setHasPickup}
             />
             <ModuleSwitch
               label="Reservaciones"
-              description="Solicitudes de mesa"
-              checked={hasReservations}
-              disabled={submitting}
+              description={
+                proServiceModulesAllowed
+                  ? "Solicitudes de mesa"
+                  : "Disponible solo en Plan Pro con pago activo."
+              }
+              checked={proServiceModulesAllowed && hasReservations}
+              disabled={submitting || !proServiceModulesAllowed}
               onChange={setHasReservations}
             />
           </div>

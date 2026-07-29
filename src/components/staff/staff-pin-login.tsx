@@ -226,7 +226,7 @@ export function StaffPinLogin({
 
   const submitPin = useCallback(
     async (value: string, member: PublicStaffMember) => {
-      if (submittingRef.current || value.length !== 4) return;
+      if (submittingRef.current || value.length !== 6) return;
       submittingRef.current = true;
       const attempt = ++attemptRef.current;
       setBusy(true);
@@ -301,15 +301,15 @@ export function StaffPinLogin({
     }
 
     setPin((prev) => {
-      if (prev.length >= 4) return prev;
+      if (prev.length >= 6) return prev;
       return prev + key;
     });
   }, []);
 
-  // Dispara el login cuando el PIN llega a 4 dígitos (fuera del updater de estado).
+  // Dispara el login cuando el PIN llega a 6 dígitos (fuera del updater de estado).
   useEffect(() => {
     const member = selectedRef.current;
-    if (!member || pin.length !== 4 || submittingRef.current) return;
+    if (!member || pin.length !== 6 || submittingRef.current) return;
     void submitPin(pin, member);
   }, [pin, submitPin]);
 
@@ -825,10 +825,10 @@ function PinPad({
     ? "Comprobando PIN…"
     : showFailedDots
       ? "Ese PIN no coincide. Inténtalo de nuevo."
-      : `PIN: ${pin.length} de 4`;
+      : `PIN: ${pin.length} de 6`;
   // Hint bajo el pad solo cuando no hay banner/alert que ya diga lo mismo.
   const statusHint =
-    busy || error || offline ? null : "Al completar 4 dígitos entras";
+    busy || error || offline ? null : "Al completar 6 dígitos entras";
 
   return (
     <div className="w-full">
@@ -870,7 +870,7 @@ function PinPad({
           aria-busy={busy || undefined}
           role="status"
         >
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4, 5].map((i) => (
             <span
               key={i}
               className={`size-4 rounded-full transition-colors ${

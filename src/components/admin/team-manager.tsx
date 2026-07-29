@@ -134,23 +134,25 @@ function statusBadge(active: boolean): { label: string; className: string } {
 }
 
 function normalizePin(value: string): string {
-  return value.replace(/\D/g, "").slice(0, 4);
+  return value.replace(/\D/g, "").slice(0, 6);
 }
 
 const WEAK_PIN_MESSAGE =
-  "Ese PIN es muy fácil de adivinar. Elige 4 dígitos que no sean consecutivos ni repetidos.";
+  "Ese PIN es muy fácil de adivinar. Elige 6 dígitos que no sean consecutivos ni repetidos.";
 
-/** PINs triviales en tablet a la vista (0000, 1234, secuencias). */
+/** PINs triviales en tablet a la vista (000000, 123456, secuencias). */
 function isWeakPin(pin: string): boolean {
-  if (!/^\d{4}$/.test(pin)) return false;
-  if (/^(\d)\1{3}$/.test(pin)) return true;
+  if (!/^\d{6}$/.test(pin)) return false;
+  if (/^(\d)\1{5}$/.test(pin)) return true;
   if (
-    pin === "1234" ||
-    pin === "4321" ||
-    pin === "0123" ||
-    pin === "9876" ||
-    pin === "1212" ||
-    pin === "2121"
+    pin === "123456" ||
+    pin === "654321" ||
+    pin === "012345" ||
+    pin === "987654" ||
+    pin === "112233" ||
+    pin === "121212" ||
+    pin === "123123" ||
+    pin === "111222"
   ) {
     return true;
   }
@@ -1641,7 +1643,7 @@ function MemberFormModal({
   const [discardOpen, setDiscardOpen] = useState(false);
 
   const reviewDirty =
-    step === "review" && name.trim().length > 0 && /^\d{4}$/.test(pin);
+    step === "review" && name.trim().length > 0 && /^\d{6}$/.test(pin);
 
   function requestClose() {
     if (busy) return;
@@ -1697,8 +1699,8 @@ function MemberFormModal({
       );
       return;
     }
-    if (!/^\d{4}$/.test(pin)) {
-      setLocalError("El PIN debe ser exactamente 4 dígitos.");
+    if (!/^\d{6}$/.test(pin)) {
+      setLocalError("El PIN debe ser exactamente 6 dígitos.");
       return;
     }
     if (isWeakPin(pin)) {
@@ -1833,8 +1835,8 @@ function MemberFormModal({
                       clearFieldErrors();
                     }}
                     inputMode="numeric"
-                    pattern="\d{4}"
-                    maxLength={4}
+                    pattern="\d{6}"
+                    maxLength={6}
                     disabled={busy}
                     autoComplete="new-password"
                     placeholder="••••"
@@ -1856,8 +1858,8 @@ function MemberFormModal({
                       clearFieldErrors();
                     }}
                     inputMode="numeric"
-                    pattern="\d{4}"
-                    maxLength={4}
+                    pattern="\d{6}"
+                    maxLength={6}
                     disabled={busy}
                     autoComplete="new-password"
                     placeholder="••••"
@@ -1980,7 +1982,7 @@ function PinFormModal({
   const [discardOpen, setDiscardOpen] = useState(false);
 
   /** Ready-to-deliver PIN: confirm before discarding a mistap close. */
-  const pinReady = /^\d{4}$/.test(pin);
+  const pinReady = /^\d{6}$/.test(pin);
 
   function requestClose() {
     if (busy) return;
@@ -2018,8 +2020,8 @@ function PinFormModal({
 
   function submitPin(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^\d{4}$/.test(pin)) {
-      setLocalError("El PIN debe ser exactamente 4 dígitos.");
+    if (!/^\d{6}$/.test(pin)) {
+      setLocalError("El PIN debe ser exactamente 6 dígitos.");
       return;
     }
     if (isWeakPin(pin)) {
@@ -2096,12 +2098,12 @@ function PinFormModal({
                   clearErrors();
                 }}
                 inputMode="numeric"
-                pattern="\d{4}"
-                maxLength={4}
+                pattern="\d{6}"
+                maxLength={6}
                 autoComplete="new-password"
                 autoFocus
                 disabled={busy}
-                aria-invalid={!!localError && localError.includes("4 dígitos")}
+                aria-invalid={!!localError && localError.includes("6 dígitos")}
                 className={pinInputClass}
               />
             </label>

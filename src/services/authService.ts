@@ -80,7 +80,7 @@ export async function login(
 }
 
 /**
- * Login rápido del equipo: empleado seleccionado + PIN de 4 dígitos.
+ * Login rápido del equipo: empleado seleccionado + PIN de 6 dígitos.
  */
 export async function loginWithPin(
   staffId: string,
@@ -96,9 +96,9 @@ export async function loginWithPin(
     });
   }
 
-  if (!/^\d{4}$/.test(pin)) {
+  if (!/^\d{6}$/.test(pin)) {
     throw new ApiError({
-      message: "El PIN son 4 dígitos.",
+      message: "El PIN son 6 dígitos.",
       status: 0,
       statusText: "Bad Request",
       url: PIN_LOGIN_PATH,

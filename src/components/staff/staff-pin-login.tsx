@@ -12,6 +12,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type RefObject,
 } from "react";
 import Link from "next/link";
@@ -111,6 +112,12 @@ function writeLastStaffId(tenantSlug: string, staffId: string) {
   }
 }
 
+/** sessionStorage no notifica same-tab; storage cubre otras pestañas. */
+function subscribeLastStaffId(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  return () => window.removeEventListener("storage", onStoreChange);
+}
+
 interface StaffPinLoginProps {
   tenantSlug: string;
   restaurantName: string;
@@ -135,7 +142,6 @@ export function StaffPinLogin({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showRecovery, setShowRecovery] = useState(false);
-  const [lastStaffId, setLastStaffId] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const submittingRef = useRef(false);
   const busyRef = useRef(false);
@@ -146,9 +152,10 @@ export function StaffPinLogin({
   const selectedRef = useRef<PublicStaffMember | null>(null);
   const errorAlertRef = useRef<HTMLParagraphElement>(null);
 
-  const staffSignature = useMemo(
-    () => staff.map((member) => member.id).join("\0"),
-    [staff],
+  const lastStaffId = useSyncExternalStore(
+    subscribeLastStaffId,
+    () => readLastStaffId(tenantSlug),
+    () => null,
   );
 
   // Mirror state for event handlers / async checks — never write refs during render.
@@ -159,11 +166,10 @@ export function StaffPinLogin({
 
   useEffect(() => {
     mountedRef.current = true;
-    setLastStaffId(readLastStaffId(tenantSlug));
     return () => {
       mountedRef.current = false;
     };
-  }, [tenantSlug, staffSignature]);
+  }, []);
 
   useEffect(() => {
     const sync = () => setOffline(typeof navigator !== "undefined" && !navigator.onLine);

@@ -4,7 +4,12 @@
 
 import type {
   ImpersonateResult,
+  SuperAdminCoupon,
+  SuperAdminCouponCreateInput,
+  SuperAdminCouponUpdateInput,
   SuperAdminMetrics,
+  SuperAdminPaymentStatus,
+  SuperAdminPlan,
   SuperAdminTenant,
 } from "@/types/superadmin";
 import { apiClient, ApiError } from "@/services/apiClient";
@@ -110,6 +115,19 @@ export async function updateTenantActiveStatus(
   });
 }
 
+export async function updateTenantSubscription(
+  id: number,
+  payload: { plan: SuperAdminPlan; paymentStatus: SuperAdminPaymentStatus },
+): Promise<SuperAdminTenant> {
+  return bffJson<SuperAdminTenant>(
+    `/api/superadmin/tenants/${id}/subscription`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
 export async function impersonateTenant(
   id: number,
 ): Promise<ImpersonateResult> {
@@ -117,4 +135,27 @@ export async function impersonateTenant(
     `/api/superadmin/tenants/${id}/impersonate`,
     { method: "POST" },
   );
+}
+
+export async function fetchSuperAdminCoupons(): Promise<SuperAdminCoupon[]> {
+  return bffJson<SuperAdminCoupon[]>("/api/superadmin/coupons");
+}
+
+export async function createSuperAdminCoupon(
+  input: SuperAdminCouponCreateInput,
+): Promise<SuperAdminCoupon> {
+  return bffJson<SuperAdminCoupon>("/api/superadmin/coupons", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateSuperAdminCoupon(
+  id: number,
+  input: SuperAdminCouponUpdateInput,
+): Promise<SuperAdminCoupon> {
+  return bffJson<SuperAdminCoupon>(`/api/superadmin/coupons/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }

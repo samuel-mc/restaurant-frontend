@@ -1,38 +1,23 @@
 "use client";
 
 /**
- * Tabla global de tenants + suspender/activar + impersonación.
+ * Tabla global de tenants + plan/pago + suspender/activar + impersonación.
  */
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Search } from "lucide-react";
-import type { SuperAdminTenant } from "@/types/superadmin";
+import type {
+  SuperAdminPaymentStatus,
+  SuperAdminPlan,
+  SuperAdminTenant,
+} from "@/types/superadmin";
 import {
   impersonateTenant,
   updateTenantActiveStatus,
+  updateTenantSubscription,
 } from "@/services/superadminService";
 import { ApiError } from "@/services/apiClient";
-
-function planBadge(plan: string): { label: string; className: string } {
-  switch (plan) {
-    case "PRO":
-      return {
-        label: "Pro",
-        className: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
-      };
-    case "ENTERPRISE":
-      return {
-        label: "Enterprise",
-        className: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
-      };
-    default:
-      return {
-        label: "Básico",
-        className: "bg-zinc-500/20 text-zinc-300 ring-zinc-500/30",
-      };
-  }
-}
 
 function buildTenantAdminUrl(slug: string, path: string): string {
   if (typeof window === "undefined") {
@@ -51,6 +36,17 @@ function buildTenantAdminUrl(slug: string, path: string): string {
     process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase() || "tusass.com";
   return `${protocol}//${slug}.${root}${path}`;
 }
+
+function asPlan(value: string): SuperAdminPlan {
+  return value === "PRO" ? "PRO" : "BASIC";
+}
+
+function asPayment(value: string): SuperAdminPaymentStatus {
+  return value === "PENDING_PAYMENT" ? "PENDING_PAYMENT" : "ACTIVE";
+}
+
+const selectClassName =
+  "rounded-lg border border-white/10 bg-[#0c0c0e] px-2 py-1.5 text-xs font-medium text-zinc-200 outline-none focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50";
 
 export function SuperAdminTenantsTable({
   initialTenants,
@@ -96,13 +92,48 @@ export function SuperAdminTenantsTable({
     }
   }
 
+  async function changeSubscription(
+    tenant: SuperAdminTenant,
+    next: { plan?: SuperAdminPlan; paymentStatus?: SuperAdminPaymentStatus },
+  ) {
+    if (busyId != null) return;
+    const plan = next.plan ?? asPlan(tenant.plan);
+    const paymentStatus = next.paymentStatus ?? asPayment(tenant.paymentStatus);
+    if (
+      plan === asPlan(tenant.plan) &&
+      paymentStatus === asPayment(tenant.paymentStatus)
+    ) {
+      return;
+    }
+
+    setBusyId(tenant.id);
+    setError(null);
+    try {
+      const updated = await updateTenantSubscription(tenant.id, {
+        plan,
+        paymentStatus,
+      });
+      setTenants((prev) =>
+        prev.map((t) => (t.id === updated.id ? updated : t)),
+      );
+      startTransition(() => router.refresh());
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo actualizar la suscripción.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleImpersonate(tenant: SuperAdminTenant) {
     if (busyId != null || !tenant.active) return;
     setBusyId(tenant.id);
     setError(null);
     try {
       const result = await impersonateTenant(tenant.id);
-      // Cookie admin es host-only: handoff en el subdominio (token en hash).
       const base = buildTenantAdminUrl(result.tenantSlug, "/admin/impersonate");
       window.location.assign(
         `${base}#${encodeURIComponent(result.token)}`,
@@ -162,30 +193,58 @@ export function SuperAdminTenantsTable({
                 </tr>
               ) : (
                 filtered.map((tenant) => {
-                  const badge = planBadge(tenant.plan);
                   const busy = busyId === tenant.id;
                   return (
-                    <tr
-                      key={tenant.id}
-                      className="hover:bg-white/[0.02]"
-                    >
+                    <tr key={tenant.id} className="hover:bg-white/[0.02]">
                       <td className="px-4 py-3.5">
                         <p className="font-medium text-white">{tenant.name}</p>
                         <p className="mt-0.5 font-mono text-xs text-zinc-500">
                           {tenant.subdomain}
                         </p>
+                        {tenant.websitePublished ? (
+                          <p className="mt-1 text-[11px] text-emerald-400/80">
+                            Sitio publicado
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[11px] text-zinc-600">
+                            Sitio no publicado
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${badge.className}`}
+                        <select
+                          aria-label={`Plan de ${tenant.name}`}
+                          className={selectClassName}
+                          disabled={busy}
+                          value={asPlan(tenant.plan)}
+                          onChange={(e) =>
+                            void changeSubscription(tenant, {
+                              plan: e.target.value as SuperAdminPlan,
+                            })
+                          }
                         >
-                          {badge.label}
-                        </span>
+                          <option value="BASIC">Básico</option>
+                          <option value="PRO">Pro</option>
+                        </select>
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-zinc-400">
-                        {tenant.paymentStatus === "PENDING_PAYMENT"
-                          ? "Pago pendiente"
-                          : "Activo"}
+                      <td className="px-4 py-3.5">
+                        <select
+                          aria-label={`Pago de ${tenant.name}`}
+                          className={selectClassName}
+                          disabled={busy}
+                          value={asPayment(tenant.paymentStatus)}
+                          onChange={(e) =>
+                            void changeSubscription(tenant, {
+                              paymentStatus: e.target
+                                .value as SuperAdminPaymentStatus,
+                            })
+                          }
+                        >
+                          <option value="ACTIVE">Activo</option>
+                          <option value="PENDING_PAYMENT">
+                            Pago pendiente
+                          </option>
+                        </select>
                       </td>
                       <td className="px-4 py-3.5">
                         <span

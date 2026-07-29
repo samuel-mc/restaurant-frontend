@@ -2,7 +2,9 @@
  * Tipos del backoffice global (SuperAdmin).
  */
 
-export type SuperAdminPlan = "BASIC" | "PRO" | "ENTERPRISE";
+export type SuperAdminPlan = "BASIC" | "PRO";
+
+export type SuperAdminPaymentStatus = "ACTIVE" | "PENDING_PAYMENT";
 
 export interface SuperAdminTenant {
   id: number;
@@ -35,4 +37,33 @@ export interface ImpersonateResult {
   expiresInSeconds?: number;
   impersonatedBy?: string;
   impersonatedAs?: string;
+}
+
+export interface SuperAdminCoupon {
+  id: number;
+  code: string;
+  description: string | null;
+  grantsPlan: string;
+  maxRedemptions: number | null;
+  redemptionCount: number;
+  active: boolean;
+  expiresAt: string | null;
+  createdAt: string | null;
+}
+
+export interface SuperAdminCouponCreateInput {
+  code: string;
+  description?: string;
+  grantsPlan?: SuperAdminPlan;
+  maxRedemptions?: number | null;
+  expiresAt?: string | null;
+}
+
+export interface SuperAdminCouponUpdateInput {
+  description?: string | null;
+  grantsPlan?: SuperAdminPlan;
+  maxRedemptions?: number | null;
+  clearMaxRedemptions?: boolean;
+  expiresAt?: string | null;
+  active?: boolean;
 }

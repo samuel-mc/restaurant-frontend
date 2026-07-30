@@ -435,3 +435,30 @@ export interface FeedbackSummary {
   openUrgentCount: number;
   openCount: number;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Llamadas de mesa (llamar mesero / pedir cuenta)                            */
+/* -------------------------------------------------------------------------- */
+
+export type TableCallType = "WAITER" | "BILL";
+
+export type TableCallPaymentMethod = "CASH" | "CARD" | "TRANSFER";
+
+export interface TableCallRequest {
+  tableNumber: string;
+  tableToken: string;
+  callType: TableCallType;
+  paymentMethod?: TableCallPaymentMethod | null;
+  note?: string | null;
+}
+
+export interface TableCallResponse {
+  eventType: "TABLE_CALL";
+  id: string;
+  callType: TableCallType;
+  tableNumber: string;
+  paymentMethod: TableCallPaymentMethod | null;
+  note: string | null;
+  createdAt: string;
+}
+

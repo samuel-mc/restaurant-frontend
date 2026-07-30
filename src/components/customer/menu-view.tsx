@@ -14,6 +14,7 @@ import {
 } from "@/components/customer/category-bar";
 import { ProductCard } from "@/components/customer/product-card";
 import { CartBar, type OrderModules } from "@/components/customer/cart-bar";
+import { TableHelpFab } from "@/components/customer/table-help-fab";
 import {
   useCartCount,
   useCartStore,
@@ -496,6 +497,15 @@ export function MenuView({
         <MenuConsultaFooter message="Solo consulta · para pedir usa el QR de tu mesa" />
       ) : !orderingEnabled ? (
         <MenuConsultaFooter message="Solo consulta · pedidos desactivados" />
+      ) : null}
+
+      {tableLockedFromQr && cartTable && cartTableToken ? (
+        <TableHelpFab
+          tenantSlug={tenantSlug}
+          tableNumber={cartTable}
+          tableToken={cartTableToken}
+          elevated={showCartBar || !orderingEnabled || exploreOrdersUnavailable}
+        />
       ) : null}
     </>
   );

@@ -42,3 +42,8 @@ export function adminKitchenTopic(tenantSlug: string): string {
 export function adminFeedbackTopic(tenantSlug: string): string {
   return `/topic/admin/${tenantSlug}/feedback`;
 }
+
+/** Canal STOMP de llamadas de mesa (mesero/admin). */
+export function adminTableCallsTopic(tenantSlug: string): string {
+  return `/topic/admin/${tenantSlug}/table-calls`;
+}

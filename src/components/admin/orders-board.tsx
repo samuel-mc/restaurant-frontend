@@ -8,13 +8,15 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { ChefHat, Eye, Receipt, X } from "lucide-react";
-import type { AdminOrderListFilter, Order, OrderItem, OrderPage } from "@/types/api";
+import type { AdminOrderListFilter, Order, OrderItem, OrderPage, TableCallResponse } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { AdminOptionGroup } from "@/components/admin/admin-option-group";
+import { TableCallAlerts } from "@/components/admin/table-call-alerts";
 import {
   useKitchenOrdersSubscription,
   type KitchenConnectionState,
 } from "@/hooks/useKitchenOrdersSubscription";
+import { useKitchenAlertSound } from "@/hooks/useKitchenAlertSound";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { adminKitchenOrderHref } from "@/lib/admin-nav";
 import { getAdminErrorMessage } from "@/lib/admin-error";
@@ -263,6 +265,8 @@ export function OrdersBoard({
     useState<KitchenConnectionState>("connecting");
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const detailTitleId = useId();
+  const [tableCalls, setTableCalls] = useState<TableCallResponse[]>([]);
+  const playAlertCue = useKitchenAlertSound();
 
   const skipInitialFetch = useRef(true);
 
@@ -342,9 +346,21 @@ export function OrdersBoard({
     [filter, pageIndex],
   );
 
+  const handleTableCall = useCallback(
+    (call: TableCallResponse) => {
+      setTableCalls((prev) => {
+        const without = prev.filter((c) => c.id !== call.id);
+        return [call, ...without].slice(0, 12);
+      });
+      playAlertCue();
+    },
+    [playAlertCue],
+  );
+
   useKitchenOrdersSubscription({
     tenantSlug,
     onOrderEvent: handleOrderEvent,
+    onTableCall: handleTableCall,
     onConnectionChange: setConnection,
   });
 
@@ -380,6 +396,17 @@ export function OrdersBoard({
           </Link>
           .
         </p>
+        {tableCalls.length > 0 ? (
+          <div className="border-t border-border px-4 py-3 md:px-6">
+            <TableCallAlerts
+              calls={tableCalls}
+              onDismiss={(id) =>
+                setTableCalls((prev) => prev.filter((c) => c.id !== id))
+              }
+              onDismissAll={() => setTableCalls([])}
+            />
+          </div>
+        ) : null}
       </header>
 
       <div

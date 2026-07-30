@@ -7,13 +7,15 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Receipt, RefreshCw } from "lucide-react";
-import type { Order, OrderStatus } from "@/types/api";
+import type { Order, OrderStatus, TableCallResponse } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { TableCallAlerts } from "@/components/admin/table-call-alerts";
 import {
   useKitchenOrdersSubscription,
   type KitchenConnectionState,
 } from "@/hooks/useKitchenOrdersSubscription";
+import { useKitchenAlertSound } from "@/hooks/useKitchenAlertSound";
 import { closeOrder } from "@/services/adminOrderService";
 import { getAdminErrorMessage } from "@/lib/admin-error";
 import { formatCurrency } from "@/lib/format";
@@ -88,6 +90,8 @@ export function WaiterTablesBoard({
   const [closeTarget, setCloseTarget] = useState<Order | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tableCalls, setTableCalls] = useState<TableCallResponse[]>([]);
+  const playAlertCue = useKitchenAlertSound();
 
   const onOrderEvent = useCallback((order: Order) => {
     setOrders((prev) => {
@@ -101,9 +105,21 @@ export function WaiterTablesBoard({
     });
   }, []);
 
+  const onTableCall = useCallback(
+    (call: TableCallResponse) => {
+      setTableCalls((prev) => {
+        const without = prev.filter((c) => c.id !== call.id);
+        return [call, ...without].slice(0, 12);
+      });
+      playAlertCue();
+    },
+    [playAlertCue],
+  );
+
   useKitchenOrdersSubscription({
     tenantSlug,
-    onOrderEvent: onOrderEvent,
+    onOrderEvent,
+    onTableCall,
     onConnectionChange: setConnection,
   });
 
@@ -157,6 +173,14 @@ export function WaiterTablesBoard({
         </div>
       </header>
 
+      <TableCallAlerts
+        calls={tableCalls}
+        onDismiss={(id) =>
+          setTableCalls((prev) => prev.filter((c) => c.id !== id))
+        }
+        onDismissAll={() => setTableCalls([])}
+      />
+
       {error ? (
         <p
           role="alert"
@@ -188,10 +212,19 @@ export function WaiterTablesBoard({
               (sum, item) => sum + item.quantity,
               0,
             );
+            const tableKey = order.tableNumber?.trim() ?? "";
+            const hasCall =
+              order.orderType === "IN_TABLE" &&
+              Boolean(tableKey) &&
+              tableCalls.some((c) => c.tableNumber === tableKey);
             return (
               <li
                 key={order.uuid}
-                className="flex flex-col rounded-2xl border border-border bg-card p-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
+                className={`flex flex-col rounded-2xl border bg-card p-4 ${
+                  hasCall
+                    ? "border-warn ring-2 ring-warn/40"
+                    : "border-border shadow-[0_1px_0_rgba(0,0,0,0.04)]"
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

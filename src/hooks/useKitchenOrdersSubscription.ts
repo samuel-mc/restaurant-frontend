@@ -3,6 +3,7 @@
 /**
  * Suscripción STOMP al canal de cocina/caja del tenant.
  * Topic: `/topic/admin/{tenantSlug}/orders`
+ * Opcional: `/topic/admin/{tenantSlug}/table-calls` (llamar mesero / pedir cuenta).
  *
  * Requiere ticket WS de corta vida (vía `/api/admin/ws-token`) en cada CONNECT.
  * Reconexión con backoff exponencial para redes de restaurante inestables.
@@ -11,9 +12,13 @@
 import { useEffect, useRef } from "react";
 import { Client, type IMessage, type IStompSocket } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-import type { Order, OrderResponse } from "@/types/api";
+import type { Order, OrderResponse, TableCallResponse } from "@/types/api";
 import { toOrder } from "@/lib/order-mapper";
-import { adminKitchenTopic, resolveOrdersWsUrl } from "@/lib/ws";
+import {
+  adminKitchenTopic,
+  adminTableCallsTopic,
+  resolveOrdersWsUrl,
+} from "@/lib/ws";
 
 export type KitchenConnectionState =
   | "connecting"
@@ -24,6 +29,8 @@ interface UseKitchenOrdersSubscriptionOptions {
   tenantSlug: string;
   enabled?: boolean;
   onOrderEvent: (order: Order) => void;
+  /** Si se pasa, también se suscribe a TABLE_CALL en la misma conexión. */
+  onTableCall?: (call: TableCallResponse) => void;
   onConnectionChange?: (state: KitchenConnectionState) => void;
 }
 
@@ -36,6 +43,31 @@ function parseOrderMessage(message: IMessage): Order | null {
     const raw = JSON.parse(message.body) as OrderResponse;
     if (!raw?.uuid || !raw?.status) return null;
     return toOrder(raw);
+  } catch {
+    return null;
+  }
+}
+
+function parseTableCallMessage(message: IMessage): TableCallResponse | null {
+  try {
+    const raw = JSON.parse(message.body) as Partial<TableCallResponse>;
+    if (!raw?.id || raw.eventType !== "TABLE_CALL") return null;
+    if (raw.callType !== "WAITER" && raw.callType !== "BILL") return null;
+    if (typeof raw.tableNumber !== "string" || !raw.tableNumber.trim()) {
+      return null;
+    }
+    return {
+      eventType: "TABLE_CALL",
+      id: String(raw.id),
+      callType: raw.callType,
+      tableNumber: raw.tableNumber.trim(),
+      paymentMethod: raw.paymentMethod ?? null,
+      note: raw.note ?? null,
+      createdAt:
+        typeof raw.createdAt === "string"
+          ? raw.createdAt
+          : new Date().toISOString(),
+    };
   } catch {
     return null;
   }
@@ -75,15 +107,19 @@ export function useKitchenOrdersSubscription({
   tenantSlug,
   enabled = true,
   onOrderEvent,
+  onTableCall,
   onConnectionChange,
 }: UseKitchenOrdersSubscriptionOptions): void {
   const onOrderEventRef = useRef(onOrderEvent);
+  const onTableCallRef = useRef(onTableCall);
   const onConnectionChangeRef = useRef(onConnectionChange);
+  const subscribeTableCalls = Boolean(onTableCall);
 
   useEffect(() => {
     onOrderEventRef.current = onOrderEvent;
+    onTableCallRef.current = onTableCall;
     onConnectionChangeRef.current = onConnectionChange;
-  }, [onOrderEvent, onConnectionChange]);
+  }, [onOrderEvent, onTableCall, onConnectionChange]);
 
   useEffect(() => {
     if (!enabled || !tenantSlug) return;
@@ -123,6 +159,12 @@ export function useKitchenOrdersSubscription({
             const order = parseOrderMessage(message);
             if (order) onOrderEventRef.current(order);
           });
+          if (subscribeTableCalls) {
+            client.subscribe(adminTableCallsTopic(tenantSlug), (message) => {
+              const call = parseTableCallMessage(message);
+              if (call) onTableCallRef.current?.(call);
+            });
+          }
         },
         onDisconnect: () => {
           onConnectionChangeRef.current?.("disconnected");
@@ -151,5 +193,5 @@ export function useKitchenOrdersSubscription({
     return () => {
       void client.deactivate();
     };
-  }, [tenantSlug, enabled]);
+  }, [tenantSlug, enabled, subscribeTableCalls]);
 }

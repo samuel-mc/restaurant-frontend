@@ -280,6 +280,17 @@ export function OrderTicket({
                               Obs: {item.notes}
                             </p>
                           ) : null}
+                          {item.modifiers?.length ? (
+                            <p className="mt-0.5 text-sm text-muted-foreground">
+                              {item.modifiers
+                                .map((m) =>
+                                  m.priceDelta > 0
+                                    ? `${m.name} (+${m.formattedPriceDelta})`
+                                    : m.name,
+                                )
+                                .join(" · ")}
+                            </p>
+                          ) : null}
                         </div>
                         {showItemDeliver && item.id != null && !delivered ? (
                           <button

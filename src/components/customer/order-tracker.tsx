@@ -151,6 +151,11 @@ function OrderLineItems({
                   {item.notes}
                 </p>
               ) : null}
+              {item.modifiers?.length ? (
+                <p className="mt-0.5 break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                  {item.modifiers.map((m) => m.name).join(" · ")}
+                </p>
+              ) : null}
             </div>
             <span className="max-w-[36%] shrink-0 text-right text-sm tabular-nums text-muted-foreground">
               {item.formattedSubtotal}

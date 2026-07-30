@@ -7,6 +7,7 @@ import type {
   CategoryRequest,
   CategoryResponse,
   Product,
+  ProductModifierGroupRequest,
   ProductRequest,
   ProductResponse,
 } from "@/types/api";
@@ -24,6 +25,8 @@ export interface ProductFormSubmitPayload {
   imageFile: File | null;
   /** URL previa al editar sin cambiar imagen. */
   existingImageUrl?: string | null;
+  /** Grupos de modificadores a guardar tras crear/actualizar el platillo. */
+  modifierGroups?: ProductModifierGroupRequest[];
 }
 
 function toCategory(dto: CategoryResponse): Category {
@@ -241,4 +244,21 @@ export async function deleteProduct(
   await bffVoid(`/api/admin/products/${uuid}`, tenantSlug, {
     method: "DELETE",
   });
+}
+
+/** Reemplaza grupos/opciones de modificadores del platillo. */
+export async function replaceProductModifiers(
+  uuid: string,
+  groups: ProductModifierGroupRequest[],
+  tenantSlug: string,
+): Promise<Product> {
+  const dto = await bffJson<ProductResponse>(
+    `/api/admin/products/${uuid}/modifier-groups`,
+    tenantSlug,
+    {
+      method: "PUT",
+      body: JSON.stringify({ groups }),
+    },
+  );
+  return toProduct(dto);
 }

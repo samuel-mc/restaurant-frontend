@@ -45,6 +45,12 @@ export function toOrder(dto: OrderResponse): Order {
       notes: detail.notes ?? null,
       batchNumber: detail.batchNumber ?? 1,
       status: resolveItemStatus(detail.status),
+      modifiers: (detail.modifiers ?? []).map((mod) => ({
+        modifierUuid: mod.modifierUuid ?? null,
+        name: mod.name,
+        priceDelta: mod.priceDelta ?? 0,
+        formattedPriceDelta: formatCurrency(mod.priceDelta ?? 0),
+      })),
     })),
   };
 }

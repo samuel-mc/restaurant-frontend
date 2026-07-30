@@ -18,6 +18,7 @@ import {
   createProductWithForm,
   deleteCategory,
   deleteProduct,
+  replaceProductModifiers,
   toggleProductAvailability,
   updateCategory,
   updateProductWithForm,
@@ -285,35 +286,45 @@ export function MenuManager({
     setFormError(null);
 
     try {
+      let saved: Product;
       if (modal.mode === "create") {
         if (atProductLimit) {
           setFormError(BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE);
           return;
         }
-        const created = await createProductWithForm(payload, tenantSlug);
-        startTransition(() => {
-          setProducts((prev) =>
-            [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
-          );
-          setSelectedCategoryId(created.categoryId);
-        });
-        showBanner(`Platillo «${created.name}» creado`);
+        saved = await createProductWithForm(payload, tenantSlug);
       } else if (modal.product) {
-        const updated = await updateProductWithForm(
+        saved = await updateProductWithForm(
           modal.product.uuid,
           payload,
           tenantSlug,
         );
-        startTransition(() => {
-          setProducts((prev) =>
-            prev
-              .map((p) => (p.uuid === updated.uuid ? updated : p))
-              .sort((a, b) => a.name.localeCompare(b.name)),
-          );
-          setSelectedCategoryId(updated.categoryId);
-        });
-        showBanner(`Platillo «${updated.name}» actualizado`);
+      } else {
+        return;
       }
+
+      if (payload.modifierGroups) {
+        saved = await replaceProductModifiers(
+          saved.uuid,
+          payload.modifierGroups,
+          tenantSlug,
+        );
+      }
+
+      startTransition(() => {
+        setProducts((prev) => {
+          const without = prev.filter((p) => p.uuid !== saved.uuid);
+          return [...without, saved].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          );
+        });
+        setSelectedCategoryId(saved.categoryId);
+      });
+      showBanner(
+        modal.mode === "create"
+          ? `Platillo «${saved.name}» creado`
+          : `Platillo «${saved.name}» actualizado`,
+      );
       setModal({ open: false });
       setFormError(null);
     } catch (error) {

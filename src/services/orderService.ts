@@ -55,6 +55,7 @@ function toOrderRequest(orderData: CreateOrderDTO): OrderRequest {
       productUuid: item.productId,
       quantity: item.quantity,
       notes: item.notes ?? null,
+      modifierUuids: item.modifierUuids ?? [],
     })),
   };
 }

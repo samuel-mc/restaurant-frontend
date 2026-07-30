@@ -130,6 +130,41 @@ export interface ProductResponse {
   categoryName: string;
   /** ISO-8601 (`OffsetDateTime`). */
   createdAt: string;
+  modifierGroups?: ProductModifierGroupResponse[];
+}
+
+export interface ProductModifierOptionResponse {
+  uuid: string;
+  name: string;
+  priceDelta: number;
+  available: boolean;
+  displayOrder: number;
+}
+
+export interface ProductModifierGroupResponse {
+  uuid: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  displayOrder: number;
+  options: ProductModifierOptionResponse[];
+}
+
+export interface ProductModifierOptionRequest {
+  uuid?: string | null;
+  name: string;
+  priceDelta: number;
+  available?: boolean;
+  displayOrder?: number;
+}
+
+export interface ProductModifierGroupRequest {
+  uuid?: string | null;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  displayOrder?: number;
+  options: ProductModifierOptionRequest[];
 }
 
 /** Alta/edición de producto (`ProductRequest.java`). */
@@ -196,6 +231,7 @@ export interface OrderDetailRequest {
   productUuid: string;
   quantity: number;
   notes?: string | null;
+  modifierUuids?: string[];
 }
 
 /**
@@ -226,6 +262,7 @@ export interface CreateOrderDTO {
     productId: string;
     quantity: number;
     notes?: string | null;
+    modifierUuids?: string[];
   }>;
   /** Total calculado en cliente (informativo; el backend lo recalcula). */
   total: number;
@@ -255,6 +292,13 @@ export interface OrderDetailResponse {
   notes: string | null;
   batchNumber?: number;
   status?: OrderItemStatus;
+  modifiers?: OrderDetailModifierResponse[];
+}
+
+export interface OrderDetailModifierResponse {
+  modifierUuid: string | null;
+  name: string;
+  priceDelta: number;
 }
 
 /** Respuesta cruda de un pedido (`OrderResponse.java`). */
@@ -303,6 +347,25 @@ export interface Product {
   categoryId: number;
   categoryName: string;
   createdAt: string;
+  modifierGroups: ProductModifierGroup[];
+}
+
+export interface ProductModifierOption {
+  uuid: string;
+  name: string;
+  priceDelta: number;
+  formattedPriceDelta: string;
+  available: boolean;
+  displayOrder: number;
+}
+
+export interface ProductModifierGroup {
+  uuid: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  displayOrder: number;
+  options: ProductModifierOption[];
 }
 
 /** Línea de un pedido normalizada, con subtotal formateado. */
@@ -317,6 +380,12 @@ export interface OrderItem {
   notes: string | null;
   batchNumber: number;
   status: OrderItemStatus;
+  modifiers: Array<{
+    modifierUuid: string | null;
+    name: string;
+    priceDelta: number;
+    formattedPriceDelta: string;
+  }>;
 }
 
 /** Pedido de dominio, con total formateado y líneas normalizadas. */

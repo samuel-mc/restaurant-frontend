@@ -16,6 +16,7 @@ import { formatCurrency } from "@/lib/format";
 import { formatTableLabel } from "@/lib/table-session";
 import {
   CART_ITEM_NOTES_MAX,
+  cartLineUnitPrice,
   useCartCount,
   useCartStore,
   useCartSubtotal,
@@ -431,10 +432,13 @@ export function CartBar({
     setIsSubmitting(true);
 
     const orderData: CreateOrderDTO = {
-      items: orderedLines.map(({ product, quantity, notes }) => ({
-        productId: product.uuid,
-        quantity,
-        notes: notes?.trim() ? notes.trim().slice(0, CART_ITEM_NOTES_MAX) : null,
+      items: orderedLines.map((line) => ({
+        productId: line.product.uuid,
+        quantity: line.quantity,
+        notes: line.notes?.trim()
+          ? line.notes.trim().slice(0, CART_ITEM_NOTES_MAX)
+          : null,
+        modifierUuids: line.modifiers.map((m) => m.uuid),
       })),
       tableNumber:
         effectiveType === "IN_TABLE"
@@ -775,26 +779,31 @@ export function CartBar({
                       {itemLabel} en el carrito · puedes vaciarlo abajo
                     </p>
                     <ul className="divide-y divide-border/60">
-                      {orderedLines.map(({ product, quantity, notes }) => (
+                      {orderedLines.map((line) => (
                         <li
-                          key={product.uuid}
+                          key={line.key}
                           className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
                         >
                           <div className="min-w-0 flex-1">
                             <p
                               className="truncate text-sm font-medium tracking-tight text-foreground"
-                              title={product.name}
+                              title={line.product.name}
                             >
-                              {product.name}
+                              {line.product.name}
                             </p>
-                            {notes ? (
+                            {line.modifiers.length > 0 ? (
                               <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                                {notes}
+                                {line.modifiers.map((m) => m.name).join(" · ")}
+                              </p>
+                            ) : null}
+                            {line.notes ? (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                {line.notes}
                               </p>
                             ) : null}
                           </div>
                           <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                            ×{quantity}
+                            ×{line.quantity}
                           </span>
                         </li>
                       ))}
@@ -867,38 +876,56 @@ export function CartBar({
                   </div>
 
                   <ul className="divide-y divide-border/60">
-                    {orderedLines.map(({ product, quantity, notes }) => (
+                    {orderedLines.map((line) => {
+                      const unit = cartLineUnitPrice(line);
+                      return (
                       <li
-                        key={product.uuid}
+                        key={line.key}
                         className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0"
                       >
                         <div className="flex items-center gap-3">
                           <div className="min-w-0 flex-1">
                             <p
                               className="truncate text-sm font-medium tracking-tight text-foreground"
-                              title={product.name}
+                              title={line.product.name}
                             >
-                              {product.name}
+                              {line.product.name}
                             </p>
                             <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-                              {formatCurrency(product.price * quantity)}
+                              {formatCurrency(unit * line.quantity)}
                             </p>
-                            {!showLineSteppers && notes ? (
+                            {!showLineSteppers && line.modifiers.length > 0 ? (
                               <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                                Nota: {notes}
+                                {line.modifiers
+                                  .map((m) =>
+                                    m.priceDelta > 0
+                                      ? `${m.name} (+${formatCurrency(m.priceDelta)})`
+                                      : m.name,
+                                  )
+                                  .join(" · ")}
+                              </p>
+                            ) : null}
+                            {!showLineSteppers && line.notes ? (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                Nota: {line.notes}
                               </p>
                             ) : null}
                           </div>
                           {showLineSteppers ? (
                             <QuantityStepper
-                              quantity={quantity}
-                              label={product.name}
-                              onIncrement={() => addItem(product)}
-                              onDecrement={() => decrementItem(product.uuid)}
+                              quantity={line.quantity}
+                              label={line.product.name}
+                              onIncrement={() =>
+                                addItem(line.product, {
+                                  notes: line.notes,
+                                  modifiers: line.modifiers,
+                                })
+                              }
+                              onDecrement={() => decrementItem(line.key)}
                             />
                           ) : (
                             <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                              ×{quantity}
+                              ×{line.quantity}
                             </span>
                           )}
                         </div>
@@ -909,21 +936,22 @@ export function CartBar({
                             </span>
                             <input
                               type="text"
-                              name={`notes-${product.uuid}`}
+                              name={`notes-${line.key}`}
                               maxLength={CART_ITEM_NOTES_MAX}
                               placeholder="Ej. sin cebolla…"
-                              value={notes ?? ""}
+                              value={line.notes ?? ""}
                               disabled={isSubmitting}
                               onChange={(event) =>
-                                setLineNotes(product.uuid, event.target.value)
+                                setLineNotes(line.key, event.target.value)
                               }
                               className={fieldClass}
-                              aria-label={`Notas para ${product.name}`}
+                              aria-label={`Notas para ${line.product.name}`}
                             />
                           </label>
                         ) : null}
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
 
                   {isInTableFlow ? (

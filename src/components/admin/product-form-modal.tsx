@@ -5,7 +5,7 @@
  */
 
 import { useId, useState, type FormEvent, type ReactNode } from "react";
-import type { Category, Product } from "@/types/api";
+import type { Category, Product, ProductModifierGroupRequest } from "@/types/api";
 import type { ProductFormSubmitPayload } from "@/services/adminCatalogService";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
@@ -15,6 +15,65 @@ export interface ProductFormValues {
   /** Precisión decimal como string (evita drift de float en el input). */
   price: string;
   categoryId: number;
+}
+
+interface ModifierOptionDraft {
+  name: string;
+  priceDelta: string;
+}
+
+interface ModifierGroupDraft {
+  name: string;
+  minSelect: string;
+  maxSelect: string;
+  options: ModifierOptionDraft[];
+}
+
+function groupsFromProduct(product: Product | null | undefined): ModifierGroupDraft[] {
+  if (!product?.modifierGroups?.length) return [];
+  return product.modifierGroups.map((g) => ({
+    name: g.name,
+    minSelect: String(g.minSelect),
+    maxSelect: String(g.maxSelect),
+    options: g.options.map((o) => ({
+      name: o.name,
+      priceDelta: Number.isFinite(o.priceDelta) ? o.priceDelta.toFixed(2) : "0.00",
+    })),
+  }));
+}
+
+function toModifierGroupRequests(
+  drafts: ModifierGroupDraft[],
+): ProductModifierGroupRequest[] {
+  const result: ProductModifierGroupRequest[] = [];
+  drafts.forEach((group, groupIndex) => {
+    const name = group.name.trim();
+    if (!name) return;
+    const minSelect = Math.max(0, Number.parseInt(group.minSelect, 10) || 0);
+    const maxSelect = Math.max(1, Number.parseInt(group.maxSelect, 10) || 1);
+    const options = group.options
+      .map((opt, optIndex) => {
+        const optName = opt.name.trim();
+        if (!optName) return null;
+        const price = parsePriceInput(opt.priceDelta);
+        return {
+          name: optName,
+          priceDelta: price ?? 0,
+          available: true,
+          displayOrder: optIndex,
+        };
+      })
+      .filter((o): o is NonNullable<typeof o> => o != null);
+    if (options.length === 0) return;
+    result.push({
+      name,
+      minSelect: Math.min(minSelect, options.length),
+      maxSelect: Math.min(Math.max(maxSelect, minSelect), options.length),
+      displayOrder: groupIndex,
+      options,
+    });
+  });
+  return result;
 }
 
 interface ProductFormModalProps {
@@ -127,6 +186,9 @@ function ProductFormDialog({
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof ProductFormValues | "image", string>>
   >({});
+  const [modifierGroups, setModifierGroups] = useState<ModifierGroupDraft[]>(() =>
+    groupsFromProduct(initial),
+  );
 
   function updateField<K extends keyof ProductFormValues>(
     key: K,
@@ -214,6 +276,7 @@ function ProductFormDialog({
       categoryId: values.categoryId,
       imageFile,
       existingImageUrl: initial?.imageUrl ?? null,
+      modifierGroups: toModifierGroupRequests(modifierGroups),
     };
   }
 
@@ -403,6 +466,193 @@ function ProductFormDialog({
                 {fieldErrors.image}
               </span>
             ) : null}
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-border bg-secondary/40 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">Opciones / extras</p>
+                <p className="text-xs text-muted-foreground">
+                  Tamaño, término, extras con costo adicional.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() =>
+                  setModifierGroups((prev) => [
+                    ...prev,
+                    {
+                      name: "",
+                      minSelect: "0",
+                      maxSelect: "1",
+                      options: [{ name: "", priceDelta: "0.00" }],
+                    },
+                  ])
+                }
+                className={`rounded-lg bg-card px-3 py-2 text-xs font-semibold ${focusRing}`}
+              >
+                + Grupo
+              </button>
+            </div>
+
+            {modifierGroups.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Sin opciones. El comensal solo verá notas libres.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {modifierGroups.map((group, gi) => (
+                  <li
+                    key={gi}
+                    className="space-y-2 rounded-xl border border-border bg-card p-3"
+                  >
+                    <div className="flex items-start gap-2">
+                      <input
+                        value={group.name}
+                        onChange={(e) =>
+                          setModifierGroups((prev) =>
+                            prev.map((g, i) =>
+                              i === gi ? { ...g, name: e.target.value } : g,
+                            ),
+                          )
+                        }
+                        placeholder="Ej. Extras"
+                        className={`${inputClass(false)} flex-1`}
+                        disabled={submitting}
+                      />
+                      <button
+                        type="button"
+                        disabled={submitting}
+                        onClick={() =>
+                          setModifierGroups((prev) =>
+                            prev.filter((_, i) => i !== gi),
+                          )
+                        }
+                        className={`rounded-lg px-2 py-2 text-xs font-semibold text-destructive ${focusRing}`}
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs text-muted-foreground">
+                        Mín.
+                        <input
+                          inputMode="numeric"
+                          value={group.minSelect}
+                          onChange={(e) =>
+                            setModifierGroups((prev) =>
+                              prev.map((g, i) =>
+                                i === gi
+                                  ? { ...g, minSelect: e.target.value }
+                                  : g,
+                              ),
+                            )
+                          }
+                          className={`${inputClass(false)} mt-1`}
+                          disabled={submitting}
+                        />
+                      </label>
+                      <label className="text-xs text-muted-foreground">
+                        Máx.
+                        <input
+                          inputMode="numeric"
+                          value={group.maxSelect}
+                          onChange={(e) =>
+                            setModifierGroups((prev) =>
+                              prev.map((g, i) =>
+                                i === gi
+                                  ? { ...g, maxSelect: e.target.value }
+                                  : g,
+                              ),
+                            )
+                          }
+                          className={`${inputClass(false)} mt-1`}
+                          disabled={submitting}
+                        />
+                      </label>
+                    </div>
+                    <ul className="space-y-2">
+                      {group.options.map((opt, oi) => (
+                        <li key={oi} className="flex gap-2">
+                          <input
+                            value={opt.name}
+                            onChange={(e) =>
+                              setModifierGroups((prev) =>
+                                prev.map((g, i) =>
+                                  i === gi
+                                    ? {
+                                        ...g,
+                                        options: g.options.map((o, j) =>
+                                          j === oi
+                                            ? { ...o, name: e.target.value }
+                                            : o,
+                                        ),
+                                      }
+                                    : g,
+                                ),
+                              )
+                            }
+                            placeholder="Opción"
+                            className={`${inputClass(false)} flex-1`}
+                            disabled={submitting}
+                          />
+                          <input
+                            inputMode="decimal"
+                            value={opt.priceDelta}
+                            onChange={(e) =>
+                              setModifierGroups((prev) =>
+                                prev.map((g, i) =>
+                                  i === gi
+                                    ? {
+                                        ...g,
+                                        options: g.options.map((o, j) =>
+                                          j === oi
+                                            ? {
+                                                ...o,
+                                                priceDelta: e.target.value,
+                                              }
+                                            : o,
+                                        ),
+                                      }
+                                    : g,
+                                ),
+                              )
+                            }
+                            placeholder="+$"
+                            className={`${inputClass(false)} w-24`}
+                            disabled={submitting}
+                            aria-label="Costo extra"
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() =>
+                        setModifierGroups((prev) =>
+                          prev.map((g, i) =>
+                            i === gi
+                              ? {
+                                  ...g,
+                                  options: [
+                                    ...g.options,
+                                    { name: "", priceDelta: "0.00" },
+                                  ],
+                                }
+                              : g,
+                          ),
+                        )
+                      }
+                      className={`text-xs font-semibold text-foreground underline-offset-2 hover:underline ${focusRing}`}
+                    >
+                      + Opción
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {error ? (

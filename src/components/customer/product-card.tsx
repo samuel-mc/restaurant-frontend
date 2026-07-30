@@ -136,10 +136,8 @@ export function ProductCard({
 }: ProductCardProps) {
   const quantity = useProductQuantity(product.uuid);
   const addItem = useCartStore((state) => state.addItem);
-  const decrementItem = useCartStore((state) => state.decrementItem);
-  const lineNotes = useCartStore(
-    (state) => state.lines[product.uuid]?.notes ?? null,
-  );
+  const decrementProduct = useCartStore((state) => state.decrementProduct);
+  const hasModifiers = (product.modifierGroups?.length ?? 0) > 0;
   const unavailable = !product.isAvailable;
   const prevQuantityRef = useRef(quantity);
   const [stepperEnter, setStepperEnter] = useState(false);
@@ -155,9 +153,20 @@ export function ProductCard({
     prevQuantityRef.current = quantity;
   }, [quantity]);
 
-  function handleConfirmAdd(notes: string | null) {
-    addItem(product, { notes });
+  function handleConfirmAdd(
+    notes: string | null,
+    modifiers: import("@/store/cartStore").CartSelectedModifier[],
+  ) {
+    addItem(product, { notes, modifiers });
     setAddSheetOpen(false);
+  }
+
+  function handleIncrement() {
+    if (hasModifiers) {
+      setAddSheetOpen(true);
+      return;
+    }
+    addItem(product);
   }
 
   return (
@@ -193,15 +202,21 @@ export function ProductCard({
             />
           ) : null}
 
-          {quantity > 0 && lineNotes ? (
-            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-              Nota: {lineNotes}
+          {hasModifiers ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Con opciones / extras
             </p>
           ) : null}
 
           <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
             <span className="text-base font-bold tabular-nums tracking-tight">
               {product.formattedPrice}
+              {hasModifiers ? (
+                <span className="text-xs font-medium text-muted-foreground">
+                  {" "}
+                  +
+                </span>
+              ) : null}
             </span>
 
             {!orderingEnabled || unavailable ? null : quantity > 0 ? (
@@ -209,8 +224,8 @@ export function ProductCard({
                 <QuantityStepper
                   quantity={quantity}
                   label={product.name}
-                  onIncrement={() => addItem(product)}
-                  onDecrement={() => decrementItem(product.uuid)}
+                  onIncrement={handleIncrement}
+                  onDecrement={() => decrementProduct(product.uuid)}
                 />
               </div>
             ) : (

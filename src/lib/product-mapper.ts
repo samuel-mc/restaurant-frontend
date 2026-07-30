@@ -2,7 +2,11 @@
  * Normalización de productos desde el wire (Jackson) al dominio.
  */
 
-import type { Product, ProductResponse } from "@/types/api";
+import type {
+  Product,
+  ProductModifierGroup,
+  ProductResponse,
+} from "@/types/api";
 import { formatCurrency } from "@/lib/format";
 
 /**
@@ -24,6 +28,25 @@ export function resolveProductAvailability(
   return false;
 }
 
+function mapModifierGroups(dto: ProductResponse): ProductModifierGroup[] {
+  const groups = dto.modifierGroups ?? [];
+  return groups.map((group) => ({
+    uuid: group.uuid,
+    name: group.name,
+    minSelect: group.minSelect ?? 0,
+    maxSelect: group.maxSelect ?? 1,
+    displayOrder: group.displayOrder ?? 0,
+    options: (group.options ?? []).map((opt) => ({
+      uuid: opt.uuid,
+      name: opt.name,
+      priceDelta: opt.priceDelta ?? 0,
+      formattedPriceDelta: formatCurrency(opt.priceDelta ?? 0),
+      available: opt.available !== false,
+      displayOrder: opt.displayOrder ?? 0,
+    })),
+  }));
+}
+
 export function toProduct(dto: ProductResponse): Product {
   return {
     uuid: dto.uuid,
@@ -36,5 +59,6 @@ export function toProduct(dto: ProductResponse): Product {
     categoryId: dto.categoryId,
     categoryName: dto.categoryName,
     createdAt: dto.createdAt,
+    modifierGroups: mapModifierGroups(dto),
   };
 }

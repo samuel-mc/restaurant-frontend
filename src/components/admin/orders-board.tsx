@@ -817,6 +817,11 @@ function OrderDetailModal({
                               {item.notes}
                             </p>
                           ) : null}
+                          {item.modifiers?.length ? (
+                            <p className="text-xs text-muted-foreground">
+                              {item.modifiers.map((m) => m.name).join(" · ")}
+                            </p>
+                          ) : null}
                         </div>
                         <p className="shrink-0 font-semibold tabular-nums">
                           {item.formattedSubtotal}

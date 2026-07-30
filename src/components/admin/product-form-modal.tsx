@@ -518,7 +518,7 @@ function ProductFormDialog({
                           )
                         }
                         placeholder="Ej. Extras"
-                        className={`${inputClass(false)} flex-1`}
+                        className={inputClass(false, "min-w-0 flex-1")}
                         disabled={submitting}
                       />
                       <button
@@ -529,7 +529,7 @@ function ProductFormDialog({
                             prev.filter((_, i) => i !== gi),
                           )
                         }
-                        className={`rounded-lg px-2 py-2 text-xs font-semibold text-destructive ${focusRing}`}
+                        className={`shrink-0 rounded-lg px-2 py-2 text-xs font-semibold text-destructive ${focusRing}`}
                       >
                         Quitar
                       </button>
@@ -574,7 +574,7 @@ function ProductFormDialog({
                     </div>
                     <ul className="space-y-2">
                       {group.options.map((opt, oi) => (
-                        <li key={oi} className="flex gap-2">
+                        <li key={oi} className="flex items-center gap-2">
                           <input
                             value={opt.name}
                             onChange={(e) =>
@@ -594,7 +594,7 @@ function ProductFormDialog({
                               )
                             }
                             placeholder="Opción"
-                            className={`${inputClass(false)} flex-1`}
+                            className={inputClass(false, "min-w-0 flex-1")}
                             disabled={submitting}
                           />
                           <input
@@ -620,7 +620,7 @@ function ProductFormDialog({
                               )
                             }
                             placeholder="+$"
-                            className={`${inputClass(false)} w-24`}
+                            className={inputClass(false, "w-24 shrink-0")}
                             disabled={submitting}
                             aria-label="Costo extra"
                           />
@@ -714,8 +714,8 @@ function Field({
   );
 }
 
-function inputClass(hasError: boolean): string {
-  return `w-full rounded-xl border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 ${
+function inputClass(hasError: boolean, widthClass = "w-full"): string {
+  return `${widthClass} rounded-xl border bg-secondary px-3.5 py-2.5 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 ${
     hasError ? "border-destructive" : "border-border"
   }`;
 }

@@ -28,6 +28,11 @@ export function toOrder(dto: OrderResponse): Order {
     customerPhone: dto.customerPhone ?? null,
     orderType: dto.orderType,
     tableNumber: dto.tableNumber ?? null,
+    linkedTables: Array.isArray(dto.linkedTables)
+      ? dto.linkedTables.map((t) => String(t).trim()).filter(Boolean)
+      : [],
+    staffId: dto.staffId ?? null,
+    staffName: dto.staffName?.trim() || null,
     deliveryAddress: dto.deliveryAddress ?? null,
     status: dto.status,
     totalAmount: dto.totalAmount,

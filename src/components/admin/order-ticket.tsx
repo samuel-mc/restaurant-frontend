@@ -48,8 +48,19 @@ function formatElapsed(createdAt: string, now: number): string {
 
 function orderTypeLabel(order: Order): string {
   switch (order.orderType) {
-    case "IN_TABLE":
-      return order.tableNumber ? `Mesa ${order.tableNumber}` : "En mesa";
+    case "IN_TABLE": {
+      const primary = order.tableNumber?.trim();
+      const linked = (order.linkedTables ?? [])
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (primary && linked.length > 0) {
+        const all = [primary, ...linked].sort((a, b) =>
+          a.localeCompare(b, "es", { numeric: true }),
+        );
+        return `Mesa ${all.join("-")}`;
+      }
+      return primary ? `Mesa ${primary}` : "En mesa";
+    }
     case "PICKUP":
       return "Para llevar";
     case "DELIVERY":
@@ -176,6 +187,10 @@ export function OrderTicket({
               {[order.customerName?.trim(), order.customerPhone?.trim()]
                 .filter(Boolean)
                 .join(" · ") || "Sin datos del cliente"}
+            </p>
+          ) : order.staffName ? (
+            <p className="mt-0.5 truncate text-sm font-medium text-muted-foreground">
+              Atendido por: {order.staffName}
             </p>
           ) : order.customerName ? (
             <p className="mt-0.5 truncate text-sm font-medium text-muted-foreground">

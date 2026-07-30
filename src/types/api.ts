@@ -309,6 +309,10 @@ export interface OrderResponse {
   customerPhone: string | null;
   orderType: OrderType;
   tableNumber: string | null;
+  /** Mesas secundarias unidas a esta cuenta. */
+  linkedTables?: string[] | null;
+  staffId?: string | null;
+  staffName?: string | null;
   deliveryAddress: string | null;
   status: OrderStatus;
   totalAmount: number;
@@ -396,6 +400,9 @@ export interface Order {
   customerPhone: string | null;
   orderType: OrderType;
   tableNumber: string | null;
+  linkedTables: string[];
+  staffId: string | null;
+  staffName: string | null;
   deliveryAddress: string | null;
   status: OrderStatus;
   totalAmount: number;

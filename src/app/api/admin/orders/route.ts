@@ -9,3 +9,17 @@ export async function GET(request: Request) {
     : "/api/v1/admin/orders";
   return proxyAdminRequest(request, path, { method: "GET" });
 }
+
+/** POST /api/admin/orders → comanda manual del mesero */
+export async function POST(request: Request) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "JSON inválido." }, { status: 400 });
+  }
+  return proxyAdminRequest(request, "/api/v1/admin/orders", {
+    method: "POST",
+    body,
+  });
+}

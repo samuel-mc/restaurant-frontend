@@ -193,3 +193,104 @@ export async function closeOrder(
 
   return toOrder(body as OrderResponse);
 }
+
+export interface StaffOrderPayload {
+  tableNumber: string;
+  customerName?: string | null;
+  activeOrderUuid?: string | null;
+  details: Array<{
+    productUuid: string;
+    quantity: number;
+    notes?: string | null;
+    modifierUuids?: string[];
+  }>;
+}
+
+/** Comanda manual del mesero (abre mesa o adición) → cocina. */
+export async function createStaffOrder(
+  payload: StaffOrderPayload,
+  tenantSlug: string,
+): Promise<Order> {
+  const slug = resolveTenantSlug(tenantSlug);
+  const response = await fetch(BFF_ORDERS_PATH, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-tenant-slug": slug,
+    },
+    credentials: "same-origin",
+    body: JSON.stringify(payload),
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | OrderResponse
+    | { error?: string }
+    | null;
+
+  if (!response.ok) {
+    const message =
+      body && typeof body === "object" && "error" in body && body.error
+        ? String(body.error)
+        : "No se pudo enviar la comanda.";
+    throw new ApiError({
+      message,
+      status: response.status,
+      statusText: response.statusText,
+      url: BFF_ORDERS_PATH,
+      body,
+    });
+  }
+
+  return toOrder(body as OrderResponse);
+}
+
+export interface MergeTablesPayload {
+  tenantSlug?: string;
+  primaryTable: string;
+  secondaryTables: string[];
+}
+
+/** Une mesas secundarias a la cuenta de la mesa principal. */
+export async function mergeTables(
+  payload: MergeTablesPayload,
+  tenantSlug: string,
+): Promise<Order> {
+  const slug = resolveTenantSlug(tenantSlug);
+  const url = "/api/admin/tables/merge";
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-tenant-slug": slug,
+    },
+    credentials: "same-origin",
+    body: JSON.stringify({
+      tenantSlug: slug,
+      primaryTable: payload.primaryTable,
+      secondaryTables: payload.secondaryTables,
+    }),
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | OrderResponse
+    | { error?: string }
+    | null;
+
+  if (!response.ok) {
+    const message =
+      body && typeof body === "object" && "error" in body && body.error
+        ? String(body.error)
+        : "No se pudieron unir las mesas.";
+    throw new ApiError({
+      message,
+      status: response.status,
+      statusText: response.statusText,
+      url,
+      body,
+    });
+  }
+
+  return toOrder(body as OrderResponse);
+}

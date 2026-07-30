@@ -38,9 +38,6 @@ const ACTIVE: OrderStatus[] = [
   "DELIVERED",
 ];
 
-/** Rango de mesas del piso cuando no hay entidad Table. */
-const DEFAULT_FLOOR_SIZE = 24;
-
 function statusLabel(status: OrderStatus): { label: string; className: string } {
   switch (status) {
     case "PENDING":
@@ -105,14 +102,15 @@ interface WaiterTablesBoardProps {
   tenantSlug: string;
   restaurantName: string;
   initialOrders: Order[];
-  floorSize?: number;
+  /** Total de mesas del salón (configurado en settings). */
+  floorSize: number;
 }
 
 export function WaiterTablesBoard({
   tenantSlug,
   restaurantName,
   initialOrders,
-  floorSize = DEFAULT_FLOOR_SIZE,
+  floorSize,
 }: WaiterTablesBoardProps) {
   const [orders, setOrders] = useState(() =>
     initialOrders.filter((o) => ACTIVE.includes(o.status)),

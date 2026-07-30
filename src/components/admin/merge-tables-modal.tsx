@@ -12,8 +12,8 @@ export interface MergeTablesModalProps {
   open: boolean;
   /** Números de mesa ocupadas (con cuenta abierta). */
   occupiedTables: string[];
-  /** Rango de mesas del piso (1..N) para elegir libres. */
-  floorSize?: number;
+  /** Rango de mesas del piso (1..N) desde settings. */
+  floorSize: number;
   busy?: boolean;
   error?: string | null;
   onConfirm: (primaryTable: string, secondaryTables: string[]) => void;
@@ -30,7 +30,7 @@ function normalizeTableKey(value: string): string {
 export function MergeTablesModal({
   open,
   occupiedTables,
-  floorSize = 24,
+  floorSize,
   busy = false,
   error = null,
   onConfirm,

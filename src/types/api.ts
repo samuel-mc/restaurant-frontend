@@ -200,6 +200,8 @@ export interface RestaurantProfileResponse {
   hasReservations: boolean;
   /** Si el menú digital acepta pedidos; si es false, solo consulta. */
   orderingEnabled: boolean;
+  /** Total de mesas del salón (1–99). */
+  tableCount?: number;
   /** Website institucional visible al público. */
   websitePublished: boolean;
   /** Plan comercial: BASIC | PRO (omitido en perfil público). */
@@ -223,6 +225,8 @@ export interface RestaurantProfileRequest {
   hasPickup?: boolean;
   hasReservations?: boolean;
   orderingEnabled?: boolean;
+  /** Total de mesas del salón (1–99). */
+  tableCount?: number;
   websitePublished?: boolean;
 }
 
@@ -456,6 +460,8 @@ export interface RestaurantProfile {
   hasReservations: boolean;
   /** Si el menú digital acepta pedidos; si es false, solo consulta. */
   orderingEnabled: boolean;
+  /** Total de mesas del salón (1–99). */
+  tableCount: number;
   /** Website institucional visible al público. */
   websitePublished: boolean;
   /** Plan comercial: BASIC | PRO. */

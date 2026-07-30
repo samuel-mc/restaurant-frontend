@@ -93,6 +93,9 @@ export function SettingsForm({
   const [orderingEnabled, setOrderingEnabled] = useState(
     initialProfile.orderingEnabled,
   );
+  const [tableCount, setTableCount] = useState(
+    String(initialProfile.tableCount ?? 12),
+  );
   const [websitePublished, setWebsitePublished] = useState(
     initialProfile.websitePublished,
   );
@@ -204,6 +207,15 @@ export function SettingsForm({
         "Usa un link de Google Maps (maps.google.com, maps.app.goo.gl…).";
     }
 
+    const parsedTableCount = Number.parseInt(tableCount.trim(), 10);
+    if (
+      !Number.isFinite(parsedTableCount) ||
+      parsedTableCount < 1 ||
+      parsedTableCount > 99
+    ) {
+      nextErrors.tableCount = "Indica un total de mesas entre 1 y 99.";
+    }
+
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return null;
 
@@ -220,6 +232,7 @@ export function SettingsForm({
       hasPickup: proServiceModulesAllowed ? hasPickup : false,
       hasReservations: proServiceModulesAllowed ? hasReservations : false,
       orderingEnabled,
+      tableCount: parsedTableCount,
       websitePublished,
       logoFile,
       bannerFile,
@@ -280,6 +293,7 @@ export function SettingsForm({
       setHasPickup(updated.hasPickup);
       setHasReservations(updated.hasReservations);
       setOrderingEnabled(updated.orderingEnabled);
+      setTableCount(String(updated.tableCount));
       setWebsitePublished(updated.websitePublished);
       setProfile(updated);
       setLogoFile(null);
@@ -611,6 +625,31 @@ export function SettingsForm({
               disabled={submitting}
               onChange={setOrderingEnabled}
             />
+            <label className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-4 py-3">
+              <span className="text-sm font-semibold">Total de mesas</span>
+              <span className="text-xs text-muted-foreground">
+                Define el piso del mesero (mesas libres 1…N) y el rango al unir
+                mesas. Entre 1 y 99.
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={99}
+                step={1}
+                value={tableCount}
+                disabled={submitting}
+                onChange={(e) => {
+                  setTableCount(e.target.value.replace(/[^\d]/g, "").slice(0, 2));
+                }}
+                className={`${focusRing} mt-1 min-h-11 w-full max-w-[8rem] rounded-xl border border-border bg-background px-3 text-base font-semibold tabular-nums`}
+              />
+              {errors.tableCount ? (
+                <p role="alert" className="text-xs font-medium text-destructive">
+                  {errors.tableCount}
+                </p>
+              ) : null}
+            </label>
             <ModuleSwitch
               label="A domicilio"
               description={

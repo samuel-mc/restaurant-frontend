@@ -23,6 +23,7 @@ export interface RestaurantProfileFormPayload {
   hasPickup: boolean;
   hasReservations: boolean;
   orderingEnabled: boolean;
+  tableCount: number;
   websitePublished: boolean;
   logoFile: File | null;
   bannerFile: File | null;
@@ -42,6 +43,7 @@ function buildFormData(payload: RestaurantProfileFormPayload): FormData {
   formData.append("hasPickup", String(payload.hasPickup));
   formData.append("hasReservations", String(payload.hasReservations));
   formData.append("orderingEnabled", String(payload.orderingEnabled));
+  formData.append("tableCount", String(payload.tableCount));
   formData.append("websitePublished", String(payload.websitePublished));
   if (payload.logoFile) {
     formData.append("logo", payload.logoFile);

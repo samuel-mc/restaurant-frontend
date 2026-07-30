@@ -13,6 +13,7 @@ import {
   STAFF_LOGIN_PATH,
 } from "@/lib/jwt-payload";
 import { getActiveOrders, listOrders } from "@/services/adminOrderQueries";
+import { getTableFloorConfig } from "@/services/adminTableQueries";
 import { ApiError } from "@/services/apiClient";
 import type { Order, OrderPage } from "@/types/api";
 
@@ -52,9 +53,15 @@ export default async function AdminOrdersPage() {
 
   if (role === "MESERO") {
     let activeOrders: Order[] = [];
+    let tableCount = 12;
     let loadError: string | null = null;
     try {
-      activeOrders = await getActiveOrders(tenantSlug);
+      const [orders, floor] = await Promise.all([
+        getActiveOrders(tenantSlug),
+        getTableFloorConfig(tenantSlug),
+      ]);
+      activeOrders = orders;
+      tableCount = floor.tableCount;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         redirect(STAFF_LOGIN_PATH);
@@ -88,6 +95,7 @@ export default async function AdminOrdersPage() {
         tenantSlug={tenantSlug}
         restaurantName={restaurantName}
         initialOrders={activeOrders}
+        floorSize={tableCount}
       />
     );
   }

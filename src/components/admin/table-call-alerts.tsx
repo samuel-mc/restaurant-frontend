@@ -2,6 +2,8 @@
 
 /**
  * Banner de alertas TABLE_CALL en tablero mesero / pedidos.
+ * Delight: CTA contextual (Cobrar / Adición / Ir) además de descartar.
+ * Harden: no X mientras En curso; Limpiar solo avisa no parkados.
  */
 
 import { Bell, Receipt, X } from "lucide-react";
@@ -27,18 +29,38 @@ function callTitle(call: TableCallResponse): string {
   return "Llaman al mesero";
 }
 
+export interface TableCallPrimaryAction {
+  label: string;
+  /** Emerald for money moment (Cobrar). */
+  tone?: "live" | "neutral";
+}
+
 interface TableCallAlertsProps {
   calls: TableCallResponse[];
   onDismiss: (id: string) => void;
   onDismissAll?: () => void;
+  /** Call currently parked in Cobrar/POS — stays visible as “En curso”. */
+  inProgressCallId?: string | null;
+  getPrimaryAction?: (
+    call: TableCallResponse,
+  ) => TableCallPrimaryAction | null;
+  onPrimaryAction?: (call: TableCallResponse) => void;
 }
 
 export function TableCallAlerts({
   calls,
   onDismiss,
   onDismissAll,
+  inProgressCallId = null,
+  getPrimaryAction,
+  onPrimaryAction,
 }: TableCallAlertsProps) {
   if (calls.length === 0) return null;
+
+  const clearableCount = calls.filter((c) => c.id !== inProgressCallId).length;
+  const hasParked = Boolean(
+    inProgressCallId && calls.some((c) => c.id === inProgressCallId),
+  );
 
   return (
     <div
@@ -48,47 +70,94 @@ export function TableCallAlerts({
       aria-live="assertive"
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-warn-ink">
+        <p className="text-xs font-semibold text-warn-ink">
           Atención en mesa · {calls.length}
         </p>
-        {calls.length > 1 && onDismissAll ? (
+        {clearableCount > 0 && onDismissAll ? (
           <button
             type="button"
             onClick={onDismissAll}
             className={`text-xs font-semibold text-muted-foreground underline-offset-2 hover:underline ${focusRing}`}
           >
-            Limpiar todas
+            {hasParked ? "Limpiar otras" : "Limpiar todas"}
           </button>
         ) : null}
       </div>
       <ul className="space-y-2">
         {calls.map((call) => {
           const Icon = call.callType === "BILL" ? Receipt : Bell;
+          const inProgress = inProgressCallId === call.id;
+          const action = getPrimaryAction?.(call) ?? null;
           return (
             <li
               key={call.id}
-              className="flex items-start gap-3 rounded-2xl border border-warn/40 bg-warn-muted px-4 py-3 text-warn-ink"
+              className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-start ${
+                inProgress
+                  ? "border-border bg-secondary text-foreground"
+                  : "border-warn/40 bg-warn-muted text-warn-ink"
+              }`}
             >
-              <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-card/80">
-                <Icon className="size-4" aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-bold tracking-tight">
-                  {formatTableLabel(call.tableNumber)}
-                </p>
-                <p className="text-sm font-medium">{callTitle(call)}</p>
-                {call.note?.trim() ? (
-                  <p className="mt-1 text-xs opacity-90">{call.note.trim()}</p>
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-card/80">
+                  <Icon className="size-4" aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base font-bold tracking-tight">
+                      {formatTableLabel(call.tableNumber)}
+                    </p>
+                    {inProgress ? (
+                      <span className="rounded-full bg-card px-2 py-0.5 text-xs font-semibold text-muted-foreground ring-1 ring-border">
+                        En curso
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-sm font-medium">{callTitle(call)}</p>
+                  {call.note?.trim() ? (
+                    <p className="mt-1 text-xs opacity-90">{call.note.trim()}</p>
+                  ) : null}
+                </div>
+                {!inProgress ? (
+                  <button
+                    type="button"
+                    onClick={() => onDismiss(call.id)}
+                    aria-label={`Descartar aviso de ${formatTableLabel(call.tableNumber)}`}
+                    className={`inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-card/70 sm:hidden ${focusRing}`}
+                  >
+                    <X className="size-4" aria-hidden />
+                  </button>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() => onDismiss(call.id)}
-                aria-label={`Descartar aviso de ${formatTableLabel(call.tableNumber)}`}
-                className={`inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-card/70 ${focusRing}`}
-              >
-                <X className="size-4" aria-hidden />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {action && onPrimaryAction && !inProgress ? (
+                  <button
+                    type="button"
+                    onClick={() => onPrimaryAction(call)}
+                    className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-4 text-sm font-bold sm:flex-none ${focusRing} ${
+                      action.tone === "live"
+                        ? "bg-live text-live-foreground"
+                        : "bg-card text-foreground"
+                    }`}
+                  >
+                    {action.label}
+                  </button>
+                ) : null}
+                {inProgress ? (
+                  <p className="text-xs font-semibold text-muted-foreground sm:max-w-[9rem] sm:text-right">
+                    Termina Cobrar o la comanda para cerrar este aviso.
+                  </p>
+                ) : null}
+                {!inProgress ? (
+                  <button
+                    type="button"
+                    onClick={() => onDismiss(call.id)}
+                    aria-label={`Descartar aviso de ${formatTableLabel(call.tableNumber)}`}
+                    className={`hidden size-10 shrink-0 items-center justify-center rounded-full bg-card/70 sm:inline-flex ${focusRing}`}
+                  >
+                    <X className="size-4" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
             </li>
           );
         })}

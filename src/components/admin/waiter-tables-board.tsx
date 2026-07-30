@@ -1,19 +1,23 @@
 "use client";
 
 /**
- * Vista del mesero: mesas/cuentas activas + libres, unión de mesas y POS de comanda.
+ * Vista del mesero: cuentas abiertas + picker compacto de mesas libres, unión y POS.
  */
 
-import { useCallback, useMemo, useState } from "react";
-import { Link2, Plus, Receipt, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Link2, Plus, Receipt } from "lucide-react";
 import type { Order, OrderStatus, TableCallResponse } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { MergeTablesModal } from "@/components/admin/merge-tables-modal";
-import { TableCallAlerts } from "@/components/admin/table-call-alerts";
+import {
+  TableCallAlerts,
+  type TableCallPrimaryAction,
+} from "@/components/admin/table-call-alerts";
 import {
   WaiterPosDrawer,
   type WaiterPosLine,
+  type WaiterPosOpenAccount,
 } from "@/components/admin/waiter-pos-drawer";
 import {
   useKitchenOrdersSubscription,
@@ -41,21 +45,78 @@ const ACTIVE: OrderStatus[] = [
 function statusLabel(status: OrderStatus): { label: string; className: string } {
   switch (status) {
     case "PENDING":
-      return { label: "Pendiente", className: "bg-warn-muted text-warn-ink" };
+      // Quiet — Ticket Amber reserved for table calls only.
+      return {
+        label: "Pendiente",
+        className: "bg-secondary text-muted-foreground ring-1 ring-border",
+      };
     case "ACCEPTED":
       return {
         label: "Aceptado",
-        className: "bg-secondary text-foreground ring-1 ring-border",
+        className: "bg-secondary text-muted-foreground ring-1 ring-border",
       };
     case "IN_KITCHEN":
+      // Weighted neutral ink — cooking signal without competing with calls/Cobrar.
       return {
         label: "En cocina",
-        className: "bg-orange-500/15 text-orange-800 dark:text-orange-200",
+        className:
+          "bg-foreground/[0.07] text-foreground font-bold ring-1 ring-foreground/40",
       };
     case "DELIVERED":
-      return { label: "Listo / por cobrar", className: "bg-live-muted text-live-ink" };
+      return {
+        label: "Por cobrar",
+        className:
+          "bg-live-muted text-live-ink font-semibold ring-1 ring-live/35",
+      };
     default:
       return { label: status, className: "bg-secondary text-muted-foreground" };
+  }
+}
+
+/** Preview corto de líneas: lo que el mesero necesita reconocer sin abrir. */
+function summarizeOrderLines(order: Order, maxLines = 2): string {
+  if (order.items.length === 0) return "Sin platillos aún";
+  const shown = order.items.slice(0, maxLines);
+  const parts = shown.map((item) => `${item.quantity}× ${item.productName}`);
+  const extra = order.items.length - maxLines;
+  if (extra > 0) return `${parts.join(", ")} +${extra}`;
+  return parts.join(", ");
+}
+
+function formatElapsedShort(iso: string, nowMs: number): string | null {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const minutes = Math.max(0, Math.floor((nowMs - then) / 60_000));
+  if (minutes < 1) return "menos de 1 min";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `${days} d`;
+}
+
+/**
+ * Tiempo en el estado actual (usa updatedAt como proxy de último cambio).
+ * En cocina / por cobrar llevan la urgencia en el copy.
+ */
+function statusDurationLabel(
+  order: Order,
+  nowMs: number,
+): string | null {
+  const iso = order.updatedAt ?? order.createdAt;
+  const elapsed = formatElapsedShort(iso, nowMs);
+  if (!elapsed) return null;
+  switch (order.status) {
+    case "IN_KITCHEN":
+      return `${elapsed} en cocina`;
+    case "DELIVERED":
+      return `${elapsed} por cobrar`;
+    case "PENDING":
+      return `${elapsed} pendiente`;
+    case "ACCEPTED":
+      return `${elapsed} aceptado`;
+    default:
+      return elapsed;
   }
 }
 
@@ -64,22 +125,21 @@ function normalizeTableKey(value: string | null | undefined): string {
   return value.replace(/^(mesa\s*)/i, "").trim();
 }
 
-function linkedBadgeLabel(order: Order): string | null {
+function linkedTableKeys(order: Order): string[] | null {
   const primary = normalizeTableKey(order.tableNumber);
   const linked = (order.linkedTables ?? [])
     .map(normalizeTableKey)
     .filter(Boolean);
   if (!primary || linked.length === 0) return null;
-  const all = [primary, ...linked].sort((a, b) =>
+  return [primary, ...linked].sort((a, b) =>
     a.localeCompare(b, "es", { numeric: true }),
   );
-  return `🔗 Mesa ${all.join("-")} (Unidas)`;
 }
 
 function orderTitle(order: Order): string {
   if (order.orderType === "IN_TABLE") {
-    const badge = linkedBadgeLabel(order);
-    if (badge) return badge;
+    const linked = linkedTableKeys(order);
+    if (linked) return `Mesa ${linked.join("-")}`;
     return order.tableNumber?.trim()
       ? `Mesa ${normalizeTableKey(order.tableNumber)}`
       : "Mesa sin número";
@@ -91,6 +151,48 @@ function orderTitle(order: Order): string {
     return order.customerName?.trim() || "A domicilio";
   }
   return `#${order.uuid.slice(0, 8).toUpperCase()}`;
+}
+
+function attentionRank(order: Order, callTableKeys: Set<string>): number {
+  if (order.orderType === "IN_TABLE" && callTableKeys.size > 0) {
+    const primary = normalizeTableKey(order.tableNumber);
+    const hit =
+      (primary && callTableKeys.has(primary)) ||
+      (order.linkedTables ?? []).some((t) =>
+        callTableKeys.has(normalizeTableKey(t)),
+      );
+    if (hit) return 0;
+  }
+  switch (order.status) {
+    case "DELIVERED":
+      return 1;
+    case "IN_KITCHEN":
+      return 2;
+    case "ACCEPTED":
+      return 3;
+    case "PENDING":
+      return 4;
+    default:
+      return 5;
+  }
+}
+
+function compareAccounts(
+  a: Order,
+  b: Order,
+  callTableKeys: Set<string>,
+): number {
+  const rank = attentionRank(a, callTableKeys) - attentionRank(b, callTableKeys);
+  if (rank !== 0) return rank;
+  const aTable = a.tableNumber ?? "";
+  const bTable = b.tableNumber ?? "";
+  if (aTable && bTable) {
+    return aTable.localeCompare(bTable, "es", { numeric: true });
+  }
+  return (
+    new Date(b.updatedAt ?? b.createdAt).getTime() -
+    new Date(a.updatedAt ?? a.createdAt).getTime()
+  );
 }
 
 interface PosTarget {
@@ -118,13 +220,46 @@ export function WaiterTablesBoard({
   const [connection, setConnection] =
     useState<KitchenConnectionState>("connecting");
   const [closeTarget, setCloseTarget] = useState<Order | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tableCalls, setTableCalls] = useState<TableCallResponse[]>([]);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [dismissCallTarget, setDismissCallTarget] =
+    useState<TableCallResponse | null>(null);
+  const [dismissClearableOpen, setDismissClearableOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [posTarget, setPosTarget] = useState<PosTarget | null>(null);
+  const [freePickerOpen, setFreePickerOpen] = useState(false);
+  const [freeTableQuery, setFreeTableQuery] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [focusOrderUuid, setFocusOrderUuid] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playAlertCue = useKitchenAlertSound();
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const showNotice = useCallback((message: string) => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    setNotice(message);
+    noticeTimerRef.current = setTimeout(() => {
+      setNotice((current) => (current === message ? null : current));
+      noticeTimerRef.current = null;
+    }, 8000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    };
+  }, []);
 
   const onOrderEvent = useCallback((order: Order) => {
     setOrders((prev) => {
@@ -156,20 +291,28 @@ export function WaiterTablesBoard({
     onConnectionChange: setConnection,
   });
 
+  const callTableKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const call of tableCalls) {
+      const key = normalizeTableKey(call.tableNumber);
+      if (key) keys.add(key);
+    }
+    return keys;
+  }, [tableCalls]);
+
   const sorted = useMemo(
-    () =>
-      [...orders].sort((a, b) => {
-        const aTable = a.tableNumber ?? "";
-        const bTable = b.tableNumber ?? "";
-        if (aTable && bTable) {
-          return aTable.localeCompare(bTable, "es", { numeric: true });
-        }
-        return (
-          new Date(b.updatedAt ?? b.createdAt).getTime() -
-          new Date(a.updatedAt ?? a.createdAt).getTime()
-        );
-      }),
-    [orders],
+    () => [...orders].sort((a, b) => compareAccounts(a, b, callTableKeys)),
+    [orders, callTableKeys],
+  );
+
+  const floorAccounts = useMemo(
+    () => sorted.filter((o) => o.orderType === "IN_TABLE"),
+    [sorted],
+  );
+
+  const channelAccounts = useMemo(
+    () => sorted.filter((o) => o.orderType !== "IN_TABLE"),
+    [sorted],
   );
 
   const occupiedTableKeys = useMemo(() => {
@@ -195,19 +338,77 @@ export function WaiterTablesBoard({
     return free;
   }, [floorSize, occupiedTableKeys]);
 
+  const visibleFreeTables = useMemo(() => {
+    const q = freeTableQuery.trim().toLowerCase();
+    if (!q) return freeTables;
+    return freeTables.filter(
+      (table) => table.includes(q) || `mesa ${table}`.includes(q),
+    );
+  }, [freeTables, freeTableQuery]);
+
+  const showFreeFilter = freeTables.length >= 8;
+
+  const posOpenAccount = useMemo((): WaiterPosOpenAccount | null => {
+    if (!posTarget?.activeOrderUuid) return null;
+    const order = orders.find((o) => o.uuid === posTarget.activeOrderUuid);
+    if (!order) return null;
+    return {
+      statusLabel: statusLabel(order.status).label,
+      formattedTotal: order.formattedTotal || formatCurrency(order.totalAmount),
+      items: order.items.map((item) => ({
+        quantity: item.quantity,
+        productName: item.productName,
+      })),
+    };
+  }, [orders, posTarget]);
+
   async function confirmClose() {
     if (!closeTarget || busy) return;
+    const closing = closeTarget;
     setBusy(true);
-    setError(null);
+    setCloseError(null);
     try {
-      const closed = await closeOrder(closeTarget.uuid, tenantSlug);
+      const closed = await closeOrder(closing.uuid, tenantSlug);
       setOrders((prev) => prev.filter((o) => o.uuid !== closed.uuid));
+      const freedKeys = new Set<string>();
+      const primary = normalizeTableKey(closing.tableNumber);
+      if (primary) freedKeys.add(primary);
+      for (const linked of closing.linkedTables ?? []) {
+        const key = normalizeTableKey(linked);
+        if (key) freedKeys.add(key);
+      }
+      setTableCalls((prev) =>
+        prev.filter((call) => {
+          if (activeCallId && call.id === activeCallId) return false;
+          if (freedKeys.size === 0) return true;
+          return !freedKeys.has(normalizeTableKey(call.tableNumber));
+        }),
+      );
+      setActiveCallId(null);
       setCloseTarget(null);
+      setCloseError(null);
+      showNotice(`Cuenta cobrada · ${orderTitle(closing)}`);
     } catch (err) {
-      setError(getAdminErrorMessage(err, "No se pudo cobrar la cuenta."));
+      setCloseError(
+        getAdminErrorMessage(err, "No se pudo cobrar la cuenta. Revisa la conexión e inténtalo de nuevo."),
+      );
     } finally {
       setBusy(false);
     }
+  }
+
+  function openCloseDialog(order: Order) {
+    if (order.status !== "DELIVERED") return;
+    setError(null);
+    setCloseError(null);
+    setCloseTarget(order);
+  }
+
+  function cancelCloseDialog() {
+    if (busy) return;
+    setCloseTarget(null);
+    setCloseError(null);
+    setActiveCallId(null);
   }
 
   async function confirmMerge(primary: string, secondaries: string[]) {
@@ -229,6 +430,11 @@ export function WaiterTablesBoard({
         return [merged, ...withoutSecondaries];
       });
       setMergeOpen(false);
+      const joined = [primary, ...secondaries]
+        .map(normalizeTableKey)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+      showNotice(`Mesas unidas · Mesa ${joined.join("-")}`);
     } catch (err) {
       setMergeError(getAdminErrorMessage(err, "No se pudieron unir las mesas."));
     } finally {
@@ -238,14 +444,17 @@ export function WaiterTablesBoard({
 
   async function submitPos(lines: WaiterPosLine[]) {
     if (!posTarget) return;
+    const target = posTarget;
+    const wasAddition = Boolean(target.activeOrderUuid);
+    const callId = activeCallId;
     setBusy(true);
     setError(null);
     try {
       const order = await createStaffOrder(
         {
-          tableNumber: posTarget.tableNumber,
-          activeOrderUuid: posTarget.activeOrderUuid,
-          customerName: `Mesa ${posTarget.tableNumber}`,
+          tableNumber: target.tableNumber,
+          activeOrderUuid: target.activeOrderUuid,
+          customerName: `Mesa ${target.tableNumber}`,
           details: lines.map((line) => ({
             productUuid: line.productUuid,
             quantity: line.quantity,
@@ -260,6 +469,15 @@ export function WaiterTablesBoard({
         return [order, ...without];
       });
       setPosTarget(null);
+      if (callId) {
+        setTableCalls((prev) => prev.filter((call) => call.id !== callId));
+        setActiveCallId(null);
+      }
+      showNotice(
+        wasAddition
+          ? `Adición enviada · Mesa ${target.tableNumber}`
+          : `Comanda enviada · Mesa ${target.tableNumber}`,
+      );
     } finally {
       setBusy(false);
     }
@@ -277,7 +495,219 @@ export function WaiterTablesBoard({
 
   function openPosForFreeTable(table: string) {
     setError(null);
+    setFreePickerOpen(false);
     setPosTarget({ tableNumber: table, activeOrderUuid: null });
+  }
+
+  function findOrderForTable(tableNumber: string): Order | undefined {
+    const key = normalizeTableKey(tableNumber);
+    if (!key) return undefined;
+    return orders.find((order) => {
+      if (order.orderType !== "IN_TABLE") return false;
+      if (normalizeTableKey(order.tableNumber) === key) return true;
+      return (order.linkedTables ?? []).some(
+        (linked) => normalizeTableKey(linked) === key,
+      );
+    });
+  }
+
+  function focusAccountCard(orderUuid: string) {
+    setFocusOrderUuid(orderUuid);
+    if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`account-${orderUuid}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    focusTimerRef.current = setTimeout(() => {
+      setFocusOrderUuid((current) =>
+        current === orderUuid ? null : current,
+      );
+      focusTimerRef.current = null;
+    }, 2600);
+  }
+
+  function getCallPrimaryAction(
+    call: TableCallResponse,
+  ): TableCallPrimaryAction | null {
+    const order = findOrderForTable(call.tableNumber);
+    if (call.callType === "BILL" && order?.status === "DELIVERED") {
+      return { label: "Cobrar", tone: "live" };
+    }
+    if (order) {
+      return {
+        label: call.callType === "WAITER" ? "Adición" : "Ir a mesa",
+      };
+    }
+    return { label: "Abrir mesa" };
+  }
+
+  /** Park a call in Cobrar/POS without dismissing it; release any prior dialog. */
+  function parkCallAction(callId: string) {
+    if (busy) return false;
+    setCloseTarget(null);
+    setCloseError(null);
+    setPosTarget(null);
+    setActiveCallId(callId);
+    return true;
+  }
+
+  function handleCallPrimaryAction(call: TableCallResponse) {
+    const order = findOrderForTable(call.tableNumber);
+    if (call.callType === "BILL" && order?.status === "DELIVERED") {
+      if (!parkCallAction(call.id)) return;
+      openCloseDialog(order);
+      return;
+    }
+    if (order) {
+      if (call.callType === "WAITER") {
+        if (!parkCallAction(call.id)) return;
+        openPosForOrder(order);
+        return;
+      }
+      // Ir a mesa: focus completed — safe to clear the interrupt.
+      setTableCalls((prev) => prev.filter((item) => item.id !== call.id));
+      if (activeCallId === call.id) setActiveCallId(null);
+      focusAccountCard(order.uuid);
+      return;
+    }
+    const table = normalizeTableKey(call.tableNumber);
+    if (table) {
+      if (!parkCallAction(call.id)) return;
+      openPosForFreeTable(table);
+    }
+  }
+
+  const showFreePicker =
+    freeTables.length > 0 && (freePickerOpen || sorted.length === 0);
+
+  useEffect(() => {
+    if (!showFreePicker) setFreeTableQuery("");
+  }, [showFreePicker]);
+
+  function renderAccountCard(order: Order) {
+    const badge = statusLabel(order.status);
+    const linePreview = summarizeOrderLines(order);
+    const duration = statusDurationLabel(order, nowMs);
+    const tableKey = normalizeTableKey(order.tableNumber);
+    const linked = linkedTableKeys(order);
+    const callKeys = new Set<string>();
+    if (tableKey) callKeys.add(tableKey);
+    for (const key of order.linkedTables ?? []) {
+      const normalized = normalizeTableKey(key);
+      if (normalized) callKeys.add(normalized);
+    }
+    const hasCall =
+      order.orderType === "IN_TABLE" &&
+      callKeys.size > 0 &&
+      tableCalls.some((c) =>
+        callKeys.has(normalizeTableKey(c.tableNumber)),
+      );
+    const canCharge = order.status === "DELIVERED";
+    const attendant =
+      order.staffName?.trim() ||
+      (order.orderType === "IN_TABLE" && order.customerName?.trim()
+        ? order.customerName.trim()
+        : null);
+    // One loud wait signal: duration only when no call (call owns attention).
+    const emphasizeWait =
+      !hasCall &&
+      (order.status === "IN_KITCHEN" || order.status === "DELIVERED");
+
+    const metaBits: string[] = [];
+    if (linked) metaBits.push("Unidas");
+    if (duration) metaBits.push(duration);
+    if (attendant) {
+      metaBits.push(
+        order.staffName?.trim()
+          ? `Atendido por ${attendant}`
+          : attendant,
+      );
+    }
+
+    return (
+      <li
+        key={order.uuid}
+        id={`account-${order.uuid}`}
+        className={`flex flex-col rounded-2xl border bg-card p-4 transition-[box-shadow,border-color] ${
+          hasCall
+            ? "border-warn/55"
+            : focusOrderUuid === order.uuid
+              ? "border-live/70 ring-1 ring-live/25"
+              : "border-border"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-2xl font-bold tracking-tight">
+              {orderTitle(order)}
+            </p>
+            {hasCall ? (
+              <p className="mt-1 text-xs font-semibold text-warn-ink">
+                Te llaman
+              </p>
+            ) : null}
+            <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
+              {linePreview}
+            </p>
+            {metaBits.length > 0 ? (
+              <p
+                className={`mt-1 text-xs ${
+                  emphasizeWait
+                    ? "font-medium text-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {metaBits.join(" · ")}
+              </p>
+            ) : null}
+          </div>
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+              hasCall
+                ? "bg-secondary text-muted-foreground ring-1 ring-border"
+                : badge.className
+            }`}
+          >
+            {badge.label}
+          </span>
+        </div>
+
+        <p className="mt-3 text-base font-semibold tabular-nums tracking-tight text-foreground">
+          {order.formattedTotal || formatCurrency(order.totalAmount)}
+        </p>
+
+        <div
+          className={`mt-4 grid grid-cols-1 gap-2 ${
+            canCharge ? "sm:grid-cols-2" : ""
+          }`}
+        >
+          {order.orderType === "IN_TABLE" ? (
+            <button
+              type="button"
+              onClick={() => openPosForOrder(order)}
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold ${focusRing}`}
+            >
+              <Plus className="size-4" aria-hidden />
+              Adición
+            </button>
+          ) : null}
+          {canCharge ? (
+            <button
+              type="button"
+              onClick={() => openCloseDialog(order)}
+              title="Cierra la cuenta y libera la mesa"
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-live px-3 text-sm font-bold text-live-foreground ${focusRing} ${
+                order.orderType !== "IN_TABLE" ? "sm:col-span-2" : ""
+              }`}
+            >
+              <Receipt className="size-4" aria-hidden />
+              Cobrar
+            </button>
+          ) : null}
+        </div>
+      </li>
+    );
   }
 
   return (
@@ -285,7 +715,7 @@ export function WaiterTablesBoard({
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Gestión de Mesas
+            Salón
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {restaurantName} · cuentas abiertas del turno
@@ -293,30 +723,98 @@ export function WaiterTablesBoard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AdminConnectionBadge state={connection} />
-          <span className="inline-flex min-h-11 items-center rounded-full bg-secondary px-3 text-sm font-semibold tabular-nums">
-            {sorted.length} activas
-          </span>
           <button
             type="button"
+            disabled={freeTables.length === 0}
+            aria-expanded={showFreePicker}
+            aria-controls={showFreePicker ? "free-tables-picker" : undefined}
+            title={
+              freeTables.length === 0
+                ? "Todas las mesas tienen cuenta abierta"
+                : "Abrir pedido en mesa libre"
+            }
+            onClick={() => {
+              if (sorted.length === 0) return;
+              setFreePickerOpen((open) => !open);
+            }}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+          >
+            <Plus className="size-4" aria-hidden />
+            Nueva mesa
+            {sorted.length > 0 ? (
+              <ChevronDown
+                className={`size-4 transition-transform ${showFreePicker ? "rotate-180" : ""}`}
+                aria-hidden
+              />
+            ) : null}
+          </button>
+          <button
+            type="button"
+            title="Une mesas para que compartan una sola cuenta"
             onClick={() => {
               setMergeError(null);
               setMergeOpen(true);
             }}
-            className={`inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-3 text-sm font-semibold ${focusRing}`}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground ${focusRing}`}
           >
             <Link2 className="size-4" aria-hidden />
-            Unir Mesas
+            Unir
           </button>
         </div>
       </header>
 
       <TableCallAlerts
         calls={tableCalls}
-        onDismiss={(id) =>
-          setTableCalls((prev) => prev.filter((c) => c.id !== id))
-        }
-        onDismissAll={() => setTableCalls([])}
+        inProgressCallId={activeCallId}
+        onDismiss={(id) => {
+          if (activeCallId === id) return;
+          const call = tableCalls.find((c) => c.id === id);
+          if (!call) return;
+          if (call.callType === "BILL") {
+            setDismissClearableOpen(false);
+            setDismissCallTarget(call);
+            return;
+          }
+          setTableCalls((prev) => prev.filter((c) => c.id !== id));
+        }}
+        onDismissAll={() => {
+          const clearable = tableCalls.filter((c) => c.id !== activeCallId);
+          if (clearable.length === 0) return;
+          if (clearable.some((c) => c.callType === "BILL")) {
+            setDismissCallTarget(null);
+            setDismissClearableOpen(true);
+            return;
+          }
+          setTableCalls((prev) =>
+            activeCallId
+              ? prev.filter((c) => c.id === activeCallId)
+              : [],
+          );
+        }}
+        getPrimaryAction={getCallPrimaryAction}
+        onPrimaryAction={handleCallPrimaryAction}
       />
+
+      {notice ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-start justify-between gap-3 rounded-xl border border-live/30 bg-live-muted px-4 py-3 text-sm font-semibold text-live-ink"
+        >
+          <p className="min-w-0 flex-1">{notice}</p>
+          <button
+            type="button"
+            onClick={() => {
+              if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+              noticeTimerRef.current = null;
+              setNotice(null);
+            }}
+            className={`shrink-0 text-xs font-semibold underline-offset-2 hover:underline ${focusRing}`}
+          >
+            Cerrar
+          </button>
+        </div>
+      ) : null}
 
       {error ? (
         <p
@@ -327,158 +825,176 @@ export function WaiterTablesBoard({
         </p>
       ) : null}
 
-      <section>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-          Cuentas abiertas
-        </h2>
-        {sorted.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center">
-            <p className="text-lg font-semibold">No hay mesas abiertas</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Toma un pedido en una mesa libre o espera el QR del comensal.
-            </p>
-          </div>
-        ) : (
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {sorted.map((order) => {
-              const badge = statusLabel(order.status);
-              const itemCount = order.items.reduce(
-                (sum, item) => sum + item.quantity,
-                0,
-              );
-              const tableKey = normalizeTableKey(order.tableNumber);
-              const merged = linkedBadgeLabel(order);
-              const hasCall =
-                order.orderType === "IN_TABLE" &&
-                Boolean(tableKey) &&
-                tableCalls.some(
-                  (c) => normalizeTableKey(c.tableNumber) === tableKey,
-                );
-              return (
-                <li
-                  key={order.uuid}
-                  className={`flex flex-col rounded-2xl border bg-card p-4 ${
-                    hasCall
-                      ? "border-warn ring-2 ring-warn/40"
-                      : merged
-                        ? "border-live/50 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
-                        : "border-border shadow-[0_1px_0_rgba(0,0,0,0.04)]"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-xl font-bold tracking-tight">
-                        {orderTitle(order)}
-                      </p>
-                      {merged ? (
-                        <span className="mt-1 inline-flex rounded-full bg-live-muted px-2.5 py-0.5 text-xs font-semibold text-live-ink">
-                          Unidas
-                        </span>
-                      ) : null}
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {itemCount} platillo{itemCount === 1 ? "" : "s"}
-                        {order.staffName
-                          ? ` · Atendido por: ${order.staffName}`
-                          : order.customerName?.trim()
-                            ? ` · ${order.customerName.trim()}`
-                            : ""}
-                      </p>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}
-                    >
-                      {badge.label}
-                    </span>
-                  </div>
-
-                  <p className="mt-5 text-3xl font-bold tabular-nums tracking-tight">
-                    {order.formattedTotal || formatCurrency(order.totalAmount)}
-                  </p>
-
-                  <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => openPosForOrder(order)}
-                      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold ${focusRing}`}
-                    >
-                      <Plus className="size-4" aria-hidden />
-                      Tomar Pedido / Adición
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setError(null);
-                        setCloseTarget(order);
-                      }}
-                      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-live px-3 text-sm font-bold text-live-foreground ${focusRing}`}
-                    >
-                      <Receipt className="size-4" aria-hidden />
-                      Cobrar
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-          Mesas libres
-        </h2>
-        {freeTables.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Todas las mesas del piso tienen cuenta abierta.
+      {showFreePicker ? (
+        <div
+          id="free-tables-picker"
+          role="region"
+          aria-label="Mesas libres"
+          className="rounded-2xl border border-border bg-card px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-foreground">
+            Mesa libre
+            <span className="ml-2 font-normal text-muted-foreground">
+              {freeTables.length} disponible
+              {freeTables.length === 1 ? "" : "s"}
+            </span>
           </p>
-        ) : (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-            {freeTables.map((table) => (
-              <li
-                key={`free-${table}`}
-                className="flex flex-col rounded-2xl border border-dashed border-border bg-card/60 p-3"
-              >
-                <p className="text-lg font-bold tabular-nums">Mesa {table}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Libre</p>
+          {showFreeFilter ? (
+            <label className="mt-3 block">
+              <span className="sr-only">Buscar mesa libre</span>
+              <input
+                type="search"
+                inputMode="numeric"
+                enterKeyHint="search"
+                placeholder="Buscar mesa…"
+                value={freeTableQuery}
+                onChange={(e) => setFreeTableQuery(e.target.value)}
+                className={`w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm tabular-nums ${focusRing}`}
+              />
+            </label>
+          ) : null}
+          <ul className="mt-3 grid max-h-[min(28dvh,12rem)] grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6 md:grid-cols-8">
+            {visibleFreeTables.map((table) => (
+              <li key={`free-${table}`}>
                 <button
                   type="button"
                   onClick={() => openPosForFreeTable(table)}
-                  className={`mt-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-primary px-2 text-sm font-semibold text-primary-foreground ${focusRing}`}
+                  className={`inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-border bg-background px-2 text-sm font-bold tabular-nums hover:border-foreground hover:bg-secondary ${focusRing}`}
                 >
-                  <Plus className="size-4" aria-hidden />
-                  Tomar Pedido
+                  <span className="sr-only">Tomar pedido en mesa </span>
+                  {table}
                 </button>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+          {visibleFreeTables.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Ninguna mesa coincide con “{freeTableQuery.trim()}”.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="flex justify-center pt-2">
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-muted-foreground hover:text-foreground ${focusRing}`}
-        >
-          <RefreshCw className="size-4" aria-hidden />
-          Actualizar
-        </button>
-      </div>
+      {sorted.length === 0 ? (
+        <section>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+            Mesas
+          </h2>
+          <div className="rounded-2xl border border-dashed border-border px-6 py-10 text-center">
+            <p className="text-lg font-semibold">No hay cuentas abiertas</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {freeTables.length > 0
+                ? "Elige una mesa libre arriba o espera el QR del comensal."
+                : "Todas las mesas tienen cuenta abierta. Espera el QR o cobra una mesa lista."}
+            </p>
+          </div>
+        </section>
+      ) : (
+        <>
+          {floorAccounts.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                Mesas
+                <span className="ml-2 font-semibold normal-case tracking-normal tabular-nums text-foreground">
+                  {floorAccounts.length}
+                </span>
+              </h2>
+              <p className="mb-3 -mt-2 text-xs text-muted-foreground">
+                Primero las que te llaman o están listas para cobrar
+              </p>
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {floorAccounts.map((order) => renderAccountCard(order))}
+              </ul>
+            </section>
+          ) : null}
+
+          {channelAccounts.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                Para llevar y domicilio
+                <span className="ml-2 font-semibold normal-case tracking-normal tabular-nums text-foreground">
+                  {channelAccounts.length}
+                </span>
+              </h2>
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {channelAccounts.map((order) => renderAccountCard(order))}
+              </ul>
+            </section>
+          ) : null}
+        </>
+      )}
 
       <ConfirmDialog
         open={!!closeTarget}
         title="Cobrar y cerrar cuenta"
         description={
           closeTarget
-            ? `¿Cobrar ${orderTitle(closeTarget)} por ${closeTarget.formattedTotal || formatCurrency(closeTarget.totalAmount)}? Las mesas vinculadas quedarán libres.`
+            ? (() => {
+                const amount =
+                  closeTarget.formattedTotal ||
+                  formatCurrency(closeTarget.totalAmount);
+                const who = orderTitle(closeTarget);
+                if (closeTarget.orderType !== "IN_TABLE") {
+                  return `¿Cobrar ${who} por ${amount} y cerrar la cuenta?`;
+                }
+                const linked = linkedTableKeys(closeTarget);
+                if (linked && linked.length > 1) {
+                  return `¿Cobrar ${who} por ${amount}? Las mesas vinculadas quedarán libres.`;
+                }
+                return `¿Cobrar ${who} por ${amount} y liberar la mesa?`;
+              })()
             : ""
         }
         confirmLabel="Cobrar"
         busyLabel="Cobrando…"
-        tone="neutral"
+        tone="live"
         busy={busy}
+        error={closeError}
         onConfirm={() => void confirmClose()}
-        onCancel={() => !busy && setCloseTarget(null)}
+        onCancel={cancelCloseDialog}
+      />
+
+      <ConfirmDialog
+        open={dismissCallTarget !== null || dismissClearableOpen}
+        title={
+          dismissClearableOpen
+            ? "¿Limpiar avisos?"
+            : "¿Descartar pedido de cuenta?"
+        }
+        description={
+          dismissClearableOpen
+            ? activeCallId
+              ? "Se quitan los avisos pendientes. El aviso En curso se mantiene hasta que termines Cobrar o la comanda."
+              : "Se quitan todos los avisos de mesa, incluidos los que piden la cuenta."
+            : dismissCallTarget
+              ? `Mesa ${normalizeTableKey(dismissCallTarget.tableNumber) || dismissCallTarget.tableNumber} pide la cuenta. Si descartas, puedes perder el aviso en el apuro.`
+              : ""
+        }
+        confirmLabel={
+          dismissClearableOpen ? "Limpiar avisos" : "Descartar aviso"
+        }
+        cancelLabel="Conservar"
+        tone="danger"
+        onConfirm={() => {
+          if (dismissClearableOpen) {
+            setTableCalls((prev) =>
+              activeCallId
+                ? prev.filter((c) => c.id === activeCallId)
+                : [],
+            );
+            setDismissClearableOpen(false);
+            return;
+          }
+          if (dismissCallTarget) {
+            const id = dismissCallTarget.id;
+            setTableCalls((prev) => prev.filter((c) => c.id !== id));
+            setDismissCallTarget(null);
+          }
+        }}
+        onCancel={() => {
+          setDismissCallTarget(null);
+          setDismissClearableOpen(false);
+        }}
       />
 
       <MergeTablesModal
@@ -498,8 +1014,13 @@ export function WaiterTablesBoard({
         tenantSlug={tenantSlug}
         tableNumber={posTarget?.tableNumber ?? ""}
         activeOrderUuid={posTarget?.activeOrderUuid}
+        openAccount={posOpenAccount}
         busy={busy}
-        onClose={() => !busy && setPosTarget(null)}
+        onClose={() => {
+          if (busy) return;
+          setPosTarget(null);
+          setActiveCallId(null);
+        }}
         onSubmit={submitPos}
       />
     </div>

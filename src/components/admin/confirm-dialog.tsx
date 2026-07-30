@@ -18,9 +18,11 @@ interface ConfirmDialogProps {
   busyLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
-  tone?: "danger" | "neutral";
+  tone?: "danger" | "neutral" | "live";
   /** Error de API / acción visible dentro del diálogo (no bajo el overlay). */
   error?: string | null;
+  /** Capa z-index del overlay (p. ej. sobre un drawer full-screen). */
+  overlayClassName?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -39,6 +41,7 @@ export function ConfirmDialog({
   busy = false,
   tone = "danger",
   error = null,
+  overlayClassName = "z-[70]",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -53,7 +56,9 @@ export function ConfirmDialog({
   const confirmClass =
     tone === "danger"
       ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-      : "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50";
+      : tone === "live"
+        ? "bg-live text-live-foreground hover:brightness-110 disabled:opacity-50"
+        : "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50";
 
   const describedBy = [
     "confirm-dialog-desc",
@@ -65,7 +70,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
+      className={`fixed inset-0 ${overlayClassName} flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4`}
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel();

@@ -37,3 +37,8 @@ export function orderTrackingTopic(orderUuid: string): string {
 export function adminKitchenTopic(tenantSlug: string): string {
   return `/topic/admin/${tenantSlug}/orders`;
 }
+
+/** Canal STOMP del inbox Smart Rating (OWNER/ADMIN). */
+export function adminFeedbackTopic(tenantSlug: string): string {
+  return `/topic/admin/${tenantSlug}/feedback`;
+}

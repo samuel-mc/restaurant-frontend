@@ -3,6 +3,7 @@ import {
   BarChart3,
   ChefHat,
   ClipboardList,
+  MessageSquareWarning,
   QrCode,
   Settings,
   Users,
@@ -61,6 +62,13 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
     description: "Mesas, cuentas y cobro",
     icon: ClipboardList,
     roles: WAITER_ROLES,
+  },
+  {
+    href: "/admin/dashboard/feedback",
+    label: "Opiniones",
+    description: "Inbox de reclamos Smart Rating",
+    icon: MessageSquareWarning,
+    roles: ADMIN_ONLY,
   },
   {
     href: "/admin/dashboard/qr",

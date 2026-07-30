@@ -32,7 +32,12 @@ import { buildMenuPath } from "@/lib/qr-menu-url";
 import { useCartStore } from "@/store/cartStore";
 import { whatsappChatUrl } from "@/lib/contact-links";
 import { CustomerBrandHeader } from "@/components/customer/customer-brand-header";
+import { SmartRatingSheet } from "@/components/customer/smart-rating-sheet";
 import { getOrderByUuid } from "@/services/orderService";
+import {
+  getFeedbackStatus,
+  wasFeedbackSubmittedLocally,
+} from "@/services/feedbackService";
 import {
   useOrderStatusSubscription,
   type OrderConnectionState,
@@ -176,6 +181,8 @@ export function OrderTracker({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [helpHint, setHelpHint] = useState(false);
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [feedbackDone, setFeedbackDone] = useState(false);
   const [cartHydrated, setCartHydrated] = useState(() =>
     useCartStore.persist.hasHydrated(),
   );
@@ -200,6 +207,30 @@ export function OrderTracker({
   /** Comida lista / cuenta: deja de ofrecer «Pedir más». */
   const isOrderingDone =
     order.status === "DELIVERED" || isSettled;
+
+  useEffect(() => {
+    if (order.status !== "CLOSED" || feedbackDone) return;
+    if (wasFeedbackSubmittedLocally(order.uuid)) {
+      setFeedbackDone(true);
+      return;
+    }
+    let cancelled = false;
+    void getFeedbackStatus(order.uuid, tenantSlug)
+      .then((status) => {
+        if (cancelled) return;
+        if (status.submitted) {
+          setFeedbackDone(true);
+          return;
+        }
+        setRatingOpen(true);
+      })
+      .catch(() => {
+        // Si falla el status, el comensal puede abrir el sheet a mano.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [order.status, order.uuid, tenantSlug, feedbackDone]);
 
   const applyOrderUpdate = useCallback((next: Order) => {
     setOrder(next);
@@ -324,6 +355,7 @@ export function OrderTracker({
   const isClosed = order.status === "CLOSED";
   const isFoodDelivered = order.status === "DELIVERED";
   const showFoodProgress = !isCancelled && !isClosed;
+  const showRateCta = isClosed && !feedbackDone;
   const channelLabel = getOrderChannelLabel(
     order.orderType,
     order.tableNumber,
@@ -679,6 +711,15 @@ export function OrderTracker({
         className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm"
       >
         <div className="mx-auto flex w-full max-w-md flex-col gap-2">
+          {showRateCta ? (
+            <button
+              type="button"
+              onClick={() => setRatingOpen(true)}
+              className={`${focusRing} inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-border bg-card px-5 text-sm font-semibold text-foreground shadow-sm`}
+            >
+              Calificar experiencia
+            </button>
+          ) : null}
           <Link
             href={primaryAction.href}
             className={`${focusRing} inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-[var(--menu-accent)] px-5 text-sm font-semibold text-[var(--menu-accent-fg)] shadow-md`}
@@ -735,6 +776,15 @@ export function OrderTracker({
           ) : null}
         </div>
       </nav>
+
+      <SmartRatingSheet
+        open={ratingOpen}
+        orderUuid={order.uuid}
+        tenantSlug={tenantSlug}
+        restaurantName={restaurantName}
+        onClose={() => setRatingOpen(false)}
+        onCompleted={() => setFeedbackDone(true)}
+      />
     </div>
   );
 }

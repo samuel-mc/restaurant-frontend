@@ -388,3 +388,50 @@ export interface RestaurantProfile {
   paymentStatus: string;
   updatedAt: string;
 }
+
+/** Smart Rating: resultado hacia el comensal. */
+export type FeedbackOutcome =
+  | "GOOGLE_REVIEW"
+  | "PRIVATE_COMPLAINT"
+  | "THANKS";
+
+export type FeedbackInboxStatus = "OPEN" | "RESOLVED" | "DISMISSED";
+
+export type FeedbackReason = "FOOD" | "SERVICE" | "WAIT" | "OTHER";
+
+export interface SubmitFeedbackRequest {
+  stars: number;
+  comment?: string | null;
+  contact?: string | null;
+  reason?: FeedbackReason | null;
+}
+
+export interface SubmitFeedbackResponse {
+  outcome: FeedbackOutcome;
+  googleMapsUrl?: string | null;
+  message?: string | null;
+}
+
+export interface FeedbackStatusResponse {
+  submitted: boolean;
+}
+
+export interface AdminFeedbackItem {
+  id: number;
+  orderUuid: string;
+  stars: number;
+  comment: string | null;
+  contact: string | null;
+  reason: string | null;
+  outcome: FeedbackOutcome;
+  status: FeedbackInboxStatus;
+  urgent: boolean;
+  tableNumber: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface FeedbackSummary {
+  openUrgentCount: number;
+  openCount: number;
+}

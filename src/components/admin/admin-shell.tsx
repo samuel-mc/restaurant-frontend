@@ -22,6 +22,7 @@ import { isAdminNavActive, type AdminNavItem } from "@/lib/admin-nav";
 import { navItemsForRole } from "@/lib/admin-nav-access";
 import { logoutPathForSession } from "@/lib/jwt-payload";
 import { clearToken } from "@/services/authService";
+import { fetchFeedbackSummary } from "@/services/adminFeedbackService";
 
 interface AdminShellProps {
   restaurantName: string;
@@ -61,6 +62,35 @@ export function AdminShell({
     accessRole === "COCINA" ||
     accessRole === "ROLE_MESERO" ||
     accessRole === "ROLE_COCINA";
+  const canSeeFeedbackInbox = navItems.some(
+    (item) => item.href === "/admin/dashboard/feedback",
+  );
+  const [urgentFeedbackCount, setUrgentFeedbackCount] = useState(0);
+
+  useEffect(() => {
+    if (!canSeeFeedbackInbox || isSupportSession) return;
+    let cancelled = false;
+
+    async function refresh() {
+      try {
+        const summary = await fetchFeedbackSummary();
+        if (!cancelled) {
+          setUrgentFeedbackCount(summary.openUrgentCount ?? 0);
+        }
+      } catch {
+        // Silencioso: el badge no debe romper el panel.
+      }
+    }
+
+    void refresh();
+    const id = window.setInterval(() => {
+      void refresh();
+    }, 45_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [canSeeFeedbackInbox, isSupportSession, pathname]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -156,7 +186,11 @@ export function AdminShell({
           className="flex flex-1 flex-col overflow-y-auto px-3 py-3"
           aria-label="Navegación del panel"
         >
-          <NavList items={navItems} pathname={pathname} />
+          <NavList
+            items={navItems}
+            pathname={pathname}
+            urgentFeedbackCount={urgentFeedbackCount}
+          />
         </nav>
         <div className="border-t border-border p-3">
           <LogoutButton
@@ -246,7 +280,11 @@ export function AdminShell({
                 className="flex flex-1 flex-col overflow-y-auto px-3 py-3"
                 aria-label="Navegación del panel"
               >
-                <NavList items={navItems} pathname={pathname} />
+                <NavList
+                  items={navItems}
+                  pathname={pathname}
+                  urgentFeedbackCount={urgentFeedbackCount}
+                />
               </nav>
               <div className="border-t border-border p-3">
                 <LogoutButton
@@ -329,9 +367,11 @@ function SidebarBrand({
 function NavList({
   items,
   pathname,
+  urgentFeedbackCount = 0,
 }: {
   items: readonly AdminNavItem[];
   pathname: string;
+  urgentFeedbackCount?: number;
 }) {
   const router = useRouter();
   return (
@@ -339,6 +379,8 @@ function NavList({
       {items.map((item) => {
         const active = isAdminNavActive(pathname, item);
         const Icon = item.icon;
+        const showUrgentBadge =
+          item.href === "/admin/dashboard/feedback" && urgentFeedbackCount > 0;
         return (
           <li key={item.href}>
             <Link
@@ -363,7 +405,15 @@ function NavList({
                 className={`size-4 shrink-0 ${active ? "opacity-100" : "opacity-70"}`}
                 aria-hidden
               />
-              <span className="min-w-0 truncate">{item.label}</span>
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {showUrgentBadge ? (
+                <span
+                  className="inline-flex min-w-5 items-center justify-center rounded-md bg-destructive px-1.5 py-0.5 text-[0.65rem] font-bold tabular-nums text-destructive-foreground"
+                  aria-label={`${urgentFeedbackCount} opiniones urgentes`}
+                >
+                  {urgentFeedbackCount > 9 ? "9+" : urgentFeedbackCount}
+                </span>
+              ) : null}
             </Link>
           </li>
         );

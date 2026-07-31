@@ -10,7 +10,7 @@ import { Printer, Receipt } from "lucide-react";
 import type { Order } from "@/types/api";
 import { PreCuentaModal } from "@/components/admin/pre-cuenta-modal";
 import { TicketReceipt } from "@/components/admin/ticket-receipt";
-import { buildTicketReceiptProps } from "@/lib/ticket-from-order";
+import { buildTicketReceiptProps, resolveTicketKind } from "@/lib/ticket-from-order";
 
 const DEMO_ORDER: Order = {
   id: 1084,
@@ -107,7 +107,9 @@ const DEMO_RESTAURANT = {
 
 export default function PreCuentaShowcasePage() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [kind, setKind] = useState<"pre-cuenta" | "cuenta">("pre-cuenta");
+  const [kind, setKind] = useState<"pre-cuenta" | "cuenta">(() =>
+    resolveTicketKind(DEMO_ORDER),
+  );
   const preview = useMemo(
     () => buildTicketReceiptProps(DEMO_ORDER, DEMO_RESTAURANT, kind),
     [kind],
@@ -123,11 +125,11 @@ export default function PreCuentaShowcasePage() {
           </span>
         </div>
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-          Pre-cuenta e impresión térmica
+          Impresión térmica · pre-cuenta y cuenta
         </h1>
         <p className="max-w-xl text-sm text-muted-foreground">
-          Ticket 80mm con IVA incluido, propinas sugeridas y QR. En operación se
-          abre desde Gestión de Mesas y al cobrar en Cocina.
+          Ticket 80mm con IVA incluido, propinas y QR. En operación se abre desde
+          Mesas y al cobrar en Cocina. El demo parte en Cuenta (pedido entregado).
         </p>
       </header>
 

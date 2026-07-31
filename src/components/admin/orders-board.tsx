@@ -21,7 +21,12 @@ import { useKitchenAlertSound } from "@/hooks/useKitchenAlertSound";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { adminKitchenOrderHref } from "@/lib/admin-nav";
 import { getAdminErrorMessage } from "@/lib/admin-error";
-import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
+import {
+  resolveTicketKind,
+  ticketKindLabel,
+  ticketKindPrintLabel,
+  type RestaurantTicketInfo,
+} from "@/lib/ticket-from-order";
 import { listOrders } from "@/services/adminOrderService";
 import { formatCurrency } from "@/lib/format";
 
@@ -177,7 +182,7 @@ function groupByBatch(items: OrderItem[]): Array<{ batch: number; items: OrderIt
 
 function summarizeItems(order: Order): string {
   const rounds = groupByBatch(order.items);
-  if (rounds.length === 0) return "Sin ítems";
+  if (rounds.length === 0) return "Sin consumos";
   return rounds
     .map(({ batch, items }) => {
       const names = items
@@ -677,6 +682,8 @@ function OrderListActions({
   const stack = layout === "stack";
   const canTicket =
     order.status !== "CANCELLED" && order.items.length > 0;
+  const printKind = resolveTicketKind(order);
+  const printLabel = ticketKindLabel(printKind);
 
   return (
     <div
@@ -690,12 +697,13 @@ function OrderListActions({
         <button
           type="button"
           onClick={onPreCuenta}
+          title={ticketKindPrintLabel(printKind)}
           className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 text-sm font-semibold ${focusRing} ${
             stack ? "w-full" : ""
           }`}
         >
           <Printer className="size-3.5" aria-hidden />
-          Ticket
+          {printLabel}
         </button>
       ) : null}
       {kitchen ? (
@@ -754,6 +762,8 @@ function OrderDetailModal({
 }) {
   const rounds = groupByBatch(order.items);
   const badge = badgeMeta(order);
+  const printKind = resolveTicketKind(order);
+  const printLabel = ticketKindPrintLabel(printKind);
   const panelRef = useModalFocusTrap({ open: true, onEscape: onClose });
 
   return (
@@ -774,7 +784,7 @@ function OrderDetailModal({
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0">
             <h2 id={titleId} className="truncate text-lg font-bold tracking-tight">
-              Ticket {orderTitle(order)}
+              {orderTitle(order)}
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               {formatDateTime(order.createdAt)} ·{" "}
@@ -899,7 +909,7 @@ function OrderDetailModal({
               className={`mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold ${focusRing}`}
             >
               <Printer className="size-4" aria-hidden />
-              Imprimir ticket
+              {printLabel}
             </button>
           ) : null}
           <button

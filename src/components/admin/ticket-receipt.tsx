@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { formatCurrency } from "@/lib/format";
+import { ticketTipSuggestions } from "@/lib/ticket-from-order";
 
 export interface TicketItemModifier {
   name: string;
@@ -15,8 +16,6 @@ export interface TicketItem {
   name: string;
   /** Importe total de la línea (incluye modificadores). */
   price: number;
-  /** Precio unitario base (opcional, solo informativo). */
-  unitPrice?: number;
   modifiers?: TicketItemModifier[];
   notes?: string;
 }
@@ -31,7 +30,7 @@ export interface TicketReceiptProps {
   tableNumber?: string;
   waiterName?: string;
   items?: TicketItem[];
-  subtotal?: number;
+  /** IVA incluido en el total (informativo; no se suma otra vez). */
   taxAmount?: number;
   total?: number;
   qrUrl?: string;
@@ -43,7 +42,9 @@ export interface TicketReceiptProps {
 }
 
 /**
- * Ticket térmico ~80mm. `price` por ítem = importe de línea (no se vuelven a sumar mods).
+ * Ticket térmico ~80mm. Preview = papel: misma tipografía, bordes y tip box
+ * que salen en la impresora (sin teatro de perforado / sombra / rellenos).
+ * `price` por ítem = importe de línea (no se vuelven a sumar mods).
  */
 export function TicketReceipt({
   restaurantName = "Restaurante",
@@ -55,7 +56,6 @@ export function TicketReceipt({
   tableNumber = "—",
   waiterName,
   items = [],
-  subtotal,
   taxAmount,
   total,
   qrUrl,
@@ -66,43 +66,23 @@ export function TicketReceipt({
 }: TicketReceiptProps) {
   const qrId = useId();
 
-  const computedSubtotal =
-    subtotal ?? items.reduce((acc, item) => acc + item.price, 0);
-  const computedTotal = total ?? computedSubtotal;
+  const itemsSum = items.reduce((acc, item) => acc + item.price, 0);
+  const computedTotal = total ?? itemsSum;
   const computedTax =
     taxAmount ??
     (computedTotal > 0 ? computedTotal - computedTotal / 1.16 : 0);
-
-  const tip10 = computedTotal * 0.1;
-  const tip15 = computedTotal * 0.15;
-  const tip18 = computedTotal * 0.18;
-
+  const tips = ticketTipSuggestions(computedTotal);
   const kindLabel = ticketKind === "cuenta" ? "CUENTA" : "PRE-CUENTA";
 
   return (
     <div
       id={isPrintOnlyMode ? "thermal-receipt-printable" : undefined}
-      className={`thermal-receipt-container mx-auto w-[302px] select-none bg-white font-mono text-xs text-black ${
-        isPrintOnlyMode
-          ? "p-0"
-          : "relative rounded-sm border-y-4 border-dashed border-slate-300 p-4 shadow-2xl"
-      }`}
+      className="thermal-receipt-container mx-auto w-[302px] border border-black bg-white p-2 font-mono text-xs text-black"
       style={{
         boxSizing: "border-box",
         wordBreak: "break-word",
       }}
     >
-      {!isPrintOnlyMode ? (
-        <div
-          className="pointer-events-none absolute -top-3 left-0 right-0 h-3 bg-repeat-x opacity-80"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M0 12 L6 0 L12 12 Z'/%3E%3C/svg%3E")`,
-            backgroundSize: "12px 12px",
-          }}
-          aria-hidden
-        />
-      ) : null}
-
       <div className="space-y-1 border-b border-black pb-3 text-center">
         <h1 className="text-base font-black uppercase leading-tight tracking-wider">
           *** {restaurantName} ***
@@ -111,9 +91,7 @@ export function TicketReceipt({
           <p className="text-[11px] leading-tight">RFC: {rfc}</p>
         ) : null}
         {address ? (
-          <p className="px-2 text-[10px] leading-tight text-slate-700">
-            {address}
-          </p>
+          <p className="px-2 text-[10px] leading-tight">{address}</p>
         ) : null}
         {phone ? <p className="text-[11px]">Tel: {phone}</p> : null}
       </div>
@@ -129,7 +107,7 @@ export function TicketReceipt({
           <span className="min-w-0 truncate">
             {waiterName ? `MESERO: ${waiterName}` : "MESERO: —"}
           </span>
-          <span className="shrink-0 rounded-sm bg-black px-1.5 py-0.5 text-xs font-bold text-white">
+          <span className="shrink-0 bg-black px-1.5 py-0.5 text-xs font-bold text-white">
             {tableNumber.toUpperCase()}
           </span>
         </div>
@@ -139,17 +117,15 @@ export function TicketReceipt({
       </div>
 
       <div className="border-b border-black py-2.5">
-        <div className="flex justify-between border-b border-dashed border-slate-400 pb-1 text-[10px] font-bold uppercase">
+        <div className="flex justify-between border-b border-dashed border-black pb-1 text-[10px] font-bold uppercase">
           <span className="w-8/12">Cant / Concepto</span>
           <span className="w-4/12 text-right">Importe</span>
         </div>
 
         {items.length === 0 ? (
-          <p className="py-3 text-center text-[10px] text-slate-500">
-            Sin consumos
-          </p>
+          <p className="py-3 text-center text-[10px]">Sin consumos</p>
         ) : (
-          <ul className="divide-y divide-dashed divide-slate-200">
+          <ul className="divide-y divide-dashed divide-black/30">
             {items.map((item) => (
               <li key={item.id} className="py-1.5">
                 <div className="flex items-start justify-between font-semibold">
@@ -162,9 +138,12 @@ export function TicketReceipt({
                 </div>
 
                 {item.modifiers && item.modifiers.length > 0 ? (
-                  <ul className="mt-0.5 space-y-0.5 pl-3 text-[10px] text-slate-700">
+                  <ul className="mt-0.5 space-y-0.5 pl-3 text-[10px]">
                     {item.modifiers.map((mod, idx) => (
-                      <li key={`${item.id}-mod-${idx}`} className="flex justify-between gap-2">
+                      <li
+                        key={`${item.id}-mod-${idx}`}
+                        className="flex justify-between gap-2"
+                      >
                         <span>+ {mod.name}</span>
                         {mod.priceDelta ? (
                           <span className="tabular-nums">
@@ -177,9 +156,7 @@ export function TicketReceipt({
                 ) : null}
 
                 {item.notes ? (
-                  <p className="pl-3 text-[10px] italic text-slate-600">
-                    Obs: {item.notes}
-                  </p>
+                  <p className="pl-3 text-[10px] italic">Obs: {item.notes}</p>
                 ) : null}
               </li>
             ))}
@@ -188,13 +165,7 @@ export function TicketReceipt({
       </div>
 
       <div className="space-y-1.5 border-b border-black py-2.5 text-right">
-        <div className="flex justify-between text-[11px]">
-          <span className="text-slate-600">Consumo:</span>
-          <span className="tabular-nums">
-            {formatCurrency(computedSubtotal)}
-          </span>
-        </div>
-        <div className="flex justify-between text-[10px] text-slate-600">
+        <div className="flex justify-between text-[10px]">
           <span>IVA (16% incluido):</span>
           <span className="tabular-nums">{formatCurrency(computedTax)}</span>
         </div>
@@ -206,27 +177,27 @@ export function TicketReceipt({
         </div>
       </div>
 
-      <div className="my-3 space-y-1 border border-dashed border-black bg-slate-50 p-2 text-center">
+      <div className="my-3 space-y-1 border border-dashed border-black p-2 text-center">
         <p className="text-[10px] font-bold uppercase tracking-wider">
           -- Sugerencia de propina --
         </p>
-        <p className="pb-1 text-[9px] italic leading-none text-slate-600">
-          (No obligatoria)
-        </p>
-        <div className="grid grid-cols-3 gap-1 border-t border-slate-300 pt-1 text-[10px]">
-          <div>
-            <span className="block font-bold">10%</span>
-            <span className="block tabular-nums">{formatCurrency(tip10)}</span>
-          </div>
-          <div>
-            <span className="block font-bold">15%</span>
-            <span className="block tabular-nums">{formatCurrency(tip15)}</span>
-          </div>
-          <div>
-            <span className="block font-bold">18%</span>
-            <span className="block tabular-nums">{formatCurrency(tip18)}</span>
-          </div>
+        <p className="pb-1 text-[9px] italic leading-none">(No obligatoria)</p>
+        <div className="grid grid-cols-3 gap-1 border-t border-dashed border-black pt-1 text-[9px]">
+          {tips.map((tip) => (
+            <div key={tip.label} className="space-y-0.5">
+              <span className="block text-[10px] font-bold">{tip.label}</span>
+              <span className="block tabular-nums leading-tight">
+                {formatCurrency(tip.amount)}
+              </span>
+              <span className="block border-t border-dashed border-black/50 pt-0.5 font-bold tabular-nums leading-tight">
+                {formatCurrency(tip.withTip)}
+              </span>
+            </div>
+          ))}
         </div>
+        <p className="pt-1 text-[9px] leading-none tracking-wide">
+          % · propina · total c/propina
+        </p>
       </div>
 
       <div className="space-y-2 pt-2 text-center">
@@ -234,7 +205,7 @@ export function TicketReceipt({
 
         {qrUrl ? (
           <div className="flex flex-col items-center justify-center pt-1">
-            <div className="inline-block rounded border border-slate-300 bg-white p-1.5">
+            <div className="inline-block border border-black bg-white p-1">
               <QRCodeSVG
                 id={qrId}
                 value={qrUrl}
@@ -243,27 +214,14 @@ export function TicketReceipt({
                 includeMargin={false}
               />
             </div>
-            <p className="mt-1.5 max-w-[200px] text-[9.5px] italic leading-tight text-slate-700">
+            <p className="mt-1.5 max-w-[200px] text-[9.5px] italic leading-tight">
               &ldquo;{qrCaption}&rdquo;
             </p>
           </div>
         ) : null}
 
-        <div className="pt-2 text-[9px] tracking-widest text-slate-500">
-          === PLATOLISTO ===
-        </div>
+        <div className="pt-2 text-[9px] tracking-widest">=== PLATOLISTO ===</div>
       </div>
-
-      {!isPrintOnlyMode ? (
-        <div
-          className="pointer-events-none absolute -bottom-3 left-0 right-0 h-3 bg-repeat-x opacity-80"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M0 0 L6 12 L12 0 Z'/%3E%3C/svg%3E")`,
-            backgroundSize: "12px 12px",
-          }}
-          aria-hidden
-        />
-      ) : null}
     </div>
   );
 }

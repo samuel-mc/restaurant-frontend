@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import {
+  AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   MessageCircle,
-  PhoneCall,
   Printer,
-  Receipt,
   X,
 } from "lucide-react";
 import type { Order } from "@/types/api";
@@ -18,6 +18,8 @@ import {
   orderFolio,
   orderTicketLabel,
   resolveTicketKind,
+  ticketKindLabel,
+  ticketTipSuggestions,
   type RestaurantTicketInfo,
   type TicketKind,
 } from "@/lib/ticket-from-order";
@@ -28,10 +30,78 @@ const focusRing =
 
 const PRINT_BODY_CLASS = "print-thermal-ticket";
 const PRINT_PAGE_STYLE_ID = "thermal-print-page-style";
+const PRINT_BUSY_FALLBACK_MS = 60_000;
+const TOAST_MS = 4_200;
+
+type ToastTone = "live" | "warn" | "danger";
+
+const TOAST_CHROME: Record<
+  ToastTone,
+  { shell: string; Icon: typeof CheckCircle2; assertive: boolean }
+> = {
+  live: {
+    shell:
+      "border-live/30 bg-live-muted text-live-ink",
+    Icon: CheckCircle2,
+    assertive: false,
+  },
+  warn: {
+    shell: "border-warn/40 bg-warn-muted text-warn-ink",
+    Icon: AlertTriangle,
+    assertive: true,
+  },
+  danger: {
+    shell: "border-destructive/40 bg-destructive/10 text-destructive",
+    Icon: AlertCircle,
+    assertive: true,
+  },
+};
 
 function clearThermalPrintArtifacts() {
+  document.documentElement.classList.remove(PRINT_BODY_CLASS);
   document.body.classList.remove(PRINT_BODY_CLASS);
   document.getElementById(PRINT_PAGE_STYLE_ID)?.remove();
+}
+
+function ensureThermalPrintPageStyle() {
+  if (document.getElementById(PRINT_PAGE_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = PRINT_PAGE_STYLE_ID;
+  style.textContent = [
+    "@media print {",
+    "  @page { size: 80mm auto; margin: 0; }",
+    "  html.print-thermal-ticket, body.print-thermal-ticket {",
+    "    height: auto !important; min-height: 0 !important;",
+    "  }",
+    "}",
+  ].join("\n");
+  document.head.appendChild(style);
+}
+
+/** Extrae los 10 dígitos locales MX de un teléfono guardado (52 / 521 / local). */
+function mxLocalTenDigits(raw: string | null | undefined): string {
+  const digits = (raw ?? "").replace(/\D/g, "");
+  if (digits.length === 10) return digits;
+  if (digits.length === 12 && digits.startsWith("52")) return digits.slice(2);
+  if (digits.length === 13 && digits.startsWith("521")) return digits.slice(3);
+  if (digits.length > 10) return digits.slice(-10);
+  return digits;
+}
+
+/**
+ * Vacío = enviar sin número (WhatsApp pide el contacto).
+ * Con dígitos: exige 10 locales MX → wa.me/52XXXXXXXXXX.
+ */
+function resolveMxWhatsappDigits(
+  localTen: string,
+): { ok: true; digits: string | null } | { ok: false; message: string } {
+  const digits = localTen.replace(/\D/g, "");
+  if (!digits) return { ok: true, digits: null };
+  if (digits.length === 10) return { ok: true, digits: `52${digits}` };
+  return {
+    ok: false,
+    message: "Celular MX: 10 dígitos (sin +52). Déjalo vacío para elegir el chat.",
+  };
 }
 
 export interface PreCuentaModalProps {
@@ -41,6 +111,11 @@ export interface PreCuentaModalProps {
   restaurant: RestaurantTicketInfo;
   /** Si se omite, se deriva del status (DELIVERED/CLOSED → cuenta). */
   kind?: TicketKind;
+  /**
+   * Si el modal se abrió desde Cobrar: al cerrar se reanuda esa acción.
+   * Se muestra como pista operativa (no apilar diálogos).
+   */
+  returnToActionLabel?: string;
 }
 
 /**
@@ -53,6 +128,7 @@ export function PreCuentaModal({
   order,
   restaurant,
   kind,
+  returnToActionLabel,
 }: PreCuentaModalProps) {
   if (!open || !order) return null;
 
@@ -63,6 +139,7 @@ export function PreCuentaModal({
       restaurant={restaurant}
       kind={kind}
       onClose={onClose}
+      returnToActionLabel={returnToActionLabel}
     />
   );
 }
@@ -72,30 +149,111 @@ function PreCuentaModalContent({
   restaurant,
   kind,
   onClose,
+  returnToActionLabel,
 }: {
   order: Order;
   restaurant: RestaurantTicketInfo;
   kind?: TicketKind;
   onClose: () => void;
+  returnToActionLabel?: string;
 }) {
-  const [phoneInput, setPhoneInput] = useState(
-    () => order.customerPhone?.trim() ?? "",
+  const [phoneInput, setPhoneInput] = useState(() =>
+    mxLocalTenDigits(order.customerPhone),
   );
   const [showWhatsappInput, setShowWhatsappInput] = useState(false);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    message: string;
+    tone: ToastTone;
+  } | null>(null);
+  const [printBusy, setPrintBusy] = useState(false);
+  const toastTimerRef = useRef<number | null>(null);
+  const printFallbackTimerRef = useRef<number | null>(null);
+  const printBusyRef = useRef(false);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+  const printButtonRef = useRef<HTMLButtonElement | null>(null);
+  const showWhatsappRef = useRef(false);
+  const wasWhatsappOpenRef = useRef(false);
+  const kindNounRef = useRef("pre-cuenta");
+  showWhatsappRef.current = showWhatsappInput;
 
   const panelRef = useModalFocusTrap({
     open: true,
-    onEscape: onClose,
+    onEscape: () => {
+      if (printBusyRef.current) return;
+      // Escape primero cierra WhatsApp; segundo cierra el modal.
+      if (showWhatsappRef.current) {
+        setShowWhatsappInput(false);
+        setPhoneError(null);
+        return;
+      }
+      onClose();
+    },
+    initialFocusRef: order.items.length > 0 ? printButtonRef : undefined,
   });
 
+  function showToast(msg: string, tone: ToastTone = "live") {
+    setNotification({ message: msg, tone });
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => {
+      setNotification(null);
+      toastTimerRef.current = null;
+    }, TOAST_MS);
+  }
+
+  function endPrintBusy() {
+    printBusyRef.current = false;
+    setPrintBusy(false);
+    clearThermalPrintArtifacts();
+    if (printFallbackTimerRef.current != null) {
+      window.clearTimeout(printFallbackTimerRef.current);
+      printFallbackTimerRef.current = null;
+    }
+  }
+
   useEffect(() => {
-    window.addEventListener("afterprint", clearThermalPrintArtifacts);
+    function onAfterPrint() {
+      if (!printBusyRef.current) {
+        clearThermalPrintArtifacts();
+        return;
+      }
+      endPrintBusy();
+      // Ámbar: el SO no confirma si salió papel; el mesero debe verificar.
+      showToast(
+        `Diálogo cerrado — revisa si salió la ${kindNounRef.current}. Si no, vuelve a Imprimir · térmica 80mm`,
+        "warn",
+      );
+    }
+    window.addEventListener("afterprint", onAfterPrint);
     return () => {
-      window.removeEventListener("afterprint", clearThermalPrintArtifacts);
+      window.removeEventListener("afterprint", onAfterPrint);
+      if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current);
+      if (printFallbackTimerRef.current != null) {
+        window.clearTimeout(printFallbackTimerRef.current);
+      }
+      printBusyRef.current = false;
       clearThermalPrintArtifacts();
     };
+    // Mount-only print lifecycle; toast uses stable setState.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- print listeners
   }, []);
+
+  useEffect(() => {
+    if (showWhatsappInput) {
+      wasWhatsappOpenRef.current = true;
+      const id = window.requestAnimationFrame(() => {
+        phoneInputRef.current?.focus();
+      });
+      return () => window.cancelAnimationFrame(id);
+    }
+    if (wasWhatsappOpenRef.current) {
+      wasWhatsappOpenRef.current = false;
+      const id = window.requestAnimationFrame(() => {
+        printButtonRef.current?.focus();
+      });
+      return () => window.cancelAnimationFrame(id);
+    }
+  }, [showWhatsappInput]);
 
   const ticketProps = useMemo(
     () => buildTicketReceiptProps(order, restaurant, kind),
@@ -107,26 +265,81 @@ function PreCuentaModalContent({
   const titleLabel = orderTicketLabel(order);
   const folio = orderFolio(order);
   const itemCount = order.items.length;
-  const kindTitle = resolvedKind === "cuenta" ? "Cuenta" : "Pre-cuenta";
+  const kindTitle = ticketKindLabel(resolvedKind);
+  const kindNoun = resolvedKind === "cuenta" ? "cuenta" : "pre-cuenta";
+  kindNounRef.current = kindNoun;
+  const itemLabel =
+    itemCount === 1 ? "1 consumo" : `${itemCount} consumos`;
+  // Meta ≤3 hechos; fiscal vive en el papel; resume tiene banner propio.
+  const metaParts = [`Folio ${folio}`, itemLabel, formatCurrency(total)];
+  const resumeHint = returnToActionLabel
+    ? `Al cerrar vuelves a ${returnToActionLabel}`
+    : null;
 
-  function showToast(msg: string) {
-    setNotification(msg);
-    window.setTimeout(() => setNotification(null), 2800);
+  function handleClose() {
+    if (printBusyRef.current) return;
+    onClose();
+  }
+
+  function handleDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    if (printBusyRef.current) return;
+
+    const target = event.target as HTMLElement;
+
+    if (showWhatsappInput) {
+      // Enter en el teléfono → Enviar (no Imprimir).
+      if (
+        target === phoneInputRef.current ||
+        phoneInputRef.current?.contains(target)
+      ) {
+        event.preventDefault();
+        handleSendWhatsapp();
+      }
+      return;
+    }
+
+    if (itemCount === 0) return;
+    const focusedButton = target.closest("button");
+    // Otro botón (WhatsApp / Cerrar) conserva su Enter nativo.
+    if (focusedButton && focusedButton !== printButtonRef.current) return;
+    if (focusedButton === printButtonRef.current) return; // click nativo
+    event.preventDefault();
+    handlePrint();
   }
 
   function handlePrint() {
+    if (printBusyRef.current || itemCount === 0) return;
     clearThermalPrintArtifacts();
+    document.documentElement.classList.add(PRINT_BODY_CLASS);
     document.body.classList.add(PRINT_BODY_CLASS);
-    if (!document.getElementById(PRINT_PAGE_STYLE_ID)) {
-      const style = document.createElement("style");
-      style.id = PRINT_PAGE_STYLE_ID;
-      style.textContent =
-        "@media print { @page { size: 80mm auto; margin: 0; } }";
-      document.head.appendChild(style);
+    // Override del @page letter (QR admin) para no forzar hojas Carta vacías.
+    ensureThermalPrintPageStyle();
+    printBusyRef.current = true;
+    setPrintBusy(true);
+    // Guía pegada en el footer mientras busy; toast solo para afterprint / fallos.
+    if (printFallbackTimerRef.current != null) {
+      window.clearTimeout(printFallbackTimerRef.current);
     }
-    showToast("Abriendo diálogo de impresión…");
+    printFallbackTimerRef.current = window.setTimeout(() => {
+      // Algunos entornos no disparan afterprint si el diálogo nunca abrió.
+      if (!printBusyRef.current) return;
+      endPrintBusy();
+      showToast(
+        "No se abrió el diálogo de impresión. Revisa permisos del navegador e inténtalo de nuevo",
+        "danger",
+      );
+    }, PRINT_BUSY_FALLBACK_MS);
     window.setTimeout(() => {
-      window.print();
+      try {
+        window.print();
+      } catch {
+        endPrintBusy();
+        showToast(
+          "No se pudo abrir la impresión. Revisa la impresora e inténtalo de nuevo",
+          "danger",
+        );
+      }
     }, 50);
   }
 
@@ -134,7 +347,7 @@ function PreCuentaModalContent({
     const lines: string[] = [];
     lines.push(`*${kindTitle.toUpperCase()} — ${restaurant.name.toUpperCase()}*`);
     lines.push("--------------------------------");
-    lines.push(`*Cuenta:* ${titleLabel} | *Folio:* ${folio}`);
+    lines.push(`*${titleLabel}* · Folio ${folio}`);
     if (ticketProps.waiterName) {
       lines.push(`*Mesero:* ${ticketProps.waiterName}`);
     }
@@ -156,9 +369,9 @@ function PreCuentaModalContent({
     lines.push(`*TOTAL: ${formatCurrency(total)}*`);
     lines.push("");
     lines.push("*Sugerencia de propina:*");
-    lines.push(`• 10%: ${formatCurrency(total * 0.1)}`);
-    lines.push(`• 15%: ${formatCurrency(total * 0.15)}`);
-    lines.push(`• 18%: ${formatCurrency(total * 0.18)}`);
+    for (const tip of ticketTipSuggestions(total)) {
+      lines.push(`• ${tip.label}: ${formatCurrency(tip.amount)}`);
+    }
     lines.push("");
     if (resolvedKind === "pre-cuenta") {
       lines.push("_Pre-cuenta · no es comprobante fiscal_");
@@ -169,14 +382,29 @@ function PreCuentaModalContent({
   }
 
   function handleSendWhatsapp() {
-    const cleanPhone = phoneInput.replace(/\D/g, "");
+    const resolved = resolveMxWhatsappDigits(phoneInput);
+    if (!resolved.ok) {
+      setPhoneError(resolved.message);
+      return;
+    }
+    setPhoneError(null);
     const encodedMsg = buildWhatsappMessage();
-    const whatsappUrl = cleanPhone
-      ? `https://wa.me/${cleanPhone}?text=${encodedMsg}`
+    const whatsappUrl = resolved.digits
+      ? `https://wa.me/${resolved.digits}?text=${encodedMsg}`
       : `https://wa.me/?text=${encodedMsg}`;
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-    showToast("Abriendo WhatsApp…");
+    showToast(
+      resolved.digits
+        ? "Abriendo WhatsApp…"
+        : "Abriendo WhatsApp — elige el contacto…",
+      "live",
+    );
     setShowWhatsappInput(false);
+  }
+
+  function collapseWhatsapp() {
+    setShowWhatsappInput(false);
+    setPhoneError(null);
   }
 
   const printSheet =
@@ -189,6 +417,9 @@ function PreCuentaModalContent({
         )
       : null;
 
+  const toastChrome = notification ? TOAST_CHROME[notification.tone] : null;
+  const ToastIcon = toastChrome?.Icon;
+
   return (
     <>
       {printSheet}
@@ -197,16 +428,17 @@ function PreCuentaModalContent({
         className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-0 print:hidden sm:items-center sm:p-4"
         role="presentation"
         onClick={(e) => {
-          if (e.target === e.currentTarget) onClose();
+          if (e.target === e.currentTarget) handleClose();
         }}
       >
-        {notification ? (
+        {notification && toastChrome && ToastIcon ? (
           <div
-            className="fixed top-4 right-4 z-[90] flex items-center gap-2 rounded-xl border border-live/30 bg-live-muted px-4 py-3 text-sm font-medium text-live-ink shadow-lg"
-            role="status"
+            className={`fixed top-4 right-4 z-[90] flex max-w-sm items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${toastChrome.shell}`}
+            role={toastChrome.assertive ? "alert" : "status"}
+            aria-live={toastChrome.assertive ? "assertive" : "polite"}
           >
-            <CheckCircle2 className="size-4 shrink-0" aria-hidden />
-            <span>{notification}</span>
+            <ToastIcon className="size-4 shrink-0" aria-hidden />
+            <span>{notification.message}</span>
           </div>
         ) : null}
 
@@ -215,46 +447,63 @@ function PreCuentaModalContent({
           role="dialog"
           aria-modal="true"
           aria-labelledby="pre-cuenta-title"
+          aria-busy={printBusy || undefined}
+          onKeyDown={handleDialogKeyDown}
           className="flex max-h-[min(92dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
         >
-          <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex size-9 items-center justify-center rounded-xl bg-secondary text-foreground">
-                  <Receipt className="size-4" aria-hidden />
-                </span>
-                <h2
-                  id="pre-cuenta-title"
-                  className="truncate text-lg font-bold tracking-tight"
+          <div className="shrink-0 border-b border-border px-5 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex shrink-0 items-center rounded-lg px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${
+                      resolvedKind === "cuenta"
+                        ? "bg-live-muted text-live-ink"
+                        : "bg-secondary text-foreground"
+                    }`}
+                  >
+                    {kindTitle}
+                  </span>
+                  <h2
+                    id="pre-cuenta-title"
+                    className="truncate text-lg font-bold tracking-tight"
+                  >
+                    {titleLabel}
+                  </h2>
+                </div>
+                <p
+                  className="mt-1 text-xs text-muted-foreground"
+                  aria-live="polite"
                 >
-                  {kindTitle} · {titleLabel}
-                </h2>
+                  {metaParts.join(" · ")}
+                </p>
+                {resumeHint ? (
+                  <p className="mt-2 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium text-foreground">
+                    {resumeHint}
+                  </p>
+                ) : null}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Folio {folio} · {itemCount}{" "}
-                {itemCount === 1 ? "ítem" : "ítems"} ·{" "}
-                {formatCurrency(total)}
-              </p>
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={printBusy}
+                className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                aria-label="Cerrar"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary ${focusRing}`}
-              aria-label="Cerrar"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto bg-secondary/40 px-4 py-5 sm:px-6">
             {itemCount === 0 ? (
               <p className="rounded-xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-                Esta cuenta no tiene consumos para imprimir.
+                Esta {kindNoun} no tiene consumos para imprimir.
               </p>
             ) : (
               <>
                 <p className="mb-3 text-center text-xs text-muted-foreground">
-                  Vista 80mm · lista para impresora térmica
+                  Así sale en térmica · 80mm
                 </p>
                 <div className="flex justify-center pb-2">
                   <TicketReceipt {...ticketProps} />
@@ -263,67 +512,115 @@ function PreCuentaModalContent({
             )}
           </div>
 
-          {showWhatsappInput ? (
-            <div className="flex flex-col gap-3 border-t border-border bg-secondary/60 px-5 py-3 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <PhoneCall className="size-4 shrink-0" aria-hidden />
-                <span>Tel. cliente (opcional)</span>
-              </div>
-              <input
-                type="tel"
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                placeholder="5512345678"
-                className={`min-h-11 w-full flex-1 rounded-xl border border-border bg-card px-3 text-sm sm:max-w-[12rem] ${focusRing}`}
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSendWhatsapp}
-                  className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-live px-3 text-sm font-semibold text-live-foreground sm:flex-none ${focusRing}`}
-                >
-                  Enviar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowWhatsappInput(false)}
-                  className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-3 text-sm font-semibold ${focusRing}`}
-                >
-                  Cancelar
-                </button>
-              </div>
+          {printBusy ? (
+            <div
+              className="shrink-0 border-t border-border bg-secondary px-4 py-2.5 text-center text-xs font-semibold text-foreground sm:px-5"
+              role="status"
+              aria-live="polite"
+            >
+              Elige térmica 80mm (no Carta)… cierra el diálogo al terminar
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-2 border-t border-border px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
-            <p className="hidden text-[11px] text-muted-foreground sm:block sm:max-w-[11rem]">
-              En el diálogo del sistema también puedes guardar como PDF
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  if (showWhatsappInput) handleSendWhatsapp();
-                  else setShowWhatsappInput(true);
-                }}
-                disabled={itemCount === 0}
-                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-secondary px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+          {showWhatsappInput ? (
+            <div className="border-t border-border bg-secondary/60 px-4 py-4 sm:px-5">
+              <label
+                htmlFor="pre-cuenta-wa-phone"
+                className="flex items-center gap-2 text-sm font-semibold"
               >
-                <MessageCircle className="size-4" aria-hidden />
-                WhatsApp
-              </button>
-              <button
-                type="button"
-                onClick={handlePrint}
-                disabled={itemCount === 0}
-                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
-                title="Imprimir o guardar como PDF desde el diálogo del sistema"
-              >
-                <Printer className="size-4" aria-hidden />
-                Imprimir
-              </button>
+                <MessageCircle className="size-4 shrink-0" aria-hidden />
+                Enviar por WhatsApp
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Celular MX opcional. Vacío = eliges el chat en WhatsApp.
+              </p>
+              <div className="mt-3 flex items-stretch gap-2">
+                <span className="inline-flex min-h-11 items-center rounded-xl border border-border bg-card px-3 text-sm font-semibold tabular-nums text-muted-foreground">
+                  +52
+                </span>
+                <input
+                  ref={phoneInputRef}
+                  id="pre-cuenta-wa-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  maxLength={10}
+                  value={phoneInput}
+                  onChange={(e) => {
+                    setPhoneInput(e.target.value.replace(/\D/g, "").slice(0, 10));
+                    if (phoneError) setPhoneError(null);
+                  }}
+                  placeholder="5512345678"
+                  disabled={printBusy}
+                  aria-invalid={phoneError ? true : undefined}
+                  aria-describedby={
+                    phoneError ? "pre-cuenta-wa-phone-error" : undefined
+                  }
+                  className={`min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-card px-3 text-sm tabular-nums disabled:opacity-50 ${focusRing}`}
+                />
+              </div>
+              {phoneError ? (
+                <p
+                  id="pre-cuenta-wa-phone-error"
+                  className="mt-2 text-xs font-medium text-destructive"
+                  role="alert"
+                >
+                  {phoneError}
+                </p>
+              ) : null}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={collapseWhatsapp}
+                  disabled={printBusy}
+                  className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border bg-card px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendWhatsapp}
+                  disabled={printBusy}
+                  className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                >
+                  <MessageCircle className="size-4" aria-hidden />
+                  Enviar
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-3 border-t border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <p className="text-xs text-muted-foreground sm:max-w-[16rem]">
+                Enter imprime · térmica 80mm · PDF en el diálogo
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneError(null);
+                    setShowWhatsappInput(true);
+                  }}
+                  disabled={itemCount === 0 || printBusy}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                >
+                  <MessageCircle className="size-4" aria-hidden />
+                  WhatsApp
+                </button>
+                <button
+                  ref={printButtonRef}
+                  type="button"
+                  onClick={handlePrint}
+                  disabled={itemCount === 0 || printBusy}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                  title="Enter · impresora térmica 80mm o PDF"
+                  aria-keyshortcuts="Enter"
+                >
+                  <Printer className="size-4" aria-hidden />
+                  {printBusy ? "Imprimiendo…" : "Imprimir"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -504,51 +504,61 @@ body:has(.b2b-landing) {
 /* Ticket térmico 80mm — hoja en portal; solo visible al imprimir */
 .thermal-print-sheet {
   display: none !important;
-  position: absolute;
-  left: -10000px;
-  top: 0;
   width: 80mm;
   pointer-events: none;
 }
 
+/*
+ * Importante: NO usar visibility:hidden (sigue ocupando alto → páginas en blanco).
+ * Ocultar hermanos del portal con display:none; el ticket queda como único contenido.
+ */
 @media print {
+  html.print-thermal-ticket,
   body.print-thermal-ticket {
     background: #ffffff !important;
     color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
   }
 
-  body.print-thermal-ticket * {
-    visibility: hidden !important;
-  }
-
-  body.print-thermal-ticket .thermal-print-sheet,
-  body.print-thermal-ticket .thermal-print-sheet * {
-    visibility: visible !important;
+  body.print-thermal-ticket > *:not(.thermal-print-sheet) {
+    display: none !important;
   }
 
   body.print-thermal-ticket .thermal-print-sheet {
     display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
     width: 80mm !important;
     max-width: 80mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
     background: #ffffff !important;
     color: #000000 !important;
-    z-index: 99999 !important;
+  }
+
+  body.print-thermal-ticket .thermal-print-sheet * {
+    visibility: visible !important;
   }
 
   body.print-thermal-ticket #thermal-receipt-printable {
     width: 80mm !important;
     max-width: 80mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 2mm !important;
     box-shadow: none !important;
     border: none !important;
     background: #ffffff !important;
     color: #000000 !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
 

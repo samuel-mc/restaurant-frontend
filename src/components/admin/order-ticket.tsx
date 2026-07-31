@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import { Check, Printer } from "lucide-react";
 import type { Order, OrderItem, OrderItemStatus, OrderStatus } from "@/types/api";
 import { maxBatchNumber } from "@/lib/order-mapper";
+import { ticketKindPrintLabel } from "@/lib/ticket-from-order";
 
 interface OrderTicketProps {
   order: Order;
@@ -421,7 +422,7 @@ export function OrderTicket({
             <button
               type="button"
               disabled={controlsDisabled}
-              title="Imprimir o enviar ticket de cuenta"
+              title={ticketKindPrintLabel("cuenta")}
               onClick={(event) => {
                 event.stopPropagation();
                 onPrintTicket(order);
@@ -429,7 +430,7 @@ export function OrderTicket({
               className={`mb-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm font-semibold transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 ${focusRing}`}
             >
               <Printer className="size-4" aria-hidden />
-              Ticket
+              {ticketKindPrintLabel("cuenta")}
             </button>
           ) : null}
           <button
@@ -450,7 +451,7 @@ export function OrderTicket({
             }}
             className={`min-h-12 w-full rounded-xl bg-live px-4 py-3 text-base font-bold text-live-foreground transition-transform hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 ${focusRing}`}
           >
-            {isUpdating && updatingItemId == null ? "Cerrando…" : "Cobrar"}
+            {isUpdating && updatingItemId == null ? "Cobrando…" : "Cobrar"}
           </button>
         </>
       ) : null}

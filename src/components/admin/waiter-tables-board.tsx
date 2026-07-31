@@ -11,7 +11,12 @@ import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge"
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { MergeTablesModal } from "@/components/admin/merge-tables-modal";
 import { PreCuentaModal } from "@/components/admin/pre-cuenta-modal";
-import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
+import {
+  ticketKindLabel,
+  ticketKindPrintLabel,
+  ticketPrintBeforeCloseLabel,
+  type RestaurantTicketInfo,
+} from "@/lib/ticket-from-order";
 import {
   TableCallAlerts,
   type TableCallPrimaryAction,
@@ -260,6 +265,9 @@ export function WaiterTablesBoard({
   const [preCuentaKind, setPreCuentaKind] = useState<"pre-cuenta" | "cuenta">(
     "pre-cuenta",
   );
+  /** Orden a reabrir en Cobrar al cerrar el ticket (evita apilar diálogos). */
+  const [resumeCloseAfterPrint, setResumeCloseAfterPrint] =
+    useState<Order | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -557,6 +565,7 @@ export function WaiterTablesBoard({
       );
       setActiveCallId(null);
       setCloseTarget(null);
+      setResumeCloseAfterPrint(null);
       setCloseError(null);
       showNotice(`Cuenta cobrada · ${orderTitle(closing)}`, { tone: "live" });
     } catch (err) {
@@ -596,7 +605,25 @@ export function WaiterTablesBoard({
     if (busy) return;
     setCloseTarget(null);
     setCloseError(null);
+    setResumeCloseAfterPrint(null);
     setActiveCallId(null);
+  }
+
+  function openPrintBeforeClose(order: Order) {
+    // Secuencia: cierra Cobrar → imprime → al cerrar el ticket vuelve a Cobrar.
+    setPreCuentaKind("cuenta");
+    setResumeCloseAfterPrint(order);
+    setCloseError(null);
+    setCloseTarget(null);
+    setPreCuentaOrder(order);
+  }
+
+  function handlePreCuentaClose() {
+    setPreCuentaOrder(null);
+    if (resumeCloseAfterPrint) {
+      setCloseTarget(resumeCloseAfterPrint);
+      setResumeCloseAfterPrint(null);
+    }
   }
 
   async function confirmMerge(primary: string, secondaries: string[]) {
@@ -762,7 +789,7 @@ export function WaiterTablesBoard({
       return { label: "Cobrar", tone: "live" };
     }
     if (call.callType === "BILL" && order) {
-      return { label: "Ticket" };
+      return { label: ticketKindLabel("pre-cuenta") };
     }
     if (order) {
       return {
@@ -807,6 +834,7 @@ export function WaiterTablesBoard({
       if (!parkCallAction(call.id)) return;
       focusAccountCard(order.uuid);
       setPreCuentaKind("pre-cuenta");
+      setResumeCloseAfterPrint(null);
       setPreCuentaOrder(order);
       return;
     }
@@ -1113,13 +1141,14 @@ export function WaiterTablesBoard({
               type="button"
               onClick={() => {
                 setPreCuentaKind("pre-cuenta");
+                setResumeCloseAfterPrint(null);
                 setPreCuentaOrder(order);
               }}
-              title="Imprimir o enviar pre-cuenta"
+              title={ticketKindPrintLabel("pre-cuenta")}
               className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 text-sm font-semibold ${focusRing}`}
             >
               <Printer className="size-4" aria-hidden />
-              Ticket
+              {ticketKindLabel("pre-cuenta")}
             </button>
             {order.orderType === "IN_TABLE" ? (
               <button
@@ -1482,7 +1511,7 @@ export function WaiterTablesBoard({
 
       <ConfirmDialog
         open={!!closeTarget}
-        title="Cobrar y cerrar cuenta"
+        title="Cobrar"
         description={
           closeTarget
             ? (() => {
@@ -1505,14 +1534,11 @@ export function WaiterTablesBoard({
           closeTarget ? (
             <button
               type="button"
-              onClick={() => {
-                setPreCuentaKind("cuenta");
-                setPreCuentaOrder(closeTarget);
-              }}
+              onClick={() => openPrintBeforeClose(closeTarget)}
               className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold ${focusRing}`}
             >
               <Printer className="size-4" aria-hidden />
-              Imprimir cuenta antes de cobrar
+              {ticketPrintBeforeCloseLabel()}
             </button>
           ) : null
         }
@@ -1527,10 +1553,13 @@ export function WaiterTablesBoard({
 
       <PreCuentaModal
         open={preCuentaOrder != null}
-        onClose={() => setPreCuentaOrder(null)}
+        onClose={handlePreCuentaClose}
         order={preCuentaOrder}
         restaurant={ticketRestaurant}
         kind={preCuentaKind}
+        returnToActionLabel={
+          resumeCloseAfterPrint ? "Cobrar" : undefined
+        }
       />
 
       <ConfirmDialog

@@ -27,6 +27,7 @@ import { getAdminErrorMessage } from "@/lib/admin-error";
 import { maxBatchNumber } from "@/lib/order-mapper";
 import {
   resolveTicketKind,
+  ticketPrintBeforeCloseLabel,
   type RestaurantTicketInfo,
 } from "@/lib/ticket-from-order";
 
@@ -245,6 +246,9 @@ export function KitchenDashboard({
   const [preCuentaKind, setPreCuentaKind] = useState<"pre-cuenta" | "cuenta">(
     "cuenta",
   );
+  /** Orden a reabrir en Cobrar al cerrar el ticket (evita apilar diálogos). */
+  const [resumeCloseAfterPrint, setResumeCloseAfterPrint] =
+    useState<Order | null>(null);
   const [closing, setClosing] = useState(false);
   const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
   const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
@@ -419,7 +423,23 @@ export function KitchenDashboard({
     if (connection !== "disconnected") return;
     if (closing) return;
     setCloseTarget(null);
+    setResumeCloseAfterPrint(null);
   }, [connection, closing]);
+
+  function openPrintBeforeClose(order: Order) {
+    setPreCuentaKind("cuenta");
+    setResumeCloseAfterPrint(order);
+    setCloseTarget(null);
+    setPreCuentaOrder(order);
+  }
+
+  function handlePreCuentaClose() {
+    setPreCuentaOrder(null);
+    if (resumeCloseAfterPrint) {
+      setCloseTarget(resumeCloseAfterPrint);
+      setResumeCloseAfterPrint(null);
+    }
+  }
 
   async function handleAdvance(order: Order) {
     const next = nextStatusFor(order.status);
@@ -549,6 +569,7 @@ export function KitchenDashboard({
       const updated = await closeOrder(order.uuid, tenantSlug);
       handleOrderEvent(updated);
       setCloseTarget(null);
+      setResumeCloseAfterPrint(null);
       setBanner(
         order.orderType === "IN_TABLE"
           ? `Cuenta cobrada · ${orderWho(order)} · mesa liberada`
@@ -828,6 +849,7 @@ export function KitchenDashboard({
                 }}
                 onPrintTicket={(order) => {
                   setPreCuentaKind(resolveTicketKind(order));
+                  setResumeCloseAfterPrint(null);
                   setPreCuentaOrder(order);
                 }}
                 onItemStatus={handleItemStatus}
@@ -1030,34 +1052,37 @@ export function KitchenDashboard({
           closeTarget ? (
             <button
               type="button"
-              onClick={() => {
-                setPreCuentaKind("cuenta");
-                setPreCuentaOrder(closeTarget);
-              }}
+              onClick={() => openPrintBeforeClose(closeTarget)}
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
             >
               <Printer className="size-4" aria-hidden />
-              Imprimir cuenta antes de cobrar
+              {ticketPrintBeforeCloseLabel()}
             </button>
           ) : null
         }
         confirmLabel="Cobrar y cerrar"
-        busyLabel="Cerrando…"
+        busyLabel="Cobrando…"
         cancelLabel="Cancelar"
         busy={closing}
         tone="neutral"
         onConfirm={() => void handleConfirmClose()}
         onCancel={() => {
-          if (!closing) setCloseTarget(null);
+          if (!closing) {
+            setCloseTarget(null);
+            setResumeCloseAfterPrint(null);
+          }
         }}
       />
 
       <PreCuentaModal
         open={preCuentaOrder != null}
-        onClose={() => setPreCuentaOrder(null)}
+        onClose={handlePreCuentaClose}
         order={preCuentaOrder}
         restaurant={ticketRestaurant}
         kind={preCuentaKind}
+        returnToActionLabel={
+          resumeCloseAfterPrint ? "Cobrar y cerrar" : undefined
+        }
       />
     </div>
   );

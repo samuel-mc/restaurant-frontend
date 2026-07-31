@@ -21,6 +21,34 @@ export interface RestaurantTicketInfo {
 
 export type TicketKind = "pre-cuenta" | "cuenta";
 
+/**
+ * Glosario Operate (impresión):
+ * - Compacto (card / fila): sustantivo — `ticketKindLabel`
+ * - CTA ancho / detalle: verbo + objeto — `ticketKindPrintLabel`
+ * - Desde Cobrar: `ticketPrintBeforeCloseLabel`
+ * - En el modal de preview: botón primario “Imprimir” (el kind ya está en el badge)
+ */
+
+/** Sustantivo corto para botones compactos (card, fila, aviso BILL). */
+export function ticketKindLabel(kind: TicketKind): string {
+  return kind === "cuenta" ? "Cuenta" : "Pre-cuenta";
+}
+
+/** Verbo + objeto para CTAs de impresión (detalle, cocina Por cobrar). */
+export function ticketKindPrintLabel(kind: TicketKind): string {
+  return kind === "cuenta" ? "Imprimir cuenta" : "Imprimir pre-cuenta";
+}
+
+/** CTA secundaria en el diálogo Cobrar (siempre imprime cuenta). */
+export function ticketPrintBeforeCloseLabel(): string {
+  return `${ticketKindPrintLabel("cuenta")} antes de cobrar`;
+}
+
+/** Chip / meta en mayúsculas como en el papel térmico. */
+export function ticketKindUpperLabel(kind: TicketKind): string {
+  return kind === "cuenta" ? "CUENTA" : "PRE-CUENTA";
+}
+
 /** Datos de restaurante para el ticket a partir del perfil admin. */
 export function ticketInfoFromProfile(
   profile: RestaurantProfile | null,
@@ -33,6 +61,23 @@ export function ticketInfoFromProfile(
     phone: profile?.whatsapp ?? null,
     tenantSlug: tenantSlug?.trim() || null,
   };
+}
+
+/** Tasas de propina sugerida en ticket / WhatsApp (MX servicio). */
+export const TICKET_TIP_RATES = [0.1, 0.15, 0.18] as const;
+
+export function ticketTipSuggestions(
+  total: number,
+): Array<{ label: string; amount: number; withTip: number }> {
+  return TICKET_TIP_RATES.map((rate) => {
+    const amount = total * rate;
+    return {
+      label: `${Math.round(rate * 100)}%`,
+      amount,
+      /** Total a liquidar con esa propina (papel térmico). */
+      withTip: total + amount,
+    };
+  });
 }
 
 /**
@@ -87,7 +132,6 @@ export function orderToTicketItems(order: Order): TicketItem[] {
     name: item.productName,
     /** Importe de línea (ya incluye modificadores). */
     price: item.subtotal,
-    unitPrice: item.unitPrice,
     notes: item.notes?.trim() || undefined,
     modifiers: item.modifiers.map((m) => ({
       name: m.name,
@@ -148,6 +192,7 @@ export function buildTicketReceiptProps(
 ): TicketReceiptProps {
   const total = order.totalAmount;
   const resolved = resolveTicketKind(order, kind);
+  const slug = restaurant.tenantSlug?.trim() || null;
   return {
     restaurantName: restaurant.name,
     rfc: restaurant.rfc?.trim() || undefined,
@@ -158,10 +203,10 @@ export function buildTicketReceiptProps(
     tableNumber: orderTicketLabel(order),
     waiterName: order.staffName?.trim() || undefined,
     items: orderToTicketItems(order),
-    subtotal: total,
     taxAmount: taxIncludedFromTotal(total),
     total,
-    qrUrl: orderPublicUrl(order.uuid, restaurant.tenantSlug),
+    // QR solo con slug de tenant (URL pública real); evita papel con link roto.
+    qrUrl: slug ? orderPublicUrl(order.uuid, slug) : undefined,
     qrCaption:
       resolved === "cuenta"
         ? "Escanea para calificar tu experiencia"

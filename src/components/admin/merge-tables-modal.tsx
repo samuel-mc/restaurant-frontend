@@ -202,7 +202,7 @@ export function MergeTablesModal({
                 onClick={() => toggleSecondary(table)}
                 className={`min-h-12 w-full rounded-xl text-sm font-bold tabular-nums ${focusRing} ${
                   selected
-                    ? "bg-live text-live-foreground"
+                    ? "bg-primary text-primary-foreground"
                     : occupied
                       ? "border border-border bg-secondary"
                       : "border border-dashed border-border bg-background text-muted-foreground"
@@ -355,7 +355,7 @@ export function MergeTablesModal({
               ) : null}
 
               {secondaries.length > 0 ? (
-                <p className="inline-flex items-center gap-2 rounded-xl bg-live-muted px-3 py-2 text-sm font-medium text-live-ink">
+                <p className="inline-flex items-center gap-2 rounded-xl bg-secondary px-3 py-2 text-sm font-medium text-foreground ring-1 ring-border">
                   <Link2 className="size-4 shrink-0" aria-hidden />
                   <span>
                     Resultado:{" "}
@@ -390,7 +390,7 @@ export function MergeTablesModal({
                 type="button"
                 disabled={busy || !primary || occupiedKeys.length === 0}
                 onClick={goToSecondaries}
-                className={`inline-flex min-h-12 flex-[1.4] items-center justify-center rounded-xl bg-primary px-3 text-sm font-bold text-primary-foreground ${focusRing} disabled:opacity-50`}
+                className={`inline-flex min-h-12 flex-[1.4] items-center justify-center rounded-xl border border-border bg-secondary px-3 text-sm font-bold text-foreground ${focusRing} disabled:opacity-50`}
               >
                 Continuar
               </button>
@@ -413,7 +413,7 @@ export function MergeTablesModal({
                 type="button"
                 disabled={busy || secondaries.length === 0}
                 onClick={handleConfirm}
-                className={`inline-flex min-h-12 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-bold text-primary-foreground ${focusRing} disabled:opacity-50`}
+                className={`inline-flex min-h-12 flex-[1.4] items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-bold text-foreground ${focusRing} disabled:opacity-50`}
               >
                 <Link2 className="size-4" aria-hidden />
                 {busy ? "Uniendo…" : "Unir mesas"}

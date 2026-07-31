@@ -2,10 +2,11 @@
 
 /**
  * Banner de alertas TABLE_CALL en tablero mesero / pedidos.
- * Delight: CTA contextual (Cobrar / Adición / Ir) además de descartar.
+ * Distill: una interrupción visible a la vez (+ En curso); el resto en “N más”.
  * Harden: no X mientras En curso; Limpiar solo avisa no parkados.
  */
 
+import { useEffect, useState } from "react";
 import { Bell, Receipt, X } from "lucide-react";
 import type { TableCallPaymentMethod, TableCallResponse } from "@/types/api";
 import { formatTableLabel } from "@/lib/table-session";
@@ -29,6 +30,16 @@ function callTitle(call: TableCallResponse): string {
   return "Llaman al mesero";
 }
 
+function formatCallElapsed(iso: string, nowMs: number): string | null {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const minutes = Math.max(0, Math.floor((nowMs - then) / 60_000));
+  if (minutes < 1) return "ahora";
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `hace ${hours} h`;
+}
+
 export interface TableCallPrimaryAction {
   label: string;
   /** Emerald for money moment (Cobrar). */
@@ -41,6 +52,10 @@ interface TableCallAlertsProps {
   onDismissAll?: () => void;
   /** Call currently parked in Cobrar/POS — stays visible as “En curso”. */
   inProgressCallId?: string | null;
+  /** Wall clock for elapsed labels (board ticks). */
+  nowMs?: number;
+  /** Keyboard-armed target — flash + expand if in overflow. */
+  highlightedCallId?: string | null;
   getPrimaryAction?: (
     call: TableCallResponse,
   ) => TableCallPrimaryAction | null;
@@ -52,19 +67,47 @@ export function TableCallAlerts({
   onDismiss,
   onDismissAll,
   inProgressCallId = null,
+  nowMs = Date.now(),
+  highlightedCallId = null,
   getPrimaryAction,
   onPrimaryAction,
 }: TableCallAlertsProps) {
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    const overflow =
+      calls.filter((c) => c.id !== inProgressCallId).length - 1;
+    if (overflow <= 0) setShowAll(false);
+  }, [calls, inProgressCallId]);
+
+  useEffect(() => {
+    if (!highlightedCallId) return;
+    const queue = calls.filter((c) => c.id !== inProgressCallId);
+    const isOverflow = queue.slice(1).some((c) => c.id === highlightedCallId);
+    if (isOverflow) setShowAll(true);
+  }, [highlightedCallId, calls, inProgressCallId]);
+
   if (calls.length === 0) return null;
 
-  const clearableCount = calls.filter((c) => c.id !== inProgressCallId).length;
-  const hasParked = Boolean(
-    inProgressCallId && calls.some((c) => c.id === inProgressCallId),
-  );
+  const parked = inProgressCallId
+    ? calls.find((c) => c.id === inProgressCallId)
+    : undefined;
+  const queue = calls.filter((c) => c.id !== inProgressCallId);
+  const next = queue[0];
+  const overflow = queue.slice(1);
+
+  const visible: TableCallResponse[] = [];
+  if (parked) visible.push(parked);
+  if (next) visible.push(next);
+  if (showAll) visible.push(...overflow);
+
+  const clearableCount = queue.length;
+  const hasParked = Boolean(parked);
+  const hiddenCount = showAll ? 0 : overflow.length;
 
   return (
     <div
-      className="space-y-2"
+      className="sticky top-0 z-20 -mx-4 space-y-2 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
       role="region"
       aria-label="Llamadas de mesa"
       aria-live="assertive"
@@ -84,17 +127,23 @@ export function TableCallAlerts({
         ) : null}
       </div>
       <ul className="space-y-2">
-        {calls.map((call) => {
+        {visible.map((call) => {
           const Icon = call.callType === "BILL" ? Receipt : Bell;
           const inProgress = inProgressCallId === call.id;
           const action = getPrimaryAction?.(call) ?? null;
+          const elapsed = formatCallElapsed(call.createdAt, nowMs);
           return (
             <li
               key={call.id}
-              className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-start ${
+              id={`call-alert-${call.id}`}
+              className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 transition-[box-shadow,border-color] sm:flex-row sm:items-start ${
                 inProgress
                   ? "border-border bg-secondary text-foreground"
                   : "border-warn/40 bg-warn-muted text-warn-ink"
+              } ${
+                highlightedCallId === call.id
+                  ? "border-warn ring-2 ring-warn/55"
+                  : ""
               }`}
             >
               <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -109,6 +158,17 @@ export function TableCallAlerts({
                     {inProgress ? (
                       <span className="rounded-full bg-card px-2 py-0.5 text-xs font-semibold text-muted-foreground ring-1 ring-border">
                         En curso
+                      </span>
+                    ) : null}
+                    {elapsed ? (
+                      <span
+                        className={`text-xs font-medium tabular-nums ${
+                          inProgress
+                            ? "text-muted-foreground"
+                            : "text-warn-ink/80"
+                        }`}
+                      >
+                        {elapsed}
                       </span>
                     ) : null}
                   </div>
@@ -162,6 +222,26 @@ export function TableCallAlerts({
           );
         })}
       </ul>
+      {hiddenCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className={`text-xs font-semibold text-warn-ink underline-offset-2 hover:underline ${focusRing}`}
+        >
+          {hiddenCount === 1
+            ? "1 más en espera"
+            : `${hiddenCount} más en espera`}
+        </button>
+      ) : null}
+      {showAll && overflow.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className={`text-xs font-semibold text-muted-foreground underline-offset-2 hover:underline ${focusRing}`}
+        >
+          Mostrar solo la siguiente
+        </button>
+      ) : null}
     </div>
   );
 }

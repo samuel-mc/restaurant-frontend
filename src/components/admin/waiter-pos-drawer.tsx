@@ -417,7 +417,7 @@ export function WaiterPosDrawer({
         type="button"
         disabled={busy || cart.length === 0}
         onClick={() => void handleSubmit()}
-        className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-live px-4 text-base font-bold text-live-foreground shadow-lg ${focusRing} disabled:opacity-50`}
+        className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-bold text-primary-foreground shadow-lg ${focusRing} disabled:opacity-50`}
       >
         <Send className="size-5" aria-hidden />
         {busy ? "Enviando…" : `${sendLabel} · ${formatCurrency(cartTotal)}`}

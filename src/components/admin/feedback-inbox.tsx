@@ -35,7 +35,7 @@ function formatWhen(iso: string): string {
   }
 }
 
-export function FeedbackInbox() {
+export function FeedbackInbox({ tenantSlug }: { tenantSlug: string }) {
   const [items, setItems] = useState<AdminFeedbackItem[]>([]);
   const [filter, setFilter] = useState<"OPEN" | "URGENT" | "ALL">("OPEN");
   const [loading, setLoading] = useState(true);
@@ -48,7 +48,7 @@ export function FeedbackInbox() {
     try {
       const status: FeedbackInboxStatus | "ALL" =
         filter === "ALL" ? "ALL" : "OPEN";
-      const list = await fetchFeedbackInbox({
+      const list = await fetchFeedbackInbox(tenantSlug, {
         status,
         urgentOnly: filter === "URGENT",
       });
@@ -62,7 +62,7 @@ export function FeedbackInbox() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, tenantSlug]);
 
   useEffect(() => {
     void load();
@@ -75,7 +75,7 @@ export function FeedbackInbox() {
     setBusyId(id);
     setError(null);
     try {
-      await resolveFeedback(id, status);
+      await resolveFeedback(id, status, tenantSlug);
       await load();
     } catch (err) {
       setError(

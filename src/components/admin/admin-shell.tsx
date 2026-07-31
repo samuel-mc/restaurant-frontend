@@ -73,7 +73,7 @@ export function AdminShell({
 
     async function refresh() {
       try {
-        const summary = await fetchFeedbackSummary();
+        const summary = await fetchFeedbackSummary(tenantSlug);
         if (!cancelled) {
           setUrgentFeedbackCount(summary.openUrgentCount ?? 0);
         }
@@ -90,7 +90,7 @@ export function AdminShell({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [canSeeFeedbackInbox, isSupportSession, pathname]);
+  }, [canSeeFeedbackInbox, isSupportSession, pathname, tenantSlug]);
 
   useEffect(() => {
     setMobileOpen(false);

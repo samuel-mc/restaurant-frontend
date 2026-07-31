@@ -37,11 +37,31 @@ export async function createTableCall(
 }
 
 export function getTableCallErrorMessage(error: unknown): string {
+  const fallback = "No pudimos avisar al personal. Intenta de nuevo.";
   if (error instanceof ApiError) {
-    return error.message;
+    if (error.isNetworkError) {
+      return "No pudimos conectar. Revisa tu conexión e intenta de nuevo.";
+    }
+    if (error.status === 429) {
+      return "Demasiados avisos seguidos. Espera un momento e intenta de nuevo.";
+    }
+    if (error.status === 401 || error.status === 403) {
+      return "Este código QR ya no es válido. Pide al mesero el QR actualizado de tu mesa.";
+    }
+    if (error.status === 404) {
+      return "No encontramos esta mesa. Escanea de nuevo el QR o pide ayuda al personal.";
+    }
+    if (error.status >= 500) {
+      return "El restaurante no pudo recibir el aviso ahora. Intenta de nuevo en unos segundos.";
+    }
+    const msg = error.message.trim();
+    if (!msg || /^error$/i.test(msg) || /^request failed$/i.test(msg)) {
+      return fallback;
+    }
+    return msg;
   }
   if (error instanceof Error && error.message.trim()) {
-    return error.message;
+    return error.message.trim();
   }
-  return "No pudimos avisar al personal. Intenta de nuevo.";
+  return fallback;
 }

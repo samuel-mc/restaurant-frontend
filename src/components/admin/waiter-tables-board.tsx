@@ -4,8 +4,8 @@
  * Vista del mesero: cuentas abiertas + picker compacto de mesas libres, unión y POS.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Link2, Plus, Receipt } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Bell, ChevronDown, Keyboard, Link2, Plus, Receipt } from "lucide-react";
 import type { Order, OrderStatus, TableCallResponse } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -37,6 +37,20 @@ const focusRing =
 
 /** Compact free-table suggestions before “Ver todas” (search is primary). */
 const FREE_COMPACT = 4;
+/** Ops toast without undo. */
+const NOTICE_MS = 8_000;
+/** Soft-dismiss Deshacer — long enough for a floor walk. */
+const UNDO_NOTICE_MS = 25_000;
+
+function preferScrollBehavior(): ScrollBehavior {
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    return "auto";
+  }
+  return "smooth";
+}
 
 const ACTIVE: OrderStatus[] = [
   "PENDING",
@@ -246,13 +260,20 @@ export function WaiterTablesBoard({
   const [freeWallExpanded, setFreeWallExpanded] = useState(false);
   const freeSearchRef = useRef<HTMLInputElement | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeTone, setNoticeTone] = useState<"live" | "neutral">("neutral");
   const [undoCall, setUndoCall] = useState<TableCallResponse | null>(null);
+  const [undoCallsBatch, setUndoCallsBatch] = useState<
+    TableCallResponse[] | null
+  >(null);
   const [armedCallId, setArmedCallId] = useState<string | null>(null);
   const [focusOrderUuid, setFocusOrderUuid] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const armTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const armedCallIdRef = useRef<string | null>(null);
+  const hasUndoNoticeRef = useRef(false);
+  const freePickerOpenRef = useRef(false);
   const playAlertCue = useKitchenAlertSound();
 
   useEffect(() => {
@@ -260,6 +281,14 @@ export function WaiterTablesBoard({
     const id = window.setInterval(() => setNowMs(Date.now()), ms);
     return () => window.clearInterval(id);
   }, [tableCalls.length]);
+
+  useEffect(() => {
+    armedCallIdRef.current = armedCallId;
+  }, [armedCallId]);
+
+  useEffect(() => {
+    freePickerOpenRef.current = freePickerOpen;
+  }, [freePickerOpen]);
 
   const clearNoticeTimer = useCallback(() => {
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
@@ -269,20 +298,30 @@ export function WaiterTablesBoard({
   const showNotice = useCallback(
     (
       message: string,
-      options?: { undoCall?: TableCallResponse | null },
+      options?: {
+        undoCall?: TableCallResponse | null;
+        undoCalls?: TableCallResponse[] | null;
+        /** live = money success only; default neutral for ops. */
+        tone?: "live" | "neutral";
+      },
     ) => {
       clearNoticeTimer();
       setNotice(message);
+      setNoticeTone(options?.tone ?? "neutral");
       setUndoCall(options?.undoCall ?? null);
+      setUndoCallsBatch(options?.undoCalls ?? null);
+      const hasUndo = Boolean(
+        options?.undoCall ||
+          (options?.undoCalls && options.undoCalls.length > 0),
+      );
+      hasUndoNoticeRef.current = hasUndo;
       noticeTimerRef.current = setTimeout(() => {
         setNotice((current) => (current === message ? null : current));
-        setUndoCall((current) =>
-          options?.undoCall && current?.id === options.undoCall.id
-            ? null
-            : current,
-        );
+        setUndoCall(null);
+        setUndoCallsBatch(null);
+        hasUndoNoticeRef.current = false;
         noticeTimerRef.current = null;
-      }, 8000);
+      }, hasUndo ? UNDO_NOTICE_MS : NOTICE_MS);
     },
     [clearNoticeTimer],
   );
@@ -290,10 +329,28 @@ export function WaiterTablesBoard({
   function dismissNotice() {
     clearNoticeTimer();
     setNotice(null);
+    setNoticeTone("neutral");
     setUndoCall(null);
+    setUndoCallsBatch(null);
+    hasUndoNoticeRef.current = false;
   }
 
   function restoreUndoneCall() {
+    if (undoCallsBatch && undoCallsBatch.length > 0) {
+      const batch = undoCallsBatch;
+      setTableCalls((prev) => {
+        const ids = new Set(prev.map((c) => c.id));
+        const restored = batch.filter((c) => !ids.has(c.id));
+        return [...restored, ...prev].slice(0, 12);
+      });
+      dismissNotice();
+      showNotice(
+        batch.length === 1
+          ? `Aviso restaurado · Mesa ${normalizeTableKey(batch[0].tableNumber) || batch[0].tableNumber}`
+          : `Avisos restaurados · ${batch.length}`,
+      );
+      return;
+    }
     if (!undoCall) return;
     const call = undoCall;
     setTableCalls((prev) => {
@@ -485,7 +542,7 @@ export function WaiterTablesBoard({
       setActiveCallId(null);
       setCloseTarget(null);
       setCloseError(null);
-      showNotice(`Cuenta cobrada · ${orderTitle(closing)}`);
+      showNotice(`Cuenta cobrada · ${orderTitle(closing)}`, { tone: "live" });
     } catch (err) {
       setCloseError(
         getAdminErrorMessage(err, "No se pudo cobrar la cuenta. Revisa la conexión e inténtalo de nuevo."),
@@ -634,7 +691,10 @@ export function WaiterTablesBoard({
     requestAnimationFrame(() => {
       document
         .getElementById(`account-${orderUuid}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        ?.scrollIntoView({
+          behavior: preferScrollBehavior(),
+          block: "center",
+        });
     });
     focusTimerRef.current = setTimeout(() => {
       setFocusOrderUuid((current) =>
@@ -644,9 +704,16 @@ export function WaiterTablesBoard({
     }, 2600);
   }
 
-  /** First press arms+flashes the aviso; second press within 2.5s fires CTA. */
+  /**
+   * First press arms+flashes the aviso; second press within 2.5s fires CTA.
+   * Sole clearable aviso → fire immediately (matches touch primary).
+   */
   function armOrFireCall(call: TableCallResponse) {
-    if (armedCallId === call.id) {
+    const clearable = tableCalls.filter((c) => c.id !== activeCallId);
+    const soleClearable =
+      clearable.length === 1 && clearable[0]?.id === call.id;
+
+    if (armedCallId === call.id || soleClearable) {
       if (armTimerRef.current) clearTimeout(armTimerRef.current);
       armTimerRef.current = null;
       setArmedCallId(null);
@@ -658,11 +725,16 @@ export function WaiterTablesBoard({
     requestAnimationFrame(() => {
       document
         .getElementById(`call-alert-${call.id}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        ?.scrollIntoView({
+          behavior: preferScrollBehavior(),
+          block: "nearest",
+        });
     });
     armTimerRef.current = setTimeout(() => {
-      setArmedCallId((current) => (current === call.id ? null : current));
       armTimerRef.current = null;
+      if (armedCallIdRef.current !== call.id) return;
+      setArmedCallId(null);
+      showNotice("Aviso desarmado · Enter otra vez para armar");
     }, 2500);
   }
 
@@ -672,6 +744,10 @@ export function WaiterTablesBoard({
     const order = findOrderForTable(call.tableNumber);
     if (call.callType === "BILL" && order?.status === "DELIVERED") {
       return { label: "Cobrar", tone: "live" };
+    }
+    if (call.callType === "BILL" && order) {
+      // Not Por cobrar yet — park+focus; never soft-dismiss money signal.
+      return { label: "Ver mesa" };
     }
     if (order) {
       return {
@@ -691,11 +767,30 @@ export function WaiterTablesBoard({
     return true;
   }
 
+  /** Soft-dismiss a call with Deshacer — WAITER X / Limpiar solo WAITER. Never BILL. */
+  function softDismissCall(call: TableCallResponse) {
+    setTableCalls((prev) => prev.filter((item) => item.id !== call.id));
+    if (activeCallId === call.id) setActiveCallId(null);
+    if (armedCallId === call.id) {
+      if (armTimerRef.current) clearTimeout(armTimerRef.current);
+      armTimerRef.current = null;
+      setArmedCallId(null);
+    }
+    const mesa = normalizeTableKey(call.tableNumber) || call.tableNumber;
+    showNotice(`Aviso de Mesa ${mesa} quitado`, { undoCall: call });
+  }
+
   function handleCallPrimaryAction(call: TableCallResponse) {
     const order = findOrderForTable(call.tableNumber);
     if (call.callType === "BILL" && order?.status === "DELIVERED") {
       // openCloseDialog parks the matching call.
       openCloseDialog(order);
+      return;
+    }
+    if (call.callType === "BILL" && order) {
+      // Park + focus — keep the money signal until Cobrar or explicit discard.
+      if (!parkCallAction(call.id)) return;
+      focusAccountCard(order.uuid);
       return;
     }
     if (order) {
@@ -704,13 +799,9 @@ export function WaiterTablesBoard({
         openPosForOrder(order);
         return;
       }
-      // Ir a mesa: soft-dismiss + undo (navigation is not resolution).
-      setTableCalls((prev) => prev.filter((item) => item.id !== call.id));
-      if (activeCallId === call.id) setActiveCallId(null);
+      // Non-BILL navigation: soft-dismiss + undo.
+      softDismissCall(call);
       focusAccountCard(order.uuid);
-      const mesa =
-        normalizeTableKey(call.tableNumber) || call.tableNumber;
-      showNotice(`Aviso de Mesa ${mesa} quitado`, { undoCall: call });
       return;
     }
     const table = normalizeTableKey(call.tableNumber);
@@ -722,21 +813,48 @@ export function WaiterTablesBoard({
 
   const showFreePicker =
     freeTables.length > 0 && (freePickerOpen || sorted.length === 0);
+  const callsActive = tableCalls.length > 0;
+  const prevCallsLenRef = useRef(0);
+
+  // Quieter: when new avisos land, collapse the free picker so attention owns the stage.
+  // Harden: a new aviso also drops pending Deshacer (stale after the next interrupt).
+  // Clarify: if the picker was open, say why it closed and how to reopen (digits kept).
+  useEffect(() => {
+    const len = tableCalls.length;
+    if (len > prevCallsLenRef.current) {
+      const wasPickerOpen = freePickerOpenRef.current;
+      setFreePickerOpen(false);
+      if (hasUndoNoticeRef.current) {
+        clearNoticeTimer();
+        setNotice(null);
+        setNoticeTone("neutral");
+        setUndoCall(null);
+        setUndoCallsBatch(null);
+        hasUndoNoticeRef.current = false;
+      } else if (wasPickerOpen) {
+        showNotice(
+          "Avisos nuevos · mesas libres cerradas · N para reabrir",
+        );
+      }
+    }
+    prevCallsLenRef.current = len;
+  }, [tableCalls.length, clearNoticeTimer, showNotice]);
 
   useEffect(() => {
-    if (!showFreePicker) {
-      setFreeTableQuery("");
-      setFreeWallExpanded(false);
-    }
+    if (showFreePicker) return;
+    // Keep search digits after auto-collapse; intentional close clears them.
+    setFreeWallExpanded(false);
   }, [showFreePicker]);
 
   useEffect(() => {
     if (!showFreePicker || !showFreeFilter) return;
+    // Don't steal Enter/C from avisos while calls are active.
+    if (callsActive) return;
     const id = window.requestAnimationFrame(() => {
       freeSearchRef.current?.focus();
     });
     return () => window.cancelAnimationFrame(id);
-  }, [showFreePicker, showFreeFilter]);
+  }, [showFreePicker, showFreeFilter, callsActive]);
 
   const boardChromeBlocked =
     busy ||
@@ -765,6 +883,8 @@ export function WaiterTablesBoard({
         if (freePickerOpen && sorted.length > 0) {
           e.preventDefault();
           setFreePickerOpen(false);
+          setFreeTableQuery("");
+          setFreeWallExpanded(false);
         }
         return;
       }
@@ -868,15 +988,20 @@ export function WaiterTablesBoard({
           callKeys.has(normalizeTableKey(c.tableNumber)),
         )
       : undefined;
-    /** Soft ownership cue — alerts keep amber; cards keep words only. */
+    /** Ownership mark — chip, not amber card wash; alerts stay the loud interrupt. */
     const callCue =
       linkedCall?.callType === "BILL"
         ? "Piden la cuenta"
         : linkedCall
           ? "Te llaman"
           : null;
+    const CallCueIcon =
+      linkedCall?.callType === "BILL" ? Receipt : Bell;
     const channel = channelTypeLabel(order);
     const canCharge = order.status === "DELIVERED";
+    /** Distill: BILL aviso owns Cobrar — hide the card twin so alerts are the money door. */
+    const showCardCharge =
+      canCharge && linkedCall?.callType !== "BILL";
     const attendant =
       order.staffName?.trim() ||
       (order.orderType === "IN_TABLE" && order.customerName?.trim()
@@ -903,6 +1028,15 @@ export function WaiterTablesBoard({
       <li
         key={order.uuid}
         id={`account-${order.uuid}`}
+        onClick={(event) => {
+          if (
+            event.target instanceof HTMLElement &&
+            event.target.closest("button, a, input, label")
+          ) {
+            return;
+          }
+          focusAccountCard(order.uuid);
+        }}
         className={`flex flex-col rounded-2xl border bg-card p-4 transition-[box-shadow,border-color] ${
           focused
             ? "border-foreground/45 ring-1 ring-foreground/20"
@@ -917,8 +1051,9 @@ export function WaiterTablesBoard({
               {orderTitle(order)}
             </p>
             {callCue ? (
-              <p className="mt-1 text-xs font-semibold text-warn-ink">
-                {callCue}
+              <p className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-warn-muted px-2 py-0.5 text-xs font-semibold text-warn-ink">
+                <CallCueIcon className="size-3 shrink-0" aria-hidden />
+                <span className="truncate">{callCue}</span>
               </p>
             ) : channel && orderTitle(order) !== channel ? (
               <p className="mt-1 text-xs font-semibold text-channel-ink">
@@ -953,7 +1088,7 @@ export function WaiterTablesBoard({
 
         <div
           className={`mt-4 grid grid-cols-1 gap-2 ${
-            canCharge ? "sm:grid-cols-2" : ""
+            showCardCharge ? "sm:grid-cols-2" : ""
           }`}
         >
           {order.orderType === "IN_TABLE" ? (
@@ -966,7 +1101,7 @@ export function WaiterTablesBoard({
               Adición
             </button>
           ) : null}
-          {canCharge ? (
+          {showCardCharge ? (
             <button
               type="button"
               onClick={() => openCloseDialog(order)}
@@ -994,20 +1129,18 @@ export function WaiterTablesBoard({
           <p className="mt-1 text-sm text-muted-foreground">
             {restaurantName} · cuentas abiertas del turno
           </p>
-          {tableCalls.length > 0 ||
-          freePickerOpen ||
-          sorted.length === 0 ? (
+          {armedCallId ? (
             <p
-              className="mt-1 text-xs text-muted-foreground"
-              title="Enter / C: primer toque arma el aviso, segundo ejecuta · N: nueva mesa · /: buscar · Esc: cerrar picker"
+              className="mt-1 text-xs font-semibold text-warn-ink"
+              aria-live="polite"
             >
-              Enter/C: arma aviso → otra vez ejecuta · N mesa · / buscar · Esc
-              cierra
+              Aviso listo · Enter o C otra vez
             </p>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AdminConnectionBadge state={connection} />
+          <WaiterShortcutCheatsheet />
           <button
             type="button"
             disabled={freeTables.length === 0}
@@ -1020,6 +1153,10 @@ export function WaiterTablesBoard({
             }
             onClick={() => {
               if (sorted.length === 0) return;
+              if (freePickerOpen) {
+                setFreeTableQuery("");
+                setFreeWallExpanded(false);
+              }
               setFreePickerOpen((open) => !open);
             }}
             className={`inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
@@ -1067,7 +1204,8 @@ export function WaiterTablesBoard({
             setDismissCallTarget(call);
             return;
           }
-          setTableCalls((prev) => prev.filter((c) => c.id !== id));
+          // WAITER (and other non-BILL): soft-dismiss + Deshacer.
+          softDismissCall(call);
         }}
         onDismissAll={() => {
           const clearable = tableCalls.filter((c) => c.id !== activeCallId);
@@ -1077,10 +1215,20 @@ export function WaiterTablesBoard({
             setDismissClearableOpen(true);
             return;
           }
+          // WAITER-only stack: soft-clear + bulk Deshacer.
           setTableCalls((prev) =>
             activeCallId
               ? prev.filter((c) => c.id === activeCallId)
               : [],
+          );
+          if (armTimerRef.current) clearTimeout(armTimerRef.current);
+          armTimerRef.current = null;
+          setArmedCallId(null);
+          showNotice(
+            clearable.length === 1
+              ? `Aviso quitado · Mesa ${normalizeTableKey(clearable[0].tableNumber) || clearable[0].tableNumber}`
+              : `Avisos quitados · ${clearable.length}`,
+            { undoCalls: clearable },
           );
         }}
         getPrimaryAction={getCallPrimaryAction}
@@ -1096,15 +1244,21 @@ export function WaiterTablesBoard({
         <div
           role="status"
           aria-live="polite"
-          className="flex items-start justify-between gap-3 rounded-xl border border-live/30 bg-live-muted px-4 py-3 text-sm font-semibold text-live-ink"
+          className={`flex items-center justify-between gap-2 text-xs ${
+            noticeTone === "live"
+              ? "rounded-lg border border-live/25 bg-live-muted/70 px-3 py-2 font-medium text-live-ink"
+              : undoCall || (undoCallsBatch && undoCallsBatch.length > 0)
+                ? "rounded-lg border border-border bg-secondary/70 px-3 py-2 font-medium text-foreground"
+                : "px-1 py-1.5 font-medium text-muted-foreground"
+          }`}
         >
           <p className="min-w-0 flex-1">{notice}</p>
-          <div className="flex shrink-0 items-center gap-3">
-            {undoCall ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {undoCall || (undoCallsBatch && undoCallsBatch.length > 0) ? (
               <button
                 type="button"
                 onClick={restoreUndoneCall}
-                className={`text-xs font-bold underline-offset-2 hover:underline ${focusRing}`}
+                className={`inline-flex min-h-9 items-center rounded-lg px-2.5 font-bold underline-offset-2 hover:bg-background/60 hover:underline ${focusRing}`}
               >
                 Deshacer
               </button>
@@ -1112,7 +1266,7 @@ export function WaiterTablesBoard({
             <button
               type="button"
               onClick={dismissNotice}
-              className={`text-xs font-semibold underline-offset-2 hover:underline ${focusRing}`}
+              className={`inline-flex min-h-9 items-center rounded-lg px-2.5 underline-offset-2 hover:underline ${focusRing}`}
             >
               Cerrar
             </button>
@@ -1347,12 +1501,20 @@ export function WaiterTablesBoard({
                 ? prev.filter((c) => c.id === activeCallId)
                 : [],
             );
+            if (armTimerRef.current) clearTimeout(armTimerRef.current);
+            armTimerRef.current = null;
+            setArmedCallId(null);
             setDismissClearableOpen(false);
             return;
           }
           if (dismissCallTarget) {
             const id = dismissCallTarget.id;
             setTableCalls((prev) => prev.filter((c) => c.id !== id));
+            if (armedCallId === id) {
+              if (armTimerRef.current) clearTimeout(armTimerRef.current);
+              armTimerRef.current = null;
+              setArmedCallId(null);
+            }
             setDismissCallTarget(null);
           }
         }}
@@ -1388,6 +1550,114 @@ export function WaiterTablesBoard({
         }}
         onSubmit={submitPos}
       />
+    </div>
+  );
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-border bg-card px-1.5 font-mono text-xs font-semibold leading-none text-foreground shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+      {children}
+    </kbd>
+  );
+}
+
+/**
+ * Atajos táctiles (mismo patrón que cocina): botón ≥44px + panel, no solo title.
+ */
+function WaiterShortcutCheatsheet() {
+  const [expanded, setExpanded] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [expanded]);
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="salon-shortcuts-panel"
+        aria-label={
+          expanded ? "Ocultar atajos de teclado" : "Mostrar atajos de teclado"
+        }
+        onClick={() => setExpanded((open) => !open)}
+        className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-secondary px-2.5 text-foreground hover:bg-secondary/80 md:px-3 ${focusRing}`}
+      >
+        <Keyboard className="size-4 shrink-0" aria-hidden />
+        <span className="text-xs font-bold tracking-tight">Atajos</span>
+      </button>
+      {expanded ? (
+        <div
+          id="salon-shortcuts-panel"
+          role="region"
+          aria-label="Atajos de teclado del salón"
+          className="absolute right-0 top-full z-30 mt-1.5 w-[min(calc(100vw-2rem),20rem)] rounded-xl border border-border bg-card p-3 shadow-md"
+        >
+          <ul className="flex flex-col gap-2.5 text-xs text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <span className="inline-flex shrink-0 items-center gap-0.5 pt-0.5">
+                <Kbd>Enter</Kbd>
+                <span aria-hidden className="text-border">
+                  /
+                </span>
+                <Kbd>C</Kbd>
+              </span>
+              <span>
+                Un aviso: ejecuta ya. Varios: arma, luego otra vez
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="shrink-0 pt-0.5 font-semibold text-foreground">
+                Aviso
+              </span>
+              <span>
+                Cobrar · Ver mesa (deja En curso y enfoca la cuenta) · Adición ·
+                Abrir
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="shrink-0 pt-0.5">
+                <Kbd>C</Kbd>
+              </span>
+              <span>En mesa enfocada y Por cobrar: cobra al instante</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="shrink-0 pt-0.5">
+                <Kbd>N</Kbd>
+              </span>
+              <span>Mesa libre (reabre si un aviso cerró el picker)</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="shrink-0 pt-0.5">
+                <Kbd>/</Kbd>
+              </span>
+              <span>Buscar número de mesa libre</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="shrink-0 pt-0.5">
+                <Kbd>Esc</Kbd>
+              </span>
+              <span>Cerrar picker y limpiar la búsqueda</span>
+            </li>
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

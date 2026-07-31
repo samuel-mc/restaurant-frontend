@@ -107,14 +107,14 @@ export function TableCallAlerts({
 
   return (
     <div
-      className="sticky top-0 z-20 -mx-4 space-y-2 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+      className="sticky top-0 z-20 -mx-4 space-y-1.5 border-b border-border/40 bg-background/95 px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
       role="region"
       aria-label="Llamadas de mesa"
-      aria-live="assertive"
+      aria-live="polite"
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-warn-ink">
-          Atención en mesa · {calls.length}
+        <p className="text-xs font-medium text-warn-ink">
+          Atención · {calls.length}
         </p>
         {clearableCount > 0 && onDismissAll ? (
           <button
@@ -160,6 +160,11 @@ export function TableCallAlerts({
                         En curso
                       </span>
                     ) : null}
+                    {highlightedCallId === call.id && !inProgress ? (
+                      <span className="rounded-full bg-card px-2 py-0.5 text-xs font-bold text-warn-ink ring-1 ring-warn/40">
+                        Enter otra vez
+                      </span>
+                    ) : null}
                     {elapsed ? (
                       <span
                         className={`text-xs font-medium tabular-nums ${
@@ -173,6 +178,15 @@ export function TableCallAlerts({
                     ) : null}
                   </div>
                   <p className="text-sm font-medium">{callTitle(call)}</p>
+                  {highlightedCallId === call.id && !inProgress ? (
+                    <p
+                      className="mt-1 text-xs font-semibold text-warn-ink"
+                      aria-live="polite"
+                    >
+                      Aviso listo · Enter o C otra vez ejecuta{" "}
+                      {action?.label ?? "la acción"}
+                    </p>
+                  ) : null}
                   {call.note?.trim() ? (
                     <p className="mt-1 text-xs opacity-90">{call.note.trim()}</p>
                   ) : null}

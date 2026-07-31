@@ -29,5 +29,5 @@ export default async function AdminFeedbackPage() {
     redirect("/admin/login");
   }
 
-  return <FeedbackInbox />;
+  return <FeedbackInbox tenantSlug={tenantSlug} />;
 }

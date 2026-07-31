@@ -7,10 +7,11 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { ChefHat, Eye, Receipt, X } from "lucide-react";
+import { ChefHat, Eye, Printer, Receipt, X } from "lucide-react";
 import type { AdminOrderListFilter, Order, OrderItem, OrderPage, TableCallResponse } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { AdminOptionGroup } from "@/components/admin/admin-option-group";
+import { PreCuentaModal } from "@/components/admin/pre-cuenta-modal";
 import { TableCallAlerts } from "@/components/admin/table-call-alerts";
 import {
   useKitchenOrdersSubscription,
@@ -20,6 +21,7 @@ import { useKitchenAlertSound } from "@/hooks/useKitchenAlertSound";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { adminKitchenOrderHref } from "@/lib/admin-nav";
 import { getAdminErrorMessage } from "@/lib/admin-error";
+import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
 import { listOrders } from "@/services/adminOrderService";
 import { formatCurrency } from "@/lib/format";
 
@@ -47,6 +49,9 @@ interface OrdersBoardProps {
   restaurantName: string;
   initialPage: OrderPage;
   initialFilter: AdminOrderListFilter;
+  restaurantInfo?: RestaurantTicketInfo;
+  /** Volver al salón (admin). */
+  salonHref?: string | null;
 }
 
 function orderDisplayCode(order: Order): string {
@@ -255,7 +260,12 @@ export function OrdersBoard({
   restaurantName,
   initialPage,
   initialFilter,
+  restaurantInfo,
+  salonHref = null,
 }: OrdersBoardProps) {
+  const ticketRestaurant: RestaurantTicketInfo = restaurantInfo ?? {
+    name: restaurantName,
+  };
   const [filter, setFilter] = useState<AdminOrderListFilter>(initialFilter);
   const [pageIndex, setPageIndex] = useState(initialPage.number);
   const [page, setPage] = useState<OrderPage>(initialPage);
@@ -264,6 +274,7 @@ export function OrdersBoard({
   const [connection, setConnection] =
     useState<KitchenConnectionState>("connecting");
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [preCuentaOrder, setPreCuentaOrder] = useState<Order | null>(null);
   const detailTitleId = useId();
   const [tableCalls, setTableCalls] = useState<TableCallResponse[]>([]);
   const playAlertCue = useKitchenAlertSound();
@@ -376,6 +387,14 @@ export function OrdersBoard({
           </h1>
           <div className="flex shrink-0 items-center gap-1.5">
             <AdminConnectionBadge state={connection} compact />
+            {salonHref ? (
+              <Link
+                href={salonHref}
+                className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-3 text-sm font-semibold ${focusRing}`}
+              >
+                Salón
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={() => void refresh(filter, pageIndex)}
@@ -520,6 +539,7 @@ export function OrdersBoard({
                           <OrderListActions
                             order={order}
                             onDetail={() => setDetailOrder(order)}
+                            onPreCuenta={() => setPreCuentaOrder(order)}
                             layout="row"
                           />
                         </td>
@@ -581,6 +601,7 @@ export function OrdersBoard({
                       <OrderListActions
                         order={order}
                         onDetail={() => setDetailOrder(order)}
+                        onPreCuenta={() => setPreCuentaOrder(order)}
                         layout="stack"
                       />
                     </div>
@@ -624,8 +645,24 @@ export function OrdersBoard({
           order={detailOrder}
           titleId={detailTitleId}
           onClose={() => setDetailOrder(null)}
+          onPreCuenta={() => {
+            setPreCuentaOrder(detailOrder);
+          }}
         />
       ) : null}
+
+      <PreCuentaModal
+        open={preCuentaOrder != null}
+        onClose={() => setPreCuentaOrder(null)}
+        order={preCuentaOrder}
+        restaurant={ticketRestaurant}
+        kind={
+          preCuentaOrder?.status === "CLOSED" ||
+          preCuentaOrder?.status === "DELIVERED"
+            ? "cuenta"
+            : "pre-cuenta"
+        }
+      />
     </div>
   );
 }
@@ -633,14 +670,18 @@ export function OrdersBoard({
 function OrderListActions({
   order,
   onDetail,
+  onPreCuenta,
   layout,
 }: {
   order: Order;
   onDetail: () => void;
+  onPreCuenta: () => void;
   layout: "row" | "stack";
 }) {
   const kitchen = kitchenListAction(order);
   const stack = layout === "stack";
+  const canTicket =
+    order.status !== "CANCELLED" && order.items.length > 0;
 
   return (
     <div
@@ -650,6 +691,18 @@ function OrderListActions({
           : "flex flex-wrap justify-end gap-2"
       }
     >
+      {canTicket ? (
+        <button
+          type="button"
+          onClick={onPreCuenta}
+          className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 text-sm font-semibold ${focusRing} ${
+            stack ? "w-full" : ""
+          }`}
+        >
+          <Printer className="size-3.5" aria-hidden />
+          Ticket
+        </button>
+      ) : null}
       {kitchen ? (
         <Link
           href={kitchen.href}
@@ -697,10 +750,12 @@ function OrderDetailModal({
   order,
   titleId,
   onClose,
+  onPreCuenta,
 }: {
   order: Order;
   titleId: string;
   onClose: () => void;
+  onPreCuenta: () => void;
 }) {
   const rounds = groupByBatch(order.items);
   const badge = badgeMeta(order);
@@ -842,10 +897,20 @@ function OrderDetailModal({
               {formatCurrency(order.totalAmount)}
             </p>
           </div>
+          {order.status !== "CANCELLED" && order.items.length > 0 ? (
+            <button
+              type="button"
+              onClick={onPreCuenta}
+              className={`mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold ${focusRing}`}
+            >
+              <Printer className="size-4" aria-hidden />
+              Imprimir ticket
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
-            className={`mt-3 flex min-h-11 w-full items-center justify-center rounded-xl bg-secondary px-4 text-sm font-semibold ${focusRing}`}
+            className={`mt-2 flex min-h-11 w-full items-center justify-center rounded-xl bg-secondary px-4 text-sm font-semibold ${focusRing}`}
           >
             Cerrar
           </button>

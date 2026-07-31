@@ -5,11 +5,13 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bell, ChevronDown, Keyboard, Link2, Plus, Receipt } from "lucide-react";
+import { Bell, ChevronDown, Keyboard, Link2, Plus, Printer, Receipt } from "lucide-react";
 import type { Order, OrderStatus, TableCallResponse } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { MergeTablesModal } from "@/components/admin/merge-tables-modal";
+import { PreCuentaModal } from "@/components/admin/pre-cuenta-modal";
+import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
 import {
   TableCallAlerts,
   type TableCallPrimaryAction,
@@ -230,6 +232,10 @@ interface WaiterTablesBoardProps {
   initialOrders: Order[];
   /** Total de mesas del salón (configurado en settings). */
   floorSize: number;
+  /** Datos de marca para el ticket (nombre, dirección, WhatsApp). */
+  restaurantInfo?: RestaurantTicketInfo;
+  /** Enlace a historial de pedidos (admin/owner). */
+  historyHref?: string | null;
 }
 
 export function WaiterTablesBoard({
@@ -237,13 +243,22 @@ export function WaiterTablesBoard({
   restaurantName,
   initialOrders,
   floorSize,
+  restaurantInfo,
+  historyHref = null,
 }: WaiterTablesBoardProps) {
+  const ticketRestaurant: RestaurantTicketInfo = restaurantInfo ?? {
+    name: restaurantName,
+  };
   const [orders, setOrders] = useState(() =>
     initialOrders.filter((o) => ACTIVE.includes(o.status)),
   );
   const [connection, setConnection] =
     useState<KitchenConnectionState>("connecting");
   const [closeTarget, setCloseTarget] = useState<Order | null>(null);
+  const [preCuentaOrder, setPreCuentaOrder] = useState<Order | null>(null);
+  const [preCuentaKind, setPreCuentaKind] = useState<"pre-cuenta" | "cuenta">(
+    "pre-cuenta",
+  );
   const [closeError, setCloseError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -746,8 +761,7 @@ export function WaiterTablesBoard({
       return { label: "Cobrar", tone: "live" };
     }
     if (call.callType === "BILL" && order) {
-      // Not Por cobrar yet — park+focus; never soft-dismiss money signal.
-      return { label: "Ver mesa" };
+      return { label: "Ticket" };
     }
     if (order) {
       return {
@@ -788,9 +802,11 @@ export function WaiterTablesBoard({
       return;
     }
     if (call.callType === "BILL" && order) {
-      // Park + focus — keep the money signal until Cobrar or explicit discard.
+      // Park + open pre-cuenta — keep the money signal until Cobrar or discard.
       if (!parkCallAction(call.id)) return;
       focusAccountCard(order.uuid);
+      setPreCuentaKind("pre-cuenta");
+      setPreCuentaOrder(order);
       return;
     }
     if (order) {
@@ -1086,29 +1102,41 @@ export function WaiterTablesBoard({
           {order.formattedTotal || formatCurrency(order.totalAmount)}
         </p>
 
-        <div
-          className={`mt-4 grid grid-cols-1 gap-2 ${
-            showCardCharge ? "sm:grid-cols-2" : ""
-          }`}
-        >
-          {order.orderType === "IN_TABLE" ? (
+        <div className="mt-4 flex flex-col gap-2">
+          <div
+            className={`grid gap-2 ${
+              order.orderType === "IN_TABLE" ? "grid-cols-2" : "grid-cols-1"
+            }`}
+          >
             <button
               type="button"
-              onClick={() => openPosForOrder(order)}
-              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold ${focusRing}`}
+              onClick={() => {
+                setPreCuentaKind("pre-cuenta");
+                setPreCuentaOrder(order);
+              }}
+              title="Imprimir o enviar pre-cuenta"
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 text-sm font-semibold ${focusRing}`}
             >
-              <Plus className="size-4" aria-hidden />
-              Adición
+              <Printer className="size-4" aria-hidden />
+              Ticket
             </button>
-          ) : null}
+            {order.orderType === "IN_TABLE" ? (
+              <button
+                type="button"
+                onClick={() => openPosForOrder(order)}
+                className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold ${focusRing}`}
+              >
+                <Plus className="size-4" aria-hidden />
+                Adición
+              </button>
+            ) : null}
+          </div>
           {showCardCharge ? (
             <button
               type="button"
               onClick={() => openCloseDialog(order)}
               title="Cierra la cuenta y libera la mesa"
-              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-live px-3 text-sm font-bold text-live-foreground ${focusRing} ${
-                order.orderType !== "IN_TABLE" ? "sm:col-span-2" : ""
-              }`}
+              className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-live px-3 text-sm font-bold text-live-foreground ${focusRing}`}
             >
               <Receipt className="size-4" aria-hidden />
               Cobrar
@@ -1141,6 +1169,14 @@ export function WaiterTablesBoard({
         <div className="flex flex-wrap items-center gap-2">
           <AdminConnectionBadge state={connection} />
           <WaiterShortcutCheatsheet />
+          {historyHref ? (
+            <a
+              href={historyHref}
+              className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-3 text-sm font-semibold ${focusRing}`}
+            >
+              Historial
+            </a>
+          ) : null}
           <button
             type="button"
             disabled={freeTables.length === 0}
@@ -1464,6 +1500,21 @@ export function WaiterTablesBoard({
               })()
             : ""
         }
+        detail={
+          closeTarget ? (
+            <button
+              type="button"
+              onClick={() => {
+                setPreCuentaKind("cuenta");
+                setPreCuentaOrder(closeTarget);
+              }}
+              className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold ${focusRing}`}
+            >
+              <Printer className="size-4" aria-hidden />
+              Imprimir cuenta antes de cobrar
+            </button>
+          ) : null
+        }
         confirmLabel="Cobrar"
         busyLabel="Cobrando…"
         tone="live"
@@ -1471,6 +1522,14 @@ export function WaiterTablesBoard({
         error={closeError}
         onConfirm={() => void confirmClose()}
         onCancel={cancelCloseDialog}
+      />
+
+      <PreCuentaModal
+        open={preCuentaOrder != null}
+        onClose={() => setPreCuentaOrder(null)}
+        order={preCuentaOrder}
+        restaurant={ticketRestaurant}
+        kind={preCuentaKind}
       />
 
       <ConfirmDialog

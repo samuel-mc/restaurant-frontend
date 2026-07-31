@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from "react";
-import { Check } from "lucide-react";
+import { Check, Printer } from "lucide-react";
 import type { Order, OrderItem, OrderItemStatus, OrderStatus } from "@/types/api";
 import { maxBatchNumber } from "@/lib/order-mapper";
 
@@ -25,6 +25,8 @@ interface OrderTicketProps {
   advanceLocked?: boolean;
   onAdvance: (order: Order) => void;
   onCloseAccount: (order: Order) => void;
+  /** Abre pre-cuenta / impresión (p. ej. en Por cobrar). */
+  onPrintTicket?: (order: Order) => void;
   onItemStatus: (order: Order, item: OrderItem, status: OrderItemStatus) => void;
   onSelect?: (order: Order) => void;
 }
@@ -123,6 +125,7 @@ export function OrderTicket({
   advanceLocked = false,
   onAdvance,
   onCloseAccount,
+  onPrintTicket,
   onItemStatus,
   onSelect,
 }: OrderTicketProps) {
@@ -414,6 +417,21 @@ export function OrderTicket({
                 ? "Cobrar registra el pago, cierra la cuenta y libera la mesa."
                 : "Cobrar registra el pago y cierra la cuenta."}
           </p>
+          {onPrintTicket ? (
+            <button
+              type="button"
+              disabled={controlsDisabled}
+              title="Imprimir o enviar ticket de cuenta"
+              onClick={(event) => {
+                event.stopPropagation();
+                onPrintTicket(order);
+              }}
+              className={`mb-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm font-semibold transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 ${focusRing}`}
+            >
+              <Printer className="size-4" aria-hidden />
+              Ticket
+            </button>
+          ) : null}
           <button
             type="button"
             disabled={stageDisabled}

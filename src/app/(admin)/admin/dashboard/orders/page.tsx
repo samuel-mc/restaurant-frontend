@@ -13,9 +13,11 @@ import {
   STAFF_LOGIN_PATH,
 } from "@/lib/jwt-payload";
 import { getActiveOrders, listOrders } from "@/services/adminOrderQueries";
+import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 import { getTableFloorConfig } from "@/services/adminTableQueries";
 import { ApiError } from "@/services/apiClient";
-import type { Order, OrderPage } from "@/types/api";
+import type { Order, OrderPage, RestaurantProfile } from "@/types/api";
+import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
 
 export const metadata: Metadata = {
   title: "Gestión de Mesas · Panel",
@@ -25,10 +27,26 @@ export const metadata: Metadata = {
 const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
+function ticketInfoFromProfile(
+  profile: RestaurantProfile | null,
+  fallbackName: string,
+): RestaurantTicketInfo {
+  return {
+    name: profile?.name?.trim() || fallbackName,
+    address: profile?.address ?? null,
+    phone: profile?.whatsapp ?? null,
+  };
+}
+
 /**
  * Pedidos / mesas. Para ROLE_MESERO es la pantalla de inicio operativa.
+ * Admin/owner: salón por defecto; `?vista=historial` para auditoría.
  */
-export default async function AdminOrdersPage() {
+export default async function AdminOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ vista?: string | string[] }>;
+}) {
   const tenantSlug = (await headers()).get("x-tenant-slug")?.trim() ?? "";
   if (!tenantSlug) {
     return (
@@ -49,11 +67,24 @@ export default async function AdminOrdersPage() {
   }
 
   const role = normalizePanelRole(extractRoleFromToken(token));
-  const restaurantName = prettifyTenantSlug(tenantSlug);
+  const fallbackName = prettifyTenantSlug(tenantSlug);
+  const query = await searchParams;
+  const vistaRaw = Array.isArray(query.vista) ? query.vista[0] : query.vista;
+  const showHistory =
+    role !== "MESERO" && vistaRaw?.trim().toLowerCase() === "historial";
 
-  if (role === "MESERO") {
+  let profile: RestaurantProfile | null = null;
+  try {
+    profile = await getRestaurantProfile(tenantSlug);
+  } catch {
+    profile = null;
+  }
+  const restaurantName = profile?.name?.trim() || fallbackName;
+  const restaurantInfo = ticketInfoFromProfile(profile, fallbackName);
+
+  if (!showHistory) {
     let activeOrders: Order[] = [];
-    let tableCount = 12;
+    let tableCount = profile?.tableCount ?? 12;
     let loadError: string | null = null;
     try {
       const [orders, floor] = await Promise.all([
@@ -94,8 +125,12 @@ export default async function AdminOrdersPage() {
       <WaiterTablesBoard
         tenantSlug={tenantSlug}
         restaurantName={restaurantName}
+        restaurantInfo={restaurantInfo}
         initialOrders={activeOrders}
         floorSize={tableCount}
+        historyHref={
+          role === "MESERO" ? null : "/admin/dashboard/orders?vista=historial"
+        }
       />
     );
   }
@@ -130,7 +165,7 @@ export default async function AdminOrdersPage() {
           {loadError ?? "Error desconocido."}
         </p>
         <Link
-          href="/admin/dashboard/orders"
+          href="/admin/dashboard/orders?vista=historial"
           className={`mt-2 inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground ${focusRing}`}
         >
           <RefreshCw className="size-4" aria-hidden />
@@ -144,8 +179,10 @@ export default async function AdminOrdersPage() {
     <OrdersBoard
       tenantSlug={tenantSlug}
       restaurantName={restaurantName}
+      restaurantInfo={restaurantInfo}
       initialPage={initialPage}
       initialFilter="ALL"
+      salonHref="/admin/dashboard/orders"
     />
   );
 }

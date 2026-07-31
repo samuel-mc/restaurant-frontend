@@ -6,12 +6,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Keyboard } from "lucide-react";
+import { Keyboard, Printer } from "lucide-react";
 import type { Order, OrderItem, OrderItemStatus, OrderStatus } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
 import { OrderTicket } from "@/components/admin/order-ticket";
+import { PreCuentaModal } from "@/components/admin/pre-cuenta-modal";
 import {
   useKitchenOrdersSubscription,
   type KitchenConnectionState,
@@ -24,6 +25,7 @@ import {
 } from "@/services/adminOrderService";
 import { getAdminErrorMessage } from "@/lib/admin-error";
 import { maxBatchNumber } from "@/lib/order-mapper";
+import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
 
 const UNDO_WINDOW_MS = 9_000;
 /** Misma regla visual que el borde rojo del ticket. */
@@ -102,6 +104,7 @@ interface KitchenDashboardProps {
    * etiquetas PENDIENTE / PREPARANDO / LISTO y tipografía más grande.
    */
   kdsMode?: boolean;
+  restaurantInfo?: RestaurantTicketInfo;
 }
 
 const FOCUS_PRIORITY: OrderStatus[] = [
@@ -206,7 +209,11 @@ export function KitchenDashboard({
   initialOrders,
   focusOrderUuid = null,
   kdsMode = false,
+  restaurantInfo,
 }: KitchenDashboardProps) {
+  const ticketRestaurant: RestaurantTicketInfo = restaurantInfo ?? {
+    name: restaurantName,
+  };
   const router = useRouter();
   const deepLinkOrder = findActiveOrder(initialOrders, focusOrderUuid);
   const columns = useMemo(
@@ -230,6 +237,10 @@ export function KitchenDashboard({
   const [statusUndo, setStatusUndo] = useState<StatusUndo | null>(null);
   const [undoSecondsLeft, setUndoSecondsLeft] = useState(0);
   const [closeTarget, setCloseTarget] = useState<Order | null>(null);
+  const [preCuentaOrder, setPreCuentaOrder] = useState<Order | null>(null);
+  const [preCuentaKind, setPreCuentaKind] = useState<"pre-cuenta" | "cuenta">(
+    "cuenta",
+  );
   const [closing, setClosing] = useState(false);
   const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
   const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
@@ -811,6 +822,12 @@ export function KitchenDashboard({
                 onCloseAccount={(order) => {
                   if (!actionsLocked) setCloseTarget(order);
                 }}
+                onPrintTicket={(order) => {
+                  setPreCuentaKind(
+                    order.status === "DELIVERED" ? "cuenta" : "pre-cuenta",
+                  );
+                  setPreCuentaOrder(order);
+                }}
                 onItemStatus={handleItemStatus}
                 onSelect={(selected) => setSelectedUuid(selected.uuid)}
               />
@@ -1007,6 +1024,21 @@ export function KitchenDashboard({
               : `Se marcará ${orderWho(closeTarget)} (#${closeTarget.uuid.slice(0, 8).toUpperCase()}) como pagada (${closeTarget.formattedTotal}) y se cerrará la cuenta.`
             : ""
         }
+        detail={
+          closeTarget ? (
+            <button
+              type="button"
+              onClick={() => {
+                setPreCuentaKind("cuenta");
+                setPreCuentaOrder(closeTarget);
+              }}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+            >
+              <Printer className="size-4" aria-hidden />
+              Imprimir cuenta antes de cobrar
+            </button>
+          ) : null
+        }
         confirmLabel="Cobrar y cerrar"
         busyLabel="Cerrando…"
         cancelLabel="Cancelar"
@@ -1016,6 +1048,14 @@ export function KitchenDashboard({
         onCancel={() => {
           if (!closing) setCloseTarget(null);
         }}
+      />
+
+      <PreCuentaModal
+        open={preCuentaOrder != null}
+        onClose={() => setPreCuentaOrder(null)}
+        order={preCuentaOrder}
+        restaurant={ticketRestaurant}
+        kind={preCuentaKind}
       />
     </div>
   );

@@ -12,8 +12,10 @@ import {
   STAFF_LOGIN_PATH,
 } from "@/lib/jwt-payload";
 import { getActiveOrders } from "@/services/adminOrderQueries";
+import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 import { ApiError } from "@/services/apiClient";
-import type { Order } from "@/types/api";
+import type { Order, RestaurantProfile } from "@/types/api";
+import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
 
 export const metadata: Metadata = {
   title: "Monitor de Cocina · Panel",
@@ -29,6 +31,17 @@ function parseOrderUuid(
   const value = Array.isArray(raw) ? raw[0] : raw;
   const trimmed = value?.trim() ?? "";
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function ticketInfoFromProfile(
+  profile: RestaurantProfile | null,
+  fallbackName: string,
+): RestaurantTicketInfo {
+  return {
+    name: profile?.name?.trim() || fallbackName,
+    address: profile?.address ?? null,
+    phone: profile?.whatsapp ?? null,
+  };
 }
 
 /**
@@ -61,15 +74,22 @@ export default async function AdminKitchenPage({
 
   const role = normalizePanelRole(extractRoleFromToken(token));
   const kdsMode = role === "COCINA";
+  const fallbackName = prettifyTenantSlug(tenantSlug);
 
   const query = await searchParams;
   const focusOrderUuid = parseOrderUuid(query.order);
 
   let initialOrders: Order[] = [];
   let loadError: string | null = null;
+  let profile: RestaurantProfile | null = null;
 
   try {
-    initialOrders = await getActiveOrders(tenantSlug);
+    const [orders, restaurantProfile] = await Promise.all([
+      getActiveOrders(tenantSlug),
+      getRestaurantProfile(tenantSlug).catch(() => null),
+    ]);
+    initialOrders = orders;
+    profile = restaurantProfile;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       redirect(STAFF_LOGIN_PATH);
@@ -102,10 +122,13 @@ export default async function AdminKitchenPage({
     );
   }
 
+  const restaurantName = profile?.name?.trim() || fallbackName;
+
   return (
     <KitchenDashboard
       tenantSlug={tenantSlug}
-      restaurantName={prettifyTenantSlug(tenantSlug)}
+      restaurantName={restaurantName}
+      restaurantInfo={ticketInfoFromProfile(profile, fallbackName)}
       initialOrders={initialOrders}
       focusOrderUuid={focusOrderUuid}
       kdsMode={kdsMode}

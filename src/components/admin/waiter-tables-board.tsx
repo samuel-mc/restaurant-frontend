@@ -248,6 +248,7 @@ export function WaiterTablesBoard({
 }: WaiterTablesBoardProps) {
   const ticketRestaurant: RestaurantTicketInfo = restaurantInfo ?? {
     name: restaurantName,
+    tenantSlug,
   };
   const [orders, setOrders] = useState(() =>
     initialOrders.filter((o) => ACTIVE.includes(o.status)),

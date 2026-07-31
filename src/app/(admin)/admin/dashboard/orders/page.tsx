@@ -17,7 +17,7 @@ import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 import { getTableFloorConfig } from "@/services/adminTableQueries";
 import { ApiError } from "@/services/apiClient";
 import type { Order, OrderPage, RestaurantProfile } from "@/types/api";
-import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
+import { ticketInfoFromProfile } from "@/lib/ticket-from-order";
 
 export const metadata: Metadata = {
   title: "Gestión de Mesas · Panel",
@@ -26,17 +26,6 @@ export const metadata: Metadata = {
 
 const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
-function ticketInfoFromProfile(
-  profile: RestaurantProfile | null,
-  fallbackName: string,
-): RestaurantTicketInfo {
-  return {
-    name: profile?.name?.trim() || fallbackName,
-    address: profile?.address ?? null,
-    phone: profile?.whatsapp ?? null,
-  };
-}
 
 /**
  * Pedidos / mesas. Para ROLE_MESERO es la pantalla de inicio operativa.
@@ -80,7 +69,11 @@ export default async function AdminOrdersPage({
     profile = null;
   }
   const restaurantName = profile?.name?.trim() || fallbackName;
-  const restaurantInfo = ticketInfoFromProfile(profile, fallbackName);
+  const restaurantInfo = ticketInfoFromProfile(
+    profile,
+    fallbackName,
+    tenantSlug,
+  );
 
   if (!showHistory) {
     let activeOrders: Order[] = [];

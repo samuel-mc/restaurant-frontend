@@ -2,8 +2,12 @@
  * Mapeo Order → props de ticket térmico (pre-cuenta / cuenta).
  */
 
-import type { Order } from "@/types/api";
-import type { TicketItem, TicketReceiptProps } from "@/components/admin/ticket-receipt";
+import type { Order, RestaurantProfile } from "@/types/api";
+import type {
+  TicketItem,
+  TicketReceiptProps,
+} from "@/components/admin/ticket-receipt";
+import { buildTenantSiteUrl } from "@/lib/qr-menu-url";
 
 export interface RestaurantTicketInfo {
   name: string;
@@ -11,9 +15,40 @@ export interface RestaurantTicketInfo {
   phone?: string | null;
   /** Opcional: aún no existe en perfil de tenant. */
   rfc?: string | null;
+  /** Slug del tenant para QR / URLs públicas del comensal. */
+  tenantSlug?: string | null;
 }
 
 export type TicketKind = "pre-cuenta" | "cuenta";
+
+/** Datos de restaurante para el ticket a partir del perfil admin. */
+export function ticketInfoFromProfile(
+  profile: RestaurantProfile | null,
+  fallbackName: string,
+  tenantSlug?: string,
+): RestaurantTicketInfo {
+  return {
+    name: profile?.name?.trim() || fallbackName,
+    address: profile?.address ?? null,
+    phone: profile?.whatsapp ?? null,
+    tenantSlug: tenantSlug?.trim() || null,
+  };
+}
+
+/**
+ * Cuenta al cobrar / pedido entregado o cerrado; pre-cuenta en operación activa.
+ * `preferred` gana cuando el flujo lo fija (p. ej. diálogo Cobrar → cuenta).
+ */
+export function resolveTicketKind(
+  order: Order,
+  preferred?: TicketKind,
+): TicketKind {
+  if (preferred) return preferred;
+  if (order.status === "CLOSED" || order.status === "DELIVERED") {
+    return "cuenta";
+  }
+  return "pre-cuenta";
+}
 
 /** Folio legible: id numérico o prefijo del UUID. */
 export function orderFolio(order: Order): string {
@@ -29,7 +64,10 @@ export function orderTicketLabel(order: Order): string {
       .map((t) => t.trim())
       .filter(Boolean);
     if (linked.length > 0) {
-      return `Mesa ${primary} (+${linked.join(", ")})`;
+      const all = [primary, ...linked].sort((a, b) =>
+        a.localeCompare(b, "es", { numeric: true }),
+      );
+      return `Mesa ${all.join("-")}`;
     }
     return `Mesa ${primary}`;
   }
@@ -86,8 +124,18 @@ export function formatTicketDateTime(iso: string | null | undefined): string {
   });
 }
 
-/** URL pública de seguimiento / rating del pedido (mismo origen del tenant). */
-export function orderPublicUrl(orderUuid: string): string {
+/**
+ * URL pública de seguimiento / rating del pedido (zona comensal del tenant).
+ * Prefiere `https://{slug}.{domain}/orders/{uuid}` para no depender del path admin.
+ */
+export function orderPublicUrl(
+  orderUuid: string,
+  tenantSlug?: string | null,
+): string {
+  const slug = tenantSlug?.trim();
+  if (slug) {
+    return `${buildTenantSiteUrl(slug)}/orders/${orderUuid}`;
+  }
   if (typeof window === "undefined") return `/orders/${orderUuid}`;
   return `${window.location.origin}/orders/${orderUuid}`;
 }
@@ -95,9 +143,11 @@ export function orderPublicUrl(orderUuid: string): string {
 export function buildTicketReceiptProps(
   order: Order,
   restaurant: RestaurantTicketInfo,
-  kind: TicketKind = "pre-cuenta",
+  /** Si se omite, se deriva del status del pedido. */
+  kind?: TicketKind,
 ): TicketReceiptProps {
   const total = order.totalAmount;
+  const resolved = resolveTicketKind(order, kind);
   return {
     restaurantName: restaurant.name,
     rfc: restaurant.rfc?.trim() || undefined,
@@ -111,15 +161,15 @@ export function buildTicketReceiptProps(
     subtotal: total,
     taxAmount: taxIncludedFromTotal(total),
     total,
-    qrUrl: orderPublicUrl(order.uuid),
+    qrUrl: orderPublicUrl(order.uuid, restaurant.tenantSlug),
     qrCaption:
-      kind === "cuenta"
+      resolved === "cuenta"
         ? "Escanea para calificar tu experiencia"
         : "Escanea para ver el estado de tu pedido",
     customNote:
-      kind === "cuenta"
+      resolved === "cuenta"
         ? "¡Gracias por su preferencia!"
         : "PRE-CUENTA · No es comprobante fiscal",
-    ticketKind: kind,
+    ticketKind: resolved,
   };
 }

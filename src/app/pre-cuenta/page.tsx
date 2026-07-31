@@ -102,13 +102,15 @@ const DEMO_RESTAURANT = {
   rfc: "TRA980415-HK2",
   address: "Av. Revolución 1234, Col. Condesa, CDMX",
   phone: "(55) 8765-4321",
+  tenantSlug: "latrattoria",
 };
 
 export default function PreCuentaShowcasePage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [kind, setKind] = useState<"pre-cuenta" | "cuenta">("pre-cuenta");
   const preview = useMemo(
-    () => buildTicketReceiptProps(DEMO_ORDER, DEMO_RESTAURANT, "pre-cuenta"),
-    [],
+    () => buildTicketReceiptProps(DEMO_ORDER, DEMO_RESTAURANT, kind),
+    [kind],
   );
 
   return (
@@ -132,11 +134,33 @@ export default function PreCuentaShowcasePage() {
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
+          onClick={() => setKind("pre-cuenta")}
+          className={`inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold ${
+            kind === "pre-cuenta"
+              ? "bg-primary text-primary-foreground"
+              : "border border-border bg-card"
+          }`}
+        >
+          Pre-cuenta
+        </button>
+        <button
+          type="button"
+          onClick={() => setKind("cuenta")}
+          className={`inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold ${
+            kind === "cuenta"
+              ? "bg-primary text-primary-foreground"
+              : "border border-border bg-card"
+          }`}
+        >
+          Cuenta
+        </button>
+        <button
+          type="button"
           onClick={() => setModalOpen(true)}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-secondary px-4 text-sm font-bold"
         >
           <Printer className="size-4" aria-hidden />
-          Abrir modal de pre-cuenta
+          Abrir modal
         </button>
       </div>
 
@@ -149,7 +173,7 @@ export default function PreCuentaShowcasePage() {
         onClose={() => setModalOpen(false)}
         order={DEMO_ORDER}
         restaurant={DEMO_RESTAURANT}
-        kind="pre-cuenta"
+        kind={kind}
       />
     </div>
   );

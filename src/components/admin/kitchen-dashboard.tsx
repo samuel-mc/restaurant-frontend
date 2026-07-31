@@ -25,7 +25,10 @@ import {
 } from "@/services/adminOrderService";
 import { getAdminErrorMessage } from "@/lib/admin-error";
 import { maxBatchNumber } from "@/lib/order-mapper";
-import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
+import {
+  resolveTicketKind,
+  type RestaurantTicketInfo,
+} from "@/lib/ticket-from-order";
 
 const UNDO_WINDOW_MS = 9_000;
 /** Misma regla visual que el borde rojo del ticket. */
@@ -213,6 +216,7 @@ export function KitchenDashboard({
 }: KitchenDashboardProps) {
   const ticketRestaurant: RestaurantTicketInfo = restaurantInfo ?? {
     name: restaurantName,
+    tenantSlug,
   };
   const router = useRouter();
   const deepLinkOrder = findActiveOrder(initialOrders, focusOrderUuid);
@@ -823,9 +827,7 @@ export function KitchenDashboard({
                   if (!actionsLocked) setCloseTarget(order);
                 }}
                 onPrintTicket={(order) => {
-                  setPreCuentaKind(
-                    order.status === "DELIVERED" ? "cuenta" : "pre-cuenta",
-                  );
+                  setPreCuentaKind(resolveTicketKind(order));
                   setPreCuentaOrder(order);
                 }}
                 onItemStatus={handleItemStatus}

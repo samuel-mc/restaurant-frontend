@@ -189,7 +189,7 @@ export function TicketReceipt({
 
       <div className="space-y-1.5 border-b border-black py-2.5 text-right">
         <div className="flex justify-between text-[11px]">
-          <span className="text-slate-600">Subtotal:</span>
+          <span className="text-slate-600">Consumo:</span>
           <span className="tabular-nums">
             {formatCurrency(computedSubtotal)}
           </span>

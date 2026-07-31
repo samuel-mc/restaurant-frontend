@@ -501,9 +501,14 @@ body:has(.b2b-landing) {
   }
 }
 
-/* Ticket térmico 80mm — solo activo con body.print-thermal-ticket */
+/* Ticket térmico 80mm — hoja en portal; solo visible al imprimir */
 .thermal-print-sheet {
-  display: none;
+  display: none !important;
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 80mm;
+  pointer-events: none;
 }
 
 @media print {

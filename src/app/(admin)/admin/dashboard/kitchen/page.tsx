@@ -15,7 +15,7 @@ import { getActiveOrders } from "@/services/adminOrderQueries";
 import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 import { ApiError } from "@/services/apiClient";
 import type { Order, RestaurantProfile } from "@/types/api";
-import type { RestaurantTicketInfo } from "@/lib/ticket-from-order";
+import { ticketInfoFromProfile } from "@/lib/ticket-from-order";
 
 export const metadata: Metadata = {
   title: "Monitor de Cocina · Panel",
@@ -31,17 +31,6 @@ function parseOrderUuid(
   const value = Array.isArray(raw) ? raw[0] : raw;
   const trimmed = value?.trim() ?? "";
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function ticketInfoFromProfile(
-  profile: RestaurantProfile | null,
-  fallbackName: string,
-): RestaurantTicketInfo {
-  return {
-    name: profile?.name?.trim() || fallbackName,
-    address: profile?.address ?? null,
-    phone: profile?.whatsapp ?? null,
-  };
 }
 
 /**
@@ -128,7 +117,11 @@ export default async function AdminKitchenPage({
     <KitchenDashboard
       tenantSlug={tenantSlug}
       restaurantName={restaurantName}
-      restaurantInfo={ticketInfoFromProfile(profile, fallbackName)}
+      restaurantInfo={ticketInfoFromProfile(
+        profile,
+        fallbackName,
+        tenantSlug,
+      )}
       initialOrders={initialOrders}
       focusOrderUuid={focusOrderUuid}
       kdsMode={kdsMode}

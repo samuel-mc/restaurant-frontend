@@ -265,6 +265,7 @@ export function OrdersBoard({
 }: OrdersBoardProps) {
   const ticketRestaurant: RestaurantTicketInfo = restaurantInfo ?? {
     name: restaurantName,
+    tenantSlug,
   };
   const [filter, setFilter] = useState<AdminOrderListFilter>(initialFilter);
   const [pageIndex, setPageIndex] = useState(initialPage.number);
@@ -656,12 +657,6 @@ export function OrdersBoard({
         onClose={() => setPreCuentaOrder(null)}
         order={preCuentaOrder}
         restaurant={ticketRestaurant}
-        kind={
-          preCuentaOrder?.status === "CLOSED" ||
-          preCuentaOrder?.status === "DELIVERED"
-            ? "cuenta"
-            : "pre-cuenta"
-        }
       />
     </div>
   );

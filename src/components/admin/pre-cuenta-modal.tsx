@@ -19,6 +19,7 @@ import {
   orderTicketLabel,
   resolveTicketKind,
   ticketKindLabel,
+  ticketRecommendedTip,
   ticketTipSuggestions,
   type RestaurantTicketInfo,
   type TicketKind,
@@ -30,7 +31,7 @@ const focusRing =
 
 const PRINT_BODY_CLASS = "print-thermal-ticket";
 const PRINT_PAGE_STYLE_ID = "thermal-print-page-style";
-const PRINT_BUSY_FALLBACK_MS = 60_000;
+const PRINT_BUSY_FALLBACK_MS = 15_000;
 const TOAST_MS = 4_200;
 
 type ToastTone = "live" | "warn" | "danger";
@@ -368,9 +369,22 @@ function PreCuentaModalContent({
     lines.push("--------------------------------");
     lines.push(`*TOTAL: ${formatCurrency(total)}*`);
     lines.push("");
-    lines.push("*Sugerencia de propina:*");
-    for (const tip of ticketTipSuggestions(total)) {
-      lines.push(`• ${tip.label}: ${formatCurrency(tip.amount)}`);
+    const recommended = ticketRecommendedTip(total);
+    lines.push(
+      `*Propina sugerida (${recommended.label}):* ${formatCurrency(recommended.amount)}`,
+    );
+    lines.push(
+      `*Total con propina:* ${formatCurrency(recommended.withTip)}`,
+    );
+    const otherTips = ticketTipSuggestions(total).filter(
+      (tip) => tip.label !== recommended.label,
+    );
+    if (otherTips.length > 0) {
+      lines.push(
+        `_Otras:_ ${otherTips
+          .map((tip) => `${tip.label} ${formatCurrency(tip.amount)}`)
+          .join(" · ")}`,
+      );
     }
     lines.push("");
     if (resolvedKind === "pre-cuenta") {

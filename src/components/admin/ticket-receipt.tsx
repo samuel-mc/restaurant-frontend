@@ -177,25 +177,27 @@ export function TicketReceipt({
         </div>
       </div>
 
-      <div className="my-3 space-y-1 border border-dashed border-black p-2 text-center">
+      <div className="my-3 space-y-1.5 border border-dashed border-black p-2 text-center">
         <p className="text-[10px] font-bold uppercase tracking-wider">
           -- Sugerencia de propina --
         </p>
-        <p className="pb-1 text-[9px] italic leading-none">(No obligatoria)</p>
-        <div className="grid grid-cols-3 gap-1 border-t border-dashed border-black pt-1 text-[9px]">
+        <p className="pb-0.5 text-[9px] italic leading-none">(No obligatoria)</p>
+        <div className="grid grid-cols-3 gap-1.5 border-t border-dashed border-black pt-1.5">
           {tips.map((tip) => (
             <div key={tip.label} className="space-y-0.5">
-              <span className="block text-[10px] font-bold">{tip.label}</span>
-              <span className="block tabular-nums leading-tight">
+              <span className="block text-[11px] font-bold leading-none">
+                {tip.label}
+              </span>
+              <span className="block text-[10px] tabular-nums leading-tight">
                 {formatCurrency(tip.amount)}
               </span>
-              <span className="block border-t border-dashed border-black/50 pt-0.5 font-bold tabular-nums leading-tight">
+              <span className="block border-t border-dashed border-black/50 pt-0.5 text-[11px] font-bold tabular-nums leading-tight">
                 {formatCurrency(tip.withTip)}
               </span>
             </div>
           ))}
         </div>
-        <p className="pt-1 text-[9px] leading-none tracking-wide">
+        <p className="pt-0.5 text-[10px] leading-none tracking-wide">
           % · propina · total c/propina
         </p>
       </div>

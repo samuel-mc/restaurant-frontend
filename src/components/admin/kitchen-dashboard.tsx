@@ -1040,7 +1040,7 @@ export function KitchenDashboard({
 
       <ConfirmDialog
         open={Boolean(closeTarget)}
-        title="¿Cobrar y cerrar cuenta?"
+        title="¿Cobrar y cerrar la cuenta?"
         description={
           closeTarget
             ? closeTarget.orderType === "IN_TABLE"
@@ -1060,11 +1060,11 @@ export function KitchenDashboard({
             </button>
           ) : null
         }
-        confirmLabel="Cobrar y cerrar"
+        confirmLabel="Cobrar"
         busyLabel="Cobrando…"
         cancelLabel="Cancelar"
         busy={closing}
-        tone="neutral"
+        tone="live"
         onConfirm={() => void handleConfirmClose()}
         onCancel={() => {
           if (!closing) {
@@ -1081,7 +1081,7 @@ export function KitchenDashboard({
         restaurant={ticketRestaurant}
         kind={preCuentaKind}
         returnToActionLabel={
-          resumeCloseAfterPrint ? "Cobrar y cerrar" : undefined
+          resumeCloseAfterPrint ? "Cobrar" : undefined
         }
       />
     </div>

@@ -66,6 +66,9 @@ export function ticketInfoFromProfile(
 /** Tasas de propina sugerida en ticket / WhatsApp (MX servicio). */
 export const TICKET_TIP_RATES = [0.1, 0.15, 0.18] as const;
 
+/** Tasa recomendada en mensaje WhatsApp (liquidación rápida). */
+export const TICKET_RECOMMENDED_TIP_RATE = 0.15 as const;
+
 export function ticketTipSuggestions(
   total: number,
 ): Array<{ label: string; amount: number; withTip: number }> {
@@ -78,6 +81,20 @@ export function ticketTipSuggestions(
       withTip: total + amount,
     };
   });
+}
+
+/** Una propina sugerida con total a liquidar (WhatsApp). */
+export function ticketRecommendedTip(total: number): {
+  label: string;
+  amount: number;
+  withTip: number;
+} {
+  const amount = total * TICKET_RECOMMENDED_TIP_RATE;
+  return {
+    label: `${Math.round(TICKET_RECOMMENDED_TIP_RATE * 100)}%`,
+    amount,
+    withTip: total + amount,
+  };
 }
 
 /**

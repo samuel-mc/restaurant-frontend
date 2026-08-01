@@ -14,7 +14,7 @@ interface ConfirmDialogProps {
   /** Bloque adicional bajo la descripción (p. ej. PIN a confirmar). */
   detail?: ReactNode;
   confirmLabel?: string;
-  /** Texto del botón confirm mientras `busy` (p. ej. "Cerrando…"). */
+  /** Texto del botón confirm mientras `busy` (p. ej. "Cobrando…"). */
   busyLabel?: string;
   cancelLabel?: string;
   busy?: boolean;

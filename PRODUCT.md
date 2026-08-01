@@ -49,7 +49,7 @@ No es solo un menú QR genérico ni una plantilla compartida masiva. El diferenc
 
 - Dominios custom por restaurante (viable en arquitectura; implementación pendiente).
 - Estándar formal de accesibilidad (WCAG AA u otro) — aún no requisito explícito.
-- Smoke E2E completo del loop pedido → cocina → tracking (pendiente en roadmap).
+- Smoke E2E del loop pedido → cocina → tracking (`npm run test:e2e`, PICKUP).
 
 ## Brand Commitments
 

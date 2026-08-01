@@ -426,6 +426,7 @@ export function OrderTracker({
           />
           <p
             key={order.status}
+            data-testid="order-status-label"
             className="mt-4 text-2xl font-extrabold tracking-tight text-foreground motion-safe:animate-[fade-up_0.45s_ease-out]"
           >
             {getStatusLabel(order.status)}

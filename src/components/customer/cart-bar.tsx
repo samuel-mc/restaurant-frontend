@@ -557,6 +557,7 @@ export function CartBar({
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md cart-bar-enter p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <button
           type="button"
+          data-testid="cart-open"
           onClick={openSheet}
           aria-label={`${barLabel}. Total ${formatCurrency(subtotal)}`}
           className={`${focusRing} pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl px-5 py-4 font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition-transform active:scale-[0.98] ${
@@ -1268,6 +1269,7 @@ export function CartBar({
 
                   <button
                     type="button"
+                    data-testid="cart-confirm-order"
                     disabled={isSubmitting}
                     aria-busy={isSubmitting}
                     onClick={() => {

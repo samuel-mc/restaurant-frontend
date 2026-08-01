@@ -387,6 +387,7 @@ export function OrderTicket({
       {action ? (
         <button
           type="button"
+          data-testid="kitchen-advance"
           disabled={stageDisabled}
           title={
             actionsLocked

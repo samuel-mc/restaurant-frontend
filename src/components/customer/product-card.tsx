@@ -231,6 +231,7 @@ export function ProductCard({
             ) : (
               <button
                 type="button"
+                data-testid="menu-add-product"
                 onClick={() => setAddSheetOpen(true)}
                 className={`${focusRing} inline-flex min-h-11 items-center gap-1 rounded-xl bg-[var(--menu-accent)] px-3.5 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.97]`}
               >

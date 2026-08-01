@@ -244,6 +244,7 @@ export function ProductAddSheet({
         <div className="shrink-0 border-t border-border px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
+            data-testid="product-add-confirm"
             onClick={handleConfirm}
             className={`${focusRing} flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--menu-accent)] px-4 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.98]`}
           >

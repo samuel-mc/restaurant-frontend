@@ -192,6 +192,7 @@ export function ProductAddSheet({
                         <button
                           key={opt.uuid}
                           type="button"
+                          data-testid={`product-modifier-option-${opt.uuid}`}
                           onClick={() =>
                             toggleOption(group.uuid, opt.uuid, group.maxSelect)
                           }
@@ -235,7 +236,7 @@ export function ProductAddSheet({
           </label>
 
           {error ? (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" data-testid="product-add-error" className="text-sm text-destructive">
               {error}
             </p>
           ) : null}

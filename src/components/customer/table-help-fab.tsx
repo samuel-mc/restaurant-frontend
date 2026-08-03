@@ -335,6 +335,7 @@ export function TableHelpFab({
         <button
           type="button"
           onClick={openSheet}
+          data-testid="table-help-fab"
           aria-expanded={open}
           aria-haspopup="dialog"
           aria-label={
@@ -493,6 +494,7 @@ export function TableHelpFab({
                   <button
                     type="button"
                     disabled={busy}
+                    data-testid="table-help-waiter"
                     onClick={() => {
                       setError(null);
                       setPendingRetry(null);
@@ -515,6 +517,7 @@ export function TableHelpFab({
                   <button
                     type="button"
                     disabled={busy}
+                    data-testid="table-help-bill"
                     onClick={() => {
                       setError(null);
                       setPendingRetry(null);
@@ -576,6 +579,7 @@ export function TableHelpFab({
                       ref={confirmActionRef}
                       type="button"
                       disabled={busy}
+                      data-testid="table-help-waiter-confirm"
                       aria-busy={waiterBusy || undefined}
                       onClick={() => void sendCall("WAITER")}
                       className={`min-h-12 rounded-xl bg-warn px-2 text-sm font-bold text-warn-foreground disabled:opacity-60 ${touchPress} ${focusRing}`}

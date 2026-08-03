@@ -381,6 +381,22 @@ export const useCartStore = create<CartState>()(
   ),
 );
 
+/**
+ * Espera la rehidratación de localStorage sin tocar `persist` en el render
+ * (en SSR de Next a veces `useCartStore.persist` no está listo → TypeError).
+ */
+export function subscribeCartHydration(onReady: () => void): () => void {
+  const api = useCartStore.persist;
+  if (!api?.hasHydrated || !api.onFinishHydration) {
+    onReady();
+    return () => undefined;
+  }
+  if (api.hasHydrated()) {
+    onReady();
+  }
+  return api.onFinishHydration(onReady);
+}
+
 export const useCartCount = (): number =>
   useCartStore((state) =>
     Object.values(state.lines).reduce((total, line) => total + line.quantity, 0),

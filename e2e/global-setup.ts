@@ -1,5 +1,5 @@
 /**
- * Bootstrap API del tenant e2e: registro → Pro ACTIVE (SQL local) → ordering+pickup → producto.
+ * Bootstrap API del tenant e2e: registro → Pro ACTIVE (SQL local) → ordering+pickup+delivery → producto → staff PIN.
  *
  * No depende de SuperAdmin (la contraseña local suele vivir en secrets no versionados).
  * Requiere Docker container `restaurant-db` accesible (compose del backend).
@@ -8,6 +8,7 @@
 import { execFileSync } from "node:child_process";
 import type { FullConfig } from "@playwright/test";
 import { e2eEnv } from "./fixtures/env";
+import { ensureE2eStaff } from "./fixtures/api";
 
 const TENANT_HEADER = "X-Tenant";
 
@@ -138,11 +139,11 @@ async function enableOrdering(ownerToken: string): Promise<void> {
     body: JSON.stringify({
       orderingEnabled: true,
       hasPickup: true,
-      hasDelivery: false,
+      hasDelivery: true,
     }),
   });
   if (status >= 400) {
-    throw new Error(`Activar ordering/pickup falló (${status}): ${raw}`);
+    throw new Error(`Activar ordering/pickup/delivery falló (${status}): ${raw}`);
   }
 }
 
@@ -212,5 +213,6 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   activateProViaSql();
   await enableOrdering(ownerToken);
   await ensureProduct(ownerToken);
+  await ensureE2eStaff(ownerToken);
   console.log(`[e2e] Tenant listo: ${e2eEnv.tenantBaseUrl}`);
 }

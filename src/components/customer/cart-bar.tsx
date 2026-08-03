@@ -845,6 +845,7 @@ export function CartBar({
                             type="button"
                             disabled={isSubmitting}
                             aria-pressed={active}
+                            data-testid={`cart-channel-${opt.value}`}
                             onClick={() => setOrderType(opt.value)}
                             className={`${focusRing} min-h-11 rounded-lg px-3 text-xs font-semibold transition-colors ${
                               active
@@ -1158,6 +1159,7 @@ export function CartBar({
                               ref={addressInputRef}
                               type="text"
                               name="deliveryAddress"
+                              data-testid="cart-delivery-address"
                               autoComplete="street-address"
                               maxLength={255}
                               required
@@ -1243,7 +1245,10 @@ export function CartBar({
                 <>
                   <div className="flex items-center justify-between text-sm font-semibold tracking-tight">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="tabular-nums text-foreground">
+                    <span
+                      data-testid="cart-subtotal"
+                      className="tabular-nums text-foreground"
+                    >
                       {formatCurrency(subtotal)}
                     </span>
                   </div>

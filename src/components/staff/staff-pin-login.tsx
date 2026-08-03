@@ -494,6 +494,7 @@ function StaffMemberButton({
     <button
       type="button"
       onClick={() => onSelect(member)}
+      data-testid={`staff-member-${member.id}`}
       aria-label={`${member.name}, ${meta.label}`}
       className={`flex min-h-14 w-full touch-manipulation select-none items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors hover:bg-secondary active:bg-secondary ${
         emphasized
@@ -935,6 +936,7 @@ function PinPad({
       <div
         className="grid grid-cols-3 gap-2.5"
         role="group"
+        data-testid="staff-pin-pad"
         aria-label="Teclado numérico"
         aria-describedby={padDescribedBy}
         aria-disabled={busy || undefined}

@@ -436,6 +436,7 @@ export function OrderTicket({
           ) : null}
           <button
             type="button"
+            data-testid="kitchen-charge"
             disabled={stageDisabled}
             title={
               actionsLocked

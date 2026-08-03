@@ -291,7 +291,7 @@ export function WaiterTablesBoard({
   >(null);
   const [armedCallId, setArmedCallId] = useState<string | null>(null);
   const [focusOrderUuid, setFocusOrderUuid] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(0);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const armTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -301,6 +301,7 @@ export function WaiterTablesBoard({
   const playAlertCue = useKitchenAlertSound();
 
   useEffect(() => {
+    setNowMs(Date.now());
     const ms = tableCalls.length > 0 ? 15_000 : 30_000;
     const id = window.setInterval(() => setNowMs(Date.now()), ms);
     return () => window.clearInterval(id);
@@ -1073,6 +1074,7 @@ export function WaiterTablesBoard({
       <li
         key={order.uuid}
         id={`account-${order.uuid}`}
+        data-testid={`salon-order-${order.uuid}`}
         onClick={(event) => {
           if (
             event.target instanceof HTMLElement &&
@@ -1139,6 +1141,7 @@ export function WaiterTablesBoard({
           >
             <button
               type="button"
+              data-testid="salon-pre-cuenta"
               onClick={() => {
                 setPreCuentaKind("pre-cuenta");
                 setResumeCloseAfterPrint(null);
@@ -1239,6 +1242,7 @@ export function WaiterTablesBoard({
           <button
             type="button"
             disabled={!canMerge}
+            data-testid="salon-merge-open"
             title={
               canMerge
                 ? "Une mesas para que compartan una sola cuenta"

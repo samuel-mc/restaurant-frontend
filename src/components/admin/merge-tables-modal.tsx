@@ -199,6 +199,7 @@ export function MergeTablesModal({
                 type="button"
                 disabled={busy}
                 aria-pressed={selected}
+                data-testid={`merge-secondary-${table}`}
                 onClick={() => toggleSecondary(table)}
                 className={`min-h-12 w-full rounded-xl text-sm font-bold tabular-nums ${focusRing} ${
                   selected
@@ -233,6 +234,7 @@ export function MergeTablesModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-testid="merge-tables-modal"
         className="flex max-h-[min(92dvh,100%)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-border bg-card sm:rounded-2xl"
       >
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4">
@@ -276,6 +278,7 @@ export function MergeTablesModal({
                         type="button"
                         disabled={busy}
                         aria-pressed={selected}
+                        data-testid={`merge-primary-${table}`}
                         onClick={() => selectPrimary(table)}
                         className={`min-h-12 w-full rounded-xl text-sm font-bold tabular-nums ${focusRing} ${
                           selected
@@ -389,6 +392,7 @@ export function MergeTablesModal({
               <button
                 type="button"
                 disabled={busy || !primary || occupiedKeys.length === 0}
+                data-testid="merge-continue"
                 onClick={goToSecondaries}
                 className={`inline-flex min-h-12 flex-[1.4] items-center justify-center rounded-xl border border-border bg-secondary px-3 text-sm font-bold text-foreground ${focusRing} disabled:opacity-50`}
               >
@@ -412,6 +416,7 @@ export function MergeTablesModal({
               <button
                 type="button"
                 disabled={busy || secondaries.length === 0}
+                data-testid="merge-confirm"
                 onClick={handleConfirm}
                 className={`inline-flex min-h-12 flex-[1.4] items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-bold text-foreground ${focusRing} disabled:opacity-50`}
               >

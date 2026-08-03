@@ -121,6 +121,7 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
+            data-testid="confirm-dialog-confirm"
             disabled={busy}
             onClick={onConfirm}
             className={`inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${confirmClass} ${focusRing}`}

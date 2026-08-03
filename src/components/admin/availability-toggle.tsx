@@ -29,6 +29,7 @@ export function AvailabilityToggle({
   return (
     <div
       role="group"
+      data-testid="admin-product-toggle"
       aria-label={`Disponibilidad de ${productName}`}
       className={`inline-flex rounded-full p-0.5 ${
         isAvailable ? "bg-live-muted" : "bg-secondary"

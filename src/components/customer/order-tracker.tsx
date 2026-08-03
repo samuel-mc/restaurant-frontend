@@ -29,7 +29,7 @@ import {
 } from "@/lib/order-status";
 import { maxBatchNumber } from "@/lib/order-mapper";
 import { buildMenuPath } from "@/lib/qr-menu-url";
-import { useCartStore } from "@/store/cartStore";
+import { useCartStore, subscribeCartHydration } from "@/store/cartStore";
 import { whatsappChatUrl } from "@/lib/contact-links";
 import { CustomerBrandHeader } from "@/components/customer/customer-brand-header";
 import { SmartRatingSheet } from "@/components/customer/smart-rating-sheet";
@@ -188,9 +188,7 @@ export function OrderTracker({
   const [helpHint, setHelpHint] = useState(false);
   const [ratingOpen, setRatingOpen] = useState(false);
   const [feedbackDone, setFeedbackDone] = useState(false);
-  const [cartHydrated, setCartHydrated] = useState(() =>
-    useCartStore.persist.hasHydrated(),
-  );
+  const [cartHydrated, setCartHydrated] = useState(false);
   const ensureTenant = useCartStore((state) => state.ensureTenant);
   const clearActiveOrderSession = useCartStore(
     (state) => state.clearActiveOrderSession,
@@ -212,6 +210,8 @@ export function OrderTracker({
   /** Comida lista / cuenta: deja de ofrecer «Pedir más». */
   const isOrderingDone =
     order.status === "DELIVERED" || isSettled;
+
+  useEffect(() => subscribeCartHydration(() => setCartHydrated(true)), []);
 
   useEffect(() => {
     if (order.status !== "CLOSED" || feedbackDone) return;
@@ -290,16 +290,6 @@ export function OrderTracker({
       }
     };
   }, [connection, disconnectedSince, isSettled]);
-
-  useEffect(() => {
-    const unsub = useCartStore.persist.onFinishHydration(() => {
-      setCartHydrated(true);
-    });
-    if (useCartStore.persist.hasHydrated()) {
-      setCartHydrated(true);
-    }
-    return unsub;
-  }, []);
 
   useEffect(() => {
     if (!cartHydrated) return;
@@ -896,6 +886,7 @@ function ConnectionHint({
   return (
     <p
       role="status"
+      data-testid="order-connection-hint"
       className="mt-6 flex items-center justify-center gap-2 text-center text-xs font-medium text-muted-foreground"
     >
       <span

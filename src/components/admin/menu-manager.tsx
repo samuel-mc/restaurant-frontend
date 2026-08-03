@@ -506,6 +506,7 @@ export function MenuManager({
               type="button"
               onClick={openCreateProduct}
               disabled={!canCreateProduct}
+              data-testid="menu-new-product"
               title={
                 atProductLimit ? BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE : undefined
               }
@@ -518,6 +519,7 @@ export function MenuManager({
         {!isProPlan(plan) ? (
           <p
             role="status"
+            data-testid="menu-plan-limit-banner"
             className="mt-4 rounded-xl border border-warn/25 bg-warn-muted px-4 py-2.5 text-sm text-warn-ink"
           >
             Plan Básico: {products.length}/{BASIC_MAX_PRODUCTS} platillos
@@ -925,8 +927,10 @@ function ProductAdminCard({
   const available = product.isAvailable;
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="relative aspect-[16/10] overflow-hidden bg-secondary">
+    <article
+      data-testid={`admin-product-${product.uuid}`}
+      className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card"
+    >      <div className="relative aspect-[16/10] overflow-hidden bg-secondary">
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -996,6 +1000,7 @@ function ProductAdminCard({
             <button
               type="button"
               onClick={onDelete}
+              data-testid="admin-product-delete"
               aria-label={`Eliminar ${product.name}`}
               title="Eliminar"
               className={`inline-flex size-11 items-center justify-center rounded-xl text-destructive transition-colors hover:bg-destructive/10 ${focusRing}`}

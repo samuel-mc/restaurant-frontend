@@ -109,6 +109,7 @@ export function TableCallAlerts({
     <div
       className="sticky top-0 z-20 -mx-4 space-y-1.5 border-b border-border/40 bg-background/95 px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
       role="region"
+      data-testid="table-call-alerts"
       aria-label="Llamadas de mesa"
       aria-live="polite"
     >
@@ -136,6 +137,7 @@ export function TableCallAlerts({
             <li
               key={call.id}
               id={`call-alert-${call.id}`}
+              data-testid="table-call-alert"
               className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 transition-[box-shadow,border-color] sm:flex-row sm:items-start ${
                 inProgress
                   ? "border-border bg-secondary text-foreground"

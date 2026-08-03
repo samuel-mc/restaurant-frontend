@@ -16,6 +16,7 @@ import { ProductCard } from "@/components/customer/product-card";
 import { CartBar, type OrderModules } from "@/components/customer/cart-bar";
 import { TableHelpFab } from "@/components/customer/table-help-fab";
 import {
+  subscribeCartHydration,
   useCartCount,
   useCartStore,
 } from "@/store/cartStore";
@@ -96,9 +97,8 @@ export function MenuView({
   const [sessionRetryKey, setSessionRetryKey] = useState(0);
   const [tenantSwitchNotice, setTenantSwitchNotice] = useState(false);
   const [qrRecoveryNotice, setQrRecoveryNotice] = useState(false);
-  const [cartHydrated, setCartHydrated] = useState(() =>
-    useCartStore.persist.hasHydrated(),
-  );
+  // false hasta useEffect: no llamar persist.hasHydrated en el primer render (SSR).
+  const [cartHydrated, setCartHydrated] = useState(false);
 
   const ensureTenant = useCartStore((s) => s.ensureTenant);
   const setActiveOrderSession = useCartStore((s) => s.setActiveOrderSession);
@@ -111,15 +111,7 @@ export function MenuView({
   const cartCount = useCartCount();
   const hasOpenAccount = Boolean(sessionOrder) || Boolean(activeOrderId);
 
-  useEffect(() => {
-    const unsub = useCartStore.persist.onFinishHydration(() => {
-      setCartHydrated(true);
-    });
-    if (useCartStore.persist.hasHydrated()) {
-      setCartHydrated(true);
-    }
-    return unsub;
-  }, []);
+  useEffect(() => subscribeCartHydration(() => setCartHydrated(true)), []);
 
   // Aislar carrito por tenant (evita enviar platillos de otro local).
   useEffect(() => {

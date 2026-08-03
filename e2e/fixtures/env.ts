@@ -22,6 +22,11 @@ export const e2eEnv = {
   ownerName: env("E2E_OWNER_NAME", "E2E Owner"),
   restaurantName: env("E2E_RESTAURANT_NAME", "E2E Smoke Kitchen"),
   productName: env("E2E_PRODUCT_NAME", "E2E Plato Smoke"),
+  /** PINs fuertes (no secuencias / repetidos). */
+  meseroName: env("E2E_MESERO_NAME", "E2E Mesero"),
+  meseroPin: env("E2E_MESERO_PIN", "582917"),
+  cocinaName: env("E2E_COCINA_NAME", "E2E Cocina"),
+  cocinaPin: env("E2E_COCINA_PIN", "749382"),
 } as const;
 
 export type E2eEnv = typeof e2eEnv;

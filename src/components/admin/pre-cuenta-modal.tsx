@@ -462,6 +462,7 @@ function PreCuentaModalContent({
           aria-modal="true"
           aria-labelledby="pre-cuenta-title"
           aria-busy={printBusy || undefined}
+          data-testid="pre-cuenta-modal"
           onKeyDown={handleDialogKeyDown}
           className="flex max-h-[min(92dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:rounded-2xl"
         >
@@ -623,6 +624,7 @@ function PreCuentaModalContent({
                 <button
                   ref={printButtonRef}
                   type="button"
+                  data-testid="pre-cuenta-print"
                   onClick={handlePrint}
                   disabled={itemCount === 0 || printBusy}
                   className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}

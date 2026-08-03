@@ -171,8 +171,10 @@ export function ProductCard({
 
   return (
     <>
-      <article className="flex gap-3 p-3.5">
-        <div
+      <article
+        data-testid={`menu-product-${product.uuid}`}
+        className="flex gap-3 p-3.5"
+      >        <div
           className={
             unavailable ? "opacity-55 grayscale-[0.35]" : undefined
           }

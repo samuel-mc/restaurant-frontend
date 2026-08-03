@@ -260,7 +260,7 @@ export function KitchenDashboard({
     () => deepLinkOrder?.uuid ?? null,
   );
   const [reviewGate, setReviewGate] = useState<UrgentReviewGate | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(0);
   const focusTouchedRef = useRef(Boolean(deepLinkOrder));
   const deepLinkHandledRef = useRef(false);
   const knownUuidsRef = useRef(new Set(initialOrders.map((o) => o.uuid)));
@@ -391,6 +391,7 @@ export function KitchenDashboard({
   });
 
   useEffect(() => {
+    setNow(Date.now());
     const id = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(id);
   }, []);

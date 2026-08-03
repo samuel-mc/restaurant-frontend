@@ -675,6 +675,7 @@ function ProductFormDialog({
             </button>
             <button
               type="submit"
+              data-testid="product-form-submit"
               disabled={submitting || categories.length === 0}
               className={`inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-50 ${focusRing}`}
             >

@@ -1,4 +1,5 @@
 import {
+  Lora,
   Nunito_Sans,
   Pinyon_Script,
   Playfair_Display,
@@ -6,7 +7,7 @@ import {
 } from "next/font/google";
 
 /**
- * Fuentes de la plantilla de landing (Playfair / Nunito / Pinyon).
+ * Fuentes de landings institucionales (Playfair / Nunito / Pinyon / Lora).
  * Self-hosted vía next/font para evitar depender de @import remoto.
  */
 export const fontPlayfair = Playfair_Display({
@@ -31,6 +32,15 @@ export const fontPinyon = Pinyon_Script({
   display: "swap",
 });
 
+/** Display de Café de la Fe (landing Pro). */
+export const fontLora = Lora({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-lora",
+  display: "swap",
+});
+
 /** Tipografía principal del landing B2B SaaS. */
 export const fontJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -44,5 +54,6 @@ export const landingFontVariables = [
   fontPlayfair.variable,
   fontNunito.variable,
   fontPinyon.variable,
+  fontLora.variable,
   fontJakarta.variable,
 ].join(" ");

@@ -38,6 +38,7 @@
   "exclude": [
     "node_modules",
     "base",
-    "B2B_Landing"
+    "B2B_Landing",
+    "cafedelafe"
   ]
 }

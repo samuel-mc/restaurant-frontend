@@ -112,11 +112,13 @@
   --color-channel-muted: var(--channel-muted);
   --color-channel-ink: var(--channel-ink);
 
-  /* Landing: Playfair Display / Nunito Sans / Pinyon Script / Jakarta (next/font) */
+  /* Landing: Playfair Display / Nunito Sans / Pinyon Script / Lora / Jakarta (next/font) */
   --font-playfair-display: var(--font-playfair), ui-serif, Georgia,
     "Times New Roman", serif;
   --font-nunito-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
   --font-pinyon-script: var(--font-pinyon), ui-serif, cursive;
+  --font-lora-display: var(--font-lora), ui-serif, Georgia, "Times New Roman",
+    serif;
   --font-jakarta-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -612,5 +614,90 @@ body:has(.b2b-landing) {
   .restaurant-landing .motion-safe-only {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* ─── Café de la Fe (tenant Pro / QA) ─── */
+.cafe-de-la-fe-landing {
+  scroll-behavior: smooth;
+}
+
+.cafe-de-la-fe-landing .cafe-skip-link {
+  position: absolute;
+  left: max(1rem, env(safe-area-inset-left));
+  top: max(1rem, env(safe-area-inset-top));
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  border-radius: 9999px;
+  background: #b8963e;
+  color: #f5efe6;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 0.15s ease;
+}
+
+.cafe-de-la-fe-landing .cafe-skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid #d4b068;
+  outline-offset: 3px;
+}
+
+.cafe-de-la-fe-landing a:focus-visible,
+.cafe-de-la-fe-landing button:focus-visible {
+  outline: 2px solid #b8963e;
+  outline-offset: 3px;
+}
+
+.cafe-de-la-fe-landing #contenido-principal:focus {
+  outline: none;
+}
+
+.cafe-de-la-fe-landing .cafe-menu-card:hover .cafe-menu-img {
+  transform: scale(1.05);
+}
+
+@keyframes cafe-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cafe-de-la-fe-landing .cafe-fade-up {
+  animation: cafe-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cafe-de-la-fe-landing .cafe-fade-up-delay-1 {
+  animation-delay: 0.1s;
+}
+
+.cafe-de-la-fe-landing .cafe-fade-up-delay-2 {
+  animation-delay: 0.22s;
+}
+
+.cafe-de-la-fe-landing .cafe-fade-up-delay-3 {
+  animation-delay: 0.34s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cafe-de-la-fe-landing {
+    scroll-behavior: auto;
+  }
+
+  .cafe-de-la-fe-landing .cafe-fade-up,
+  .cafe-de-la-fe-landing .cafe-fade-up-delay-1,
+  .cafe-de-la-fe-landing .cafe-fade-up-delay-2,
+  .cafe-de-la-fe-landing .cafe-fade-up-delay-3 {
+    animation: none;
+  }
+
+  .cafe-de-la-fe-landing .cafe-menu-card:hover .cafe-menu-img {
+    transform: none;
   }
 }

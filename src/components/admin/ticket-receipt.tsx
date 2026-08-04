@@ -77,7 +77,7 @@ export function TicketReceipt({
   return (
     <div
       id={isPrintOnlyMode ? "thermal-receipt-printable" : undefined}
-      className="thermal-receipt-container mx-auto w-[302px] border border-black bg-white p-2 font-mono text-xs text-black"
+      className="thermal-receipt-container mx-auto w-[302px] border border-black bg-white p-2 font-mono text-xs text-black print:w-[302px] print:p-0 print:m-0 print:border-none print:shadow-none print:bg-white print:text-black"
       style={{
         boxSizing: "border-box",
         wordBreak: "break-word",

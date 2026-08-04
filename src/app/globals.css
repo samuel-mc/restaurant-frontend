@@ -510,16 +510,9 @@ body:has(.b2b-landing) {
 
 /*
  * Ocultar 100% de la UI del SaaS (sidebar, modales, navegadores) al imprimir ticket térmico.
- * @page fija tamaño 80mm auto y margen 0 para suprimir cabeceras/pies por defecto del navegador.
+ * El @page 80mm se inyecta en runtime (pre-cuenta / Corte Z) para no pelear con @page letter de QR.
  */
 @media print {
-  body.print-thermal-ticket {
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-  }
-
   html.print-thermal-ticket,
   body.print-thermal-ticket {
     background: #ffffff !important;
@@ -556,7 +549,8 @@ body:has(.b2b-landing) {
     visibility: visible !important;
   }
 
-  body.print-thermal-ticket #thermal-receipt-printable {
+  body.print-thermal-ticket #thermal-receipt-printable,
+  body.print-thermal-ticket #corte-z-printable {
     display: block !important;
     width: 302px !important;
     max-width: 80mm !important;

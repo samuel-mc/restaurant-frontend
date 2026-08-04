@@ -25,12 +25,15 @@ import {
   type TicketKind,
 } from "@/lib/ticket-from-order";
 import { TicketReceipt } from "./ticket-receipt";
+import {
+  PRINT_BODY_CLASS,
+  clearThermalPrintArtifacts,
+  ensureThermalPrintPageStyle,
+} from "@/lib/thermal-print";
 
 const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
-const PRINT_BODY_CLASS = "print-thermal-ticket";
-const PRINT_PAGE_STYLE_ID = "thermal-print-page-style";
 const PRINT_BUSY_FALLBACK_MS = 15_000;
 const TOAST_MS = 4_200;
 
@@ -57,27 +60,6 @@ const TOAST_CHROME: Record<
     assertive: true,
   },
 };
-
-function clearThermalPrintArtifacts() {
-  document.documentElement.classList.remove(PRINT_BODY_CLASS);
-  document.body.classList.remove(PRINT_BODY_CLASS);
-  document.getElementById(PRINT_PAGE_STYLE_ID)?.remove();
-}
-
-function ensureThermalPrintPageStyle() {
-  if (document.getElementById(PRINT_PAGE_STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = PRINT_PAGE_STYLE_ID;
-  style.textContent = [
-    "@media print {",
-    "  @page { size: 80mm auto; margin: 0; }",
-    "  html.print-thermal-ticket, body.print-thermal-ticket {",
-    "    height: auto !important; min-height: 0 !important;",
-    "  }",
-    "}",
-  ].join("\n");
-  document.head.appendChild(style);
-}
 
 /** Extrae los 10 dígitos locales MX de un teléfono guardado (52 / 521 / local). */
 function mxLocalTenDigits(raw: string | null | undefined): string {

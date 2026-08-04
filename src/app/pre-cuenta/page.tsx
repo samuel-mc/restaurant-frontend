@@ -24,6 +24,7 @@ const DEMO_ORDER: Order = {
   staffName: "Carlos M.",
   deliveryAddress: null,
   status: "DELIVERED",
+  paymentMethod: null,
   totalAmount: 880,
   formattedTotal: "$880.00",
   createdAt: new Date().toISOString(),

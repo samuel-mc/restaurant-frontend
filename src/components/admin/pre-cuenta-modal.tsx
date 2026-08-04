@@ -10,7 +10,7 @@ import {
   Printer,
   X,
 } from "lucide-react";
-import type { Order } from "@/types/api";
+import type { Order, OrderPaymentMethod } from "@/types/api";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { formatCurrency } from "@/lib/format";
 import {
@@ -117,6 +117,11 @@ export interface PreCuentaModalProps {
    * Se muestra como pista operativa (no apilar diálogos).
    */
   returnToActionLabel?: string;
+  /**
+   * Cobrar desde el ticket: pide método de pago y cierra la cuenta.
+   * Solo se muestra cuando la orden está DELIVERED.
+   */
+  onChargeAndClose?: (paymentMethod: OrderPaymentMethod) => void | Promise<void>;
 }
 
 /**
@@ -130,6 +135,7 @@ export function PreCuentaModal({
   restaurant,
   kind,
   returnToActionLabel,
+  onChargeAndClose,
 }: PreCuentaModalProps) {
   if (!open || !order) return null;
 
@@ -141,6 +147,7 @@ export function PreCuentaModal({
       kind={kind}
       onClose={onClose}
       returnToActionLabel={returnToActionLabel}
+      onChargeAndClose={onChargeAndClose}
     />
   );
 }
@@ -151,12 +158,14 @@ function PreCuentaModalContent({
   kind,
   onClose,
   returnToActionLabel,
+  onChargeAndClose,
 }: {
   order: Order;
   restaurant: RestaurantTicketInfo;
   kind?: TicketKind;
   onClose: () => void;
   returnToActionLabel?: string;
+  onChargeAndClose?: (paymentMethod: OrderPaymentMethod) => void | Promise<void>;
 }) {
   const [phoneInput, setPhoneInput] = useState(() =>
     mxLocalTenDigits(order.customerPhone),
@@ -168,6 +177,11 @@ function PreCuentaModalContent({
     tone: ToastTone;
   } | null>(null);
   const [printBusy, setPrintBusy] = useState(false);
+  const [chargeMethod, setChargeMethod] = useState<OrderPaymentMethod | null>(
+    null,
+  );
+  const [chargeBusy, setChargeBusy] = useState(false);
+  const [chargeError, setChargeError] = useState<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const printFallbackTimerRef = useRef<number | null>(null);
   const printBusyRef = useRef(false);
@@ -615,7 +629,7 @@ function PreCuentaModalContent({
                     setPhoneError(null);
                     setShowWhatsappInput(true);
                   }}
-                  disabled={itemCount === 0 || printBusy}
+                  disabled={itemCount === 0 || printBusy || chargeBusy}
                   className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
                 >
                   <MessageCircle className="size-4" aria-hidden />
@@ -626,7 +640,7 @@ function PreCuentaModalContent({
                   type="button"
                   data-testid="pre-cuenta-print"
                   onClick={handlePrint}
-                  disabled={itemCount === 0 || printBusy}
+                  disabled={itemCount === 0 || printBusy || chargeBusy}
                   className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
                   title="Enter · impresora térmica 80mm o PDF"
                   aria-keyshortcuts="Enter"
@@ -637,6 +651,77 @@ function PreCuentaModalContent({
               </div>
             </div>
           )}
+
+          {onChargeAndClose && order.status === "DELIVERED" ? (
+            <div className="space-y-3 border-t border-border px-4 py-4 sm:px-5">
+              <p className="text-sm font-semibold text-foreground">
+                Cobrar y cerrar cuenta
+              </p>
+              <div
+                className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                role="radiogroup"
+                aria-label="Método de pago"
+              >
+                {(
+                  [
+                    ["CASH", "Efectivo"],
+                    ["CARD", "Tarjeta"],
+                    ["TRANSFER", "Transferencia"],
+                  ] as const
+                ).map(([value, label]) => {
+                  const active = chargeMethod === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      data-testid={`pre-cuenta-pay-${value}`}
+                      disabled={printBusy || chargeBusy}
+                      onClick={() => {
+                        setChargeMethod(value);
+                        setChargeError(null);
+                      }}
+                      className={`inline-flex min-h-11 items-center justify-center rounded-xl border px-3 text-sm font-semibold transition-colors ${focusRing} ${
+                        active
+                          ? "border-live bg-live-muted text-live-ink"
+                          : "border-border bg-secondary text-foreground hover:bg-secondary/80"
+                      } disabled:opacity-50`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {chargeError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {chargeError}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                data-testid="pre-cuenta-charge-close"
+                disabled={!chargeMethod || printBusy || chargeBusy}
+                onClick={() => {
+                  if (!chargeMethod || !onChargeAndClose) return;
+                  setChargeBusy(true);
+                  setChargeError(null);
+                  void Promise.resolve(onChargeAndClose(chargeMethod))
+                    .catch((err) => {
+                      setChargeError(
+                        err instanceof Error
+                          ? err.message
+                          : "No se pudo cobrar la cuenta.",
+                      );
+                    })
+                    .finally(() => setChargeBusy(false));
+                }}
+                className={`inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-live px-4 text-sm font-semibold text-live-foreground hover:brightness-110 disabled:opacity-50 ${focusRing}`}
+              >
+                {chargeBusy ? "Cobrando…" : "Cobrar y cerrar cuenta"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </>

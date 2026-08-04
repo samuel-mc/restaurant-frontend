@@ -208,7 +208,9 @@ export function AnalyticsDailyDashboard({
         <div className="flex flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div>
             <h3 className="text-base font-bold tracking-tight">Desglose por Método de Pago</h3>
-            <p className="text-xs text-muted-foreground">Distribución estimada del cobro del turno.</p>
+            <p className="text-xs text-muted-foreground">
+              Desglose real por método de cobro (órdenes cerradas del día).
+            </p>
 
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between text-xs font-semibold">

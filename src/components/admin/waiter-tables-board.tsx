@@ -6,15 +6,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronDown, Keyboard, Link2, Plus, Printer, Receipt } from "lucide-react";
-import type { Order, OrderStatus, TableCallResponse } from "@/types/api";
+import type { Order, OrderPaymentMethod, OrderStatus, TableCallResponse } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
+import { CloseOrderDialog } from "@/components/admin/close-order-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { MergeTablesModal } from "@/components/admin/merge-tables-modal";
 import { PreCuentaModal } from "@/components/admin/pre-cuenta-modal";
 import {
   ticketKindLabel,
   ticketKindPrintLabel,
-  ticketPrintBeforeCloseLabel,
   type RestaurantTicketInfo,
 } from "@/lib/ticket-from-order";
 import {
@@ -557,13 +557,15 @@ export function WaiterTablesBoard({
     };
   }, [orders, posTarget]);
 
-  async function confirmClose() {
-    if (!closeTarget || busy) return;
-    const closing = closeTarget;
+  async function confirmCloseOrder(
+    closing: Order,
+    paymentMethod: OrderPaymentMethod,
+  ) {
+    if (busy) return;
     setBusy(true);
     setCloseError(null);
     try {
-      const closed = await closeOrder(closing.uuid, tenantSlug);
+      const closed = await closeOrder(closing.uuid, tenantSlug, paymentMethod);
       setOrders((prev) => prev.filter((o) => o.uuid !== closed.uuid));
       const freedKeys = new Set<string>();
       const primary = normalizeTableKey(closing.tableNumber);
@@ -588,8 +590,18 @@ export function WaiterTablesBoard({
       setCloseError(
         getAdminErrorMessage(err, "No se pudo cobrar la cuenta. Revisa la conexión e inténtalo de nuevo."),
       );
+      throw err;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function confirmClose(paymentMethod: OrderPaymentMethod) {
+    if (!closeTarget) return;
+    try {
+      await confirmCloseOrder(closeTarget, paymentMethod);
+    } catch {
+      // closeError ya seteado
     }
   }
 
@@ -1532,9 +1544,9 @@ export function WaiterTablesBoard({
         </>
       )}
 
-      <ConfirmDialog
+      <CloseOrderDialog
         open={!!closeTarget}
-        title="Cobrar"
+        title="Cobrar y cerrar cuenta"
         description={
           closeTarget
             ? (() => {
@@ -1553,24 +1565,23 @@ export function WaiterTablesBoard({
               })()
             : ""
         }
-        detail={
-          closeTarget ? (
-            <button
-              type="button"
-              onClick={() => openPrintBeforeClose(closeTarget)}
-              className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold ${focusRing}`}
-            >
-              <Printer className="size-4" aria-hidden />
-              {ticketPrintBeforeCloseLabel()}
-            </button>
-          ) : null
+        preferredPaymentMethod={
+          closeTarget
+            ? (() => {
+                const call = findCallForOrder(closeTarget);
+                const pay = call?.paymentMethod;
+                return pay === "CASH" || pay === "CARD" || pay === "TRANSFER"
+                  ? pay
+                  : null;
+              })()
+            : null
         }
-        confirmLabel="Cobrar"
-        busyLabel="Cobrando…"
-        tone="live"
         busy={busy}
         error={closeError}
-        onConfirm={() => void confirmClose()}
+        onConfirm={(method) => void confirmClose(method)}
+        onPrint={
+          closeTarget ? () => openPrintBeforeClose(closeTarget) : undefined
+        }
         onCancel={cancelCloseDialog}
       />
 
@@ -1582,6 +1593,16 @@ export function WaiterTablesBoard({
         kind={preCuentaKind}
         returnToActionLabel={
           resumeCloseAfterPrint ? "Cobrar" : undefined
+        }
+        onChargeAndClose={
+          preCuentaOrder?.status === "DELIVERED"
+            ? async (method) => {
+                const order = preCuentaOrder;
+                setPreCuentaOrder(null);
+                setResumeCloseAfterPrint(null);
+                await confirmCloseOrder(order, method);
+              }
+            : undefined
         }
       />
 

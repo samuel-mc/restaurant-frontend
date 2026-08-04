@@ -135,6 +135,7 @@ export async function freeTableIfOccupied(
         method: "PATCH",
         tenant: e2eEnv.tenantSlug,
         token: ownerToken,
+        body: JSON.stringify({ paymentMethod: "CASH" }),
       });
       if (closed.status >= 400) {
         throw new Error(

@@ -7,9 +7,15 @@ type RouteContext = {
 /** PATCH /api/admin/orders/:uuid/close → cierre/cobro de cuenta */
 export async function PATCH(request: Request, context: RouteContext) {
   const { uuid } = await context.params;
+  let body: unknown = undefined;
+  try {
+    body = await request.json();
+  } catch {
+    body = undefined;
+  }
   return proxyAdminRequest(
     request,
     `/api/v1/admin/orders/${encodeURIComponent(uuid)}/close`,
-    { method: "PATCH" },
+    { method: "PATCH", body },
   );
 }

@@ -160,6 +160,7 @@ export async function updateOrderItemStatus(
 export async function closeOrder(
   orderUuid: string,
   tenantSlug: string,
+  paymentMethod: "CASH" | "CARD" | "TRANSFER",
 ): Promise<Order> {
   const slug = resolveTenantSlug(tenantSlug);
   const url = `${BFF_ORDERS_PATH}/${orderUuid}/close`;
@@ -167,9 +168,11 @@ export async function closeOrder(
     method: "PATCH",
     headers: {
       Accept: "application/json",
+      "Content-Type": "application/json",
       "x-tenant-slug": slug,
     },
     credentials: "same-origin",
+    body: JSON.stringify({ paymentMethod }),
   });
 
   const body = (await response.json().catch(() => null)) as

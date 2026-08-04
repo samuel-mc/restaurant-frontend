@@ -136,6 +136,7 @@ export async function kitchenChargeAndClose(
   const ticket = page.locator(`#kitchen-ticket-${orderUuid}`);
   await expect(ticket).toBeVisible({ timeout: 30_000 });
   await ticket.getByTestId("kitchen-charge").click();
+  await page.getByTestId("close-pay-CASH").click();
   await page.getByTestId("confirm-dialog-confirm").click();
   await expect(ticket).toHaveCount(0, { timeout: 20_000 });
 }

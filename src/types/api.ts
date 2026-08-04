@@ -25,6 +25,10 @@ export type OrderItemStatus = "PENDING" | "PREPARING" | "DELIVERED";
 /** Modalidad del pedido. Debe coincidir con `OrderType` del backend. */
 export type OrderType = "IN_TABLE" | "PICKUP" | "DELIVERY";
 
+/** Método de cobro al cerrar cuenta / preferencia BILL. */
+export type OrderPaymentMethod = "CASH" | "CARD" | "TRANSFER";
+export type TableCallPaymentMethod = OrderPaymentMethod;
+
 /* -------------------------------------------------------------------------- */
 /* Autenticación admin (wire)                                                 */
 /* -------------------------------------------------------------------------- */
@@ -319,6 +323,8 @@ export interface OrderResponse {
   staffName?: string | null;
   deliveryAddress: string | null;
   status: OrderStatus;
+  /** Método de cobro al cerrar; null si la cuenta sigue abierta. */
+  paymentMethod?: OrderPaymentMethod | null;
   totalAmount: number;
   createdAt: string;
   updatedAt?: string | null;
@@ -409,6 +415,7 @@ export interface Order {
   staffName: string | null;
   deliveryAddress: string | null;
   status: OrderStatus;
+  paymentMethod: OrderPaymentMethod | null;
   totalAmount: number;
   formattedTotal: string;
   createdAt: string;
@@ -535,8 +542,6 @@ export interface FeedbackSummary {
 /* -------------------------------------------------------------------------- */
 
 export type TableCallType = "WAITER" | "BILL";
-
-export type TableCallPaymentMethod = "CASH" | "CARD" | "TRANSFER";
 
 export interface TableCallRequest {
   tableNumber: string;

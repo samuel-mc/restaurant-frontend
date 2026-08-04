@@ -6,10 +6,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Keyboard, Printer } from "lucide-react";
-import type { Order, OrderItem, OrderItemStatus, OrderStatus } from "@/types/api";
+import { Keyboard } from "lucide-react";
+import type { Order, OrderItem, OrderItemStatus, OrderPaymentMethod, OrderStatus } from "@/types/api";
 import { AdminConnectionBadge } from "@/components/admin/admin-connection-badge";
-import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { CloseOrderDialog } from "@/components/admin/close-order-dialog";
 import { AdminRovingTablist } from "@/components/admin/admin-roving-tablist";
 import { OrderTicket } from "@/components/admin/order-ticket";
 import { PreCuentaModal } from "@/components/admin/pre-cuenta-modal";
@@ -28,7 +28,6 @@ import { getAdminErrorMessage } from "@/lib/admin-error";
 import { maxBatchNumber } from "@/lib/order-mapper";
 import {
   resolveTicketKind,
-  ticketPrintBeforeCloseLabel,
   type RestaurantTicketInfo,
 } from "@/lib/ticket-from-order";
 
@@ -581,7 +580,7 @@ export function KitchenDashboard({
     }
   }
 
-  async function handleConfirmClose() {
+  async function handleConfirmClose(paymentMethod: OrderPaymentMethod) {
     if (!closeTarget || updatingUuid || closing || !mutationsLive) return;
     const order = closeTarget;
     setClosing(true);
@@ -594,7 +593,7 @@ export function KitchenDashboard({
     });
 
     try {
-      const updated = await closeOrder(order.uuid, tenantSlug);
+      const updated = await closeOrder(order.uuid, tenantSlug, paymentMethod);
       handleOrderEvent(updated);
       setCloseTarget(null);
       setResumeCloseAfterPrint(null);
@@ -1071,9 +1070,9 @@ export function KitchenDashboard({
         </div>
       </div>
 
-      <ConfirmDialog
+      <CloseOrderDialog
         open={Boolean(closeTarget)}
-        title="¿Cobrar y cerrar la cuenta?"
+        title="Cobrar y cerrar cuenta"
         description={
           closeTarget
             ? closeTarget.orderType === "IN_TABLE"
@@ -1081,24 +1080,11 @@ export function KitchenDashboard({
               : `Se marcará ${orderWho(closeTarget)} (#${closeTarget.uuid.slice(0, 8).toUpperCase()}) como pagada (${closeTarget.formattedTotal}) y se cerrará la cuenta.`
             : ""
         }
-        detail={
-          closeTarget ? (
-            <button
-              type="button"
-              onClick={() => openPrintBeforeClose(closeTarget)}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-            >
-              <Printer className="size-4" aria-hidden />
-              {ticketPrintBeforeCloseLabel()}
-            </button>
-          ) : null
-        }
-        confirmLabel="Cobrar"
-        busyLabel="Cobrando…"
-        cancelLabel="Cancelar"
         busy={closing}
-        tone="live"
-        onConfirm={() => void handleConfirmClose()}
+        onConfirm={(method) => void handleConfirmClose(method)}
+        onPrint={
+          closeTarget ? () => openPrintBeforeClose(closeTarget) : undefined
+        }
         onCancel={() => {
           if (!closing) {
             setCloseTarget(null);
@@ -1115,6 +1101,45 @@ export function KitchenDashboard({
         kind={preCuentaKind}
         returnToActionLabel={
           resumeCloseAfterPrint ? "Cobrar" : undefined
+        }
+        onChargeAndClose={
+          preCuentaOrder?.status === "DELIVERED" && mutationsLive
+            ? async (method) => {
+                const order = preCuentaOrder;
+                setPreCuentaOrder(null);
+                setResumeCloseAfterPrint(null);
+                setClosing(true);
+                setUpdatingUuid(order.uuid);
+                try {
+                  const updated = await closeOrder(
+                    order.uuid,
+                    tenantSlug,
+                    method,
+                  );
+                  handleOrderEvent(updated);
+                  setCloseTarget(null);
+                  setBanner(
+                    order.orderType === "IN_TABLE"
+                      ? `Cuenta cobrada · ${orderWho(order)} · mesa liberada`
+                      : `Cuenta cobrada · ${orderWho(order)}`,
+                  );
+                  window.setTimeout(() => setBanner(null), 3_500);
+                } catch (error) {
+                  const message = getAdminErrorMessage(
+                    error,
+                    "No se pudo cobrar. La cuenta sigue abierta; inténtalo de nuevo.",
+                  );
+                  setTicketErrors((prev) => ({
+                    ...prev,
+                    [order.uuid]: message,
+                  }));
+                  setCloseTarget(order);
+                } finally {
+                  setClosing(false);
+                  setUpdatingUuid(null);
+                }
+              }
+            : undefined
         }
       />
     </div>

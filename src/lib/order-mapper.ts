@@ -35,6 +35,12 @@ export function toOrder(dto: OrderResponse): Order {
     staffName: dto.staffName?.trim() || null,
     deliveryAddress: dto.deliveryAddress ?? null,
     status: dto.status,
+    paymentMethod:
+      dto.paymentMethod === "CASH" ||
+      dto.paymentMethod === "CARD" ||
+      dto.paymentMethod === "TRANSFER"
+        ? dto.paymentMethod
+        : null,
     totalAmount: dto.totalAmount,
     formattedTotal: formatCurrency(dto.totalAmount),
     createdAt: dto.createdAt,

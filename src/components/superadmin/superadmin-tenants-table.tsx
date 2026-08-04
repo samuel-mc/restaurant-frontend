@@ -306,6 +306,7 @@ function TenantManageFields({
           <button
             type="button"
             disabled={busy || !tenant.active}
+            data-testid={`sa-tenant-impersonate-${tenant.subdomain}`}
             onClick={onImpersonate}
             className={`${saSecondaryBtn} ${saFocus}`}
           >

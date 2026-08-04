@@ -27,6 +27,15 @@ export const e2eEnv = {
   meseroPin: env("E2E_MESERO_PIN", "582917"),
   cocinaName: env("E2E_COCINA_NAME", "E2E Cocina"),
   cocinaPin: env("E2E_COCINA_PIN", "749382"),
+  /** Vacío = E2E-18 intenta defaults locales; si ninguno entra → skip. */
+  superadminEmail: env("E2E_SUPERADMIN_EMAIL", "superadmin@platolisto.com"),
+  superadminPassword: process.env.E2E_SUPERADMIN_PASSWORD?.trim() ?? "",
+  skipSuperadmin: process.env.E2E_SKIP_SUPERADMIN === "1",
+  couponProDemo: env("E2E_COUPON_PRO", "PRO-DEMO-2026"),
 } as const;
 
 export type E2eEnv = typeof e2eEnv;
+
+export function tenantBaseUrl(tenantSlug: string): string {
+  return `http://${tenantSlug}.localhost:3000`;
+}

@@ -99,6 +99,7 @@ export function SuperAdminLoginForm() {
 
       <button
         type="submit"
+        data-testid="superadmin-login-submit"
         disabled={submitting}
         className={`w-full ${saPrimaryBtn} ${saFocusOnSurface}`}
       >

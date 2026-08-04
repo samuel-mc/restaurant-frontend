@@ -294,3 +294,42 @@ export async function mergeTables(
 
   return toOrder(body as OrderResponse);
 }
+
+/** Fetch active orders snapshot (cliente → BFF). */
+export async function fetchActiveOrders(
+  tenantSlug: string,
+): Promise<Order[]> {
+  const slug = resolveTenantSlug(tenantSlug);
+  const url = `${BFF_ORDERS_PATH}/active`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "x-tenant-slug": slug,
+    },
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | OrderResponse[]
+    | { error?: string }
+    | null;
+
+  if (!response.ok) {
+    const message =
+      body && typeof body === "object" && "error" in body && body.error
+        ? String(body.error)
+        : "No se pudieron sincronizar las comandas activas.";
+    throw new ApiError({
+      message,
+      status: response.status,
+      statusText: response.statusText,
+      url,
+      body,
+    });
+  }
+
+  return (body as OrderResponse[]).map(toOrder);
+}
+

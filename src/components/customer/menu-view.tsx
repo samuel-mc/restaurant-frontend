@@ -508,7 +508,10 @@ export function MenuView({
  */
 function MenuConsultaFooter({ message }: { message: string }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-center backdrop-blur-sm">
+    <div
+      data-testid="menu-consulta-footer"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-center backdrop-blur-sm"
+    >
       <p className="text-xs font-medium text-muted-foreground">{message}</p>
     </div>
   );

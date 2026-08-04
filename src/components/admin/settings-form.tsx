@@ -324,6 +324,7 @@ export function SettingsForm({
         <div
           role="status"
           aria-live="polite"
+          data-testid="settings-coupon-success"
           className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4 md:top-5"
         >
           <p className="pointer-events-auto max-w-lg rounded-xl border border-live/25 bg-card px-4 py-3 text-center text-sm font-semibold text-live-ink shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
@@ -558,6 +559,7 @@ export function SettingsForm({
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input
+                data-testid="settings-coupon-input"
                 value={couponCode}
                 disabled={couponBusy || submitting}
                 onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
@@ -570,6 +572,7 @@ export function SettingsForm({
               />
               <button
                 type="button"
+                data-testid="settings-coupon-redeem"
                 disabled={couponBusy || submitting || !couponCode.trim()}
                 onClick={() => void handleRedeemCoupon()}
                 className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 ${focusRing}`}

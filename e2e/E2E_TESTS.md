@@ -35,6 +35,11 @@ npm run test:e2e
 | **E2E-11** | ABM menú | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | API crea → visible en `/menu` → toggle Agotado/En menú → delete → desaparece. |
 | **E2E-12** | Modificadores | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | Grupo obligatorio → error sin opción → Grande (+delta) → subtotal base+delta. |
 | **E2E-13** | Límite Basic | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | SQL BASIC → 31.º POST 400 + mensaje · UI `30/30` + Nuevo disabled · restaura PRO. |
+| **E2E-14** | Registro onboarding | [`smoke-saas.spec.ts`](./smoke-saas.spec.ts) | Verde (local) | Landing `#registro` → slug nuevo → success → login admin. Reinicia backend si rate-limit in-memory. |
+| **E2E-15** | Cupón Pro | [`smoke-saas.spec.ts`](./smoke-saas.spec.ts) | Verde (local) | Demote BASIC + clear cupón → redeem UI → success · restaura PRO. |
+| **E2E-16** | Pedido no encontrado | [`smoke-saas.spec.ts`](./smoke-saas.spec.ts) | Verde (local) | UUID inválido → empty `order-unavailable` (sin Reintentar) → link menú. |
+| **E2E-17** | Menú sin ordering | [`smoke-saas.spec.ts`](./smoke-saas.spec.ts) | Verde (local) | `orderingEnabled=false` → footer consulta · sin Agregar/carrito · restaura flags. |
+| **E2E-18** | Impersonación SuperAdmin | [`smoke-saas.spec.ts`](./smoke-saas.spec.ts) | Verde (local) | SA → Abrir panel → handoff (popup o canje fetch) → banner solo lectura. |
 
 ### Detalle E2E-01
 
@@ -186,11 +191,11 @@ Checklist para ir tachando: [`E2E_CHECKLIST.md`](./E2E_CHECKLIST.md).
 
 | ID | Nombre | Idea |
 |---|---|---|
-| **E2E-14** | Registro onboarding | Landing → registro slug nuevo → login admin |
-| **E2E-15** | Cupón Pro | Redeem cupón → `paymentStatus` ACTIVE → pickup habilitables |
-| **E2E-16** | Pedido no encontrado | `/orders/uuid-inválido` → empty/error claro |
-| **E2E-17** | Menú sin ordering | `orderingEnabled=false` → sin Agregar / copy de consulta |
-| **E2E-18** | Impersonación SuperAdmin | Handoff read-only → panel tenant |
+| ~~**E2E-14**~~ | ~~Registro onboarding~~ | Cubierta en suite |
+| ~~**E2E-15**~~ | ~~Cupón Pro~~ | Cubierta en suite |
+| ~~**E2E-16**~~ | ~~Pedido no encontrado~~ | Cubierta en suite |
+| ~~**E2E-17**~~ | ~~Menú sin ordering~~ | Cubierta en suite |
+| ~~**E2E-18**~~ | ~~Impersonación SuperAdmin~~ | Cubierta en suite |
 
 ---
 

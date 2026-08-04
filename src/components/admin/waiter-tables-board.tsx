@@ -34,6 +34,7 @@ import { useKitchenAlertSound } from "@/hooks/useKitchenAlertSound";
 import {
   closeOrder,
   createStaffOrder,
+  fetchActiveOrders,
   mergeTables,
 } from "@/services/adminOrderService";
 import { getAdminErrorMessage } from "@/lib/admin-error";
@@ -80,20 +81,20 @@ function statusLabel(status: OrderStatus): { label: string; className: string } 
         className: "bg-secondary text-muted-foreground ring-1 ring-border",
       };
     case "IN_KITCHEN":
-      // Weighted neutral ink — cooking signal without competing with calls/Cobrar.
       return {
         label: "En cocina",
-        className:
-          "bg-foreground/[0.07] text-foreground font-bold ring-1 ring-foreground/40",
+        className: "bg-secondary text-muted-foreground ring-1 ring-border",
       };
     case "DELIVERED":
       return {
-        label: "Por cobrar",
-        className:
-          "bg-live-muted text-live-ink font-semibold ring-1 ring-live/35",
+        label: "Servido",
+        className: "bg-live-muted text-live-ink",
       };
     default:
-      return { label: status, className: "bg-secondary text-muted-foreground" };
+      return {
+        label: status,
+        className: "bg-secondary text-muted-foreground ring-1 ring-border",
+      };
   }
 }
 
@@ -260,6 +261,19 @@ export function WaiterTablesBoard({
   );
   const [connection, setConnection] =
     useState<KitchenConnectionState>("connecting");
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleHttpSync = useCallback(async () => {
+    try {
+      setIsSyncing(true);
+      const active = await fetchActiveOrders(tenantSlug);
+      setOrders(active.filter((o) => ACTIVE.includes(o.status)));
+    } catch (err) {
+      console.error("Error al sincronizar mesas activas por HTTP:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [tenantSlug]);
   const [closeTarget, setCloseTarget] = useState<Order | null>(null);
   const [preCuentaOrder, setPreCuentaOrder] = useState<Order | null>(null);
   const [preCuentaKind, setPreCuentaKind] = useState<"pre-cuenta" | "cuenta">(
@@ -424,6 +438,7 @@ export function WaiterTablesBoard({
     onOrderEvent,
     onTableCall,
     onConnectionChange: setConnection,
+    onSync: handleHttpSync,
   });
 
   const callTableKeys = useMemo(() => {
@@ -1200,7 +1215,11 @@ export function WaiterTablesBoard({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AdminConnectionBadge state={connection} />
+          <AdminConnectionBadge
+            state={connection}
+            onSyncRequest={handleHttpSync}
+            isSyncing={isSyncing}
+          />
           <WaiterShortcutCheatsheet />
           {historyHref ? (
             <a

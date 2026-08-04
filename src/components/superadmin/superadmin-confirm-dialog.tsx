@@ -147,6 +147,7 @@ export function SuperAdminConfirmDialog({
               )}
             </span>
             <input
+              data-testid="sa-confirm-challenge"
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               autoComplete="off"
@@ -173,6 +174,7 @@ export function SuperAdminConfirmDialog({
           </button>
           <button
             type="button"
+            data-testid="sa-confirm-submit"
             disabled={!canConfirm}
             onClick={onConfirm}
             className={`inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition ${confirmClass} ${focusRing}`}

@@ -23,7 +23,8 @@ import {
 export type KitchenConnectionState =
   | "connecting"
   | "connected"
-  | "disconnected";
+  | "disconnected"
+  | "polling";
 
 interface UseKitchenOrdersSubscriptionOptions {
   tenantSlug: string;
@@ -32,10 +33,15 @@ interface UseKitchenOrdersSubscriptionOptions {
   /** Si se pasa, también se suscribe a TABLE_CALL en la misma conexión. */
   onTableCall?: (call: TableCallResponse) => void;
   onConnectionChange?: (state: KitchenConnectionState) => void;
+  /** Callback para sincronización HTTP de comandas (se ejecuta en reconexión y polling fallback). */
+  onSync?: () => Promise<void> | void;
+  /** Intervalo en ms para el polling HTTP de respaldo cuando WS se desconecta (default: 20s). */
+  fallbackSyncIntervalMs?: number;
 }
 
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
+const DEFAULT_FALLBACK_SYNC_MS = 20_000;
 const WS_TICKET_PATH = "/api/admin/ws-token";
 
 function parseOrderMessage(message: IMessage): Order | null {
@@ -109,17 +115,52 @@ export function useKitchenOrdersSubscription({
   onOrderEvent,
   onTableCall,
   onConnectionChange,
+  onSync,
+  fallbackSyncIntervalMs = DEFAULT_FALLBACK_SYNC_MS,
 }: UseKitchenOrdersSubscriptionOptions): void {
   const onOrderEventRef = useRef(onOrderEvent);
   const onTableCallRef = useRef(onTableCall);
   const onConnectionChangeRef = useRef(onConnectionChange);
+  const onSyncRef = useRef(onSync);
   const subscribeTableCalls = Boolean(onTableCall);
+  const wasDisconnectedRef = useRef(false);
+  const fallbackTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     onOrderEventRef.current = onOrderEvent;
     onTableCallRef.current = onTableCall;
     onConnectionChangeRef.current = onConnectionChange;
-  }, [onOrderEvent, onTableCall, onConnectionChange]);
+    onSyncRef.current = onSync;
+  }, [onOrderEvent, onTableCall, onConnectionChange, onSync]);
+
+  function stopFallbackPolling() {
+    if (fallbackTimerRef.current !== null) {
+      window.clearInterval(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+  }
+
+  function startFallbackPolling() {
+    stopFallbackPolling();
+    if (!onSyncRef.current) return;
+
+    // Ejecutar un primer sync HTTP inmediato tras perder WS
+    void Promise.resolve(onSyncRef.current()).then(() => {
+      onConnectionChangeRef.current?.("polling");
+    }).catch(() => {
+      onConnectionChangeRef.current?.("disconnected");
+    });
+
+    // Mantener polling regular cada X segundos mientras WS siga desconectado
+    fallbackTimerRef.current = window.setInterval(() => {
+      if (!onSyncRef.current) return;
+      void Promise.resolve(onSyncRef.current()).then(() => {
+        onConnectionChangeRef.current?.("polling");
+      }).catch(() => {
+        onConnectionChangeRef.current?.("disconnected");
+      });
+    }, fallbackSyncIntervalMs);
+  }
 
   useEffect(() => {
     if (!enabled || !tenantSlug) return;
@@ -132,11 +173,16 @@ export function useKitchenOrdersSubscription({
     let attempt = 0;
     let client: Client;
 
+    const handleDisconnectedState = () => {
+      onConnectionChangeRef.current?.("disconnected");
+      wasDisconnectedRef.current = true;
+      startFallbackPolling();
+    };
+
     try {
       const sockJsUrl = resolveOrdersWsUrl();
       client = new Client({
         webSocketFactory: () => new SockJS(sockJsUrl) as unknown as IStompSocket,
-        // stompjs llama esta función en cada intento de reconexión.
         reconnectDelay: RECONNECT_BASE_MS,
         heartbeatIncoming: 10_000,
         heartbeatOutgoing: 10_000,
@@ -154,7 +200,15 @@ export function useKitchenOrdersSubscription({
         onConnect: () => {
           attempt = 0;
           client.reconnectDelay = RECONNECT_BASE_MS;
+          stopFallbackPolling();
           onConnectionChangeRef.current?.("connected");
+
+          // Si veníamos de estar desconectados (o es la reconexión), hacer auto-sync HTTP
+          if (wasDisconnectedRef.current && onSyncRef.current) {
+            void onSyncRef.current();
+          }
+          wasDisconnectedRef.current = false;
+
           client.subscribe(adminKitchenTopic(tenantSlug), (message) => {
             const order = parseOrderMessage(message);
             if (order) onOrderEventRef.current(order);
@@ -167,23 +221,23 @@ export function useKitchenOrdersSubscription({
           }
         },
         onDisconnect: () => {
-          onConnectionChangeRef.current?.("disconnected");
+          handleDisconnectedState();
         },
         onStompError: () => {
           attempt += 1;
-          onConnectionChangeRef.current?.("disconnected");
+          handleDisconnectedState();
         },
         onWebSocketClose: () => {
           attempt += 1;
-          onConnectionChangeRef.current?.("disconnected");
+          handleDisconnectedState();
         },
         onWebSocketError: () => {
           attempt += 1;
-          onConnectionChangeRef.current?.("disconnected");
+          handleDisconnectedState();
         },
       });
     } catch {
-      onConnectionChangeRef.current?.("disconnected");
+      handleDisconnectedState();
       return;
     }
 
@@ -191,7 +245,9 @@ export function useKitchenOrdersSubscription({
     client.activate();
 
     return () => {
+      stopFallbackPolling();
       void client.deactivate();
     };
-  }, [tenantSlug, enabled, subscribeTableCalls]);
+  }, [tenantSlug, enabled, subscribeTableCalls, fallbackSyncIntervalMs]);
 }
+

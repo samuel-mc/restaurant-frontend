@@ -91,6 +91,7 @@ export function OrderUnavailableState({
   return (
     <section
       aria-live="polite"
+      data-testid="order-unavailable"
       className="my-8 flex flex-col items-center gap-3 rounded-3xl border border-border bg-card px-6 py-12 text-center shadow-sm"
     >
       <div
@@ -99,7 +100,12 @@ export function OrderUnavailableState({
       >
         <ClipboardList className="size-7 stroke-[1.5]" />
       </div>
-      <h2 className="text-lg font-bold text-foreground">{title}</h2>
+      <h2
+        data-testid="order-unavailable-title"
+        className="text-lg font-bold text-foreground"
+      >
+        {title}
+      </h2>
       <p className="max-w-xs break-words text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
         {description}
       </p>
@@ -123,6 +129,7 @@ export function OrderUnavailableState({
         {helpControl}
         <Link
           href="/menu"
+          data-testid="order-unavailable-menu-link"
           className={canRetry || waUrl ? tertiaryBtn : secondaryBtn}
         >
           Ver menú

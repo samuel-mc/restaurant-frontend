@@ -3,6 +3,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { e2eEnv } from "./env";
 
 const TENANT_HEADER = "X-Tenant";
@@ -161,10 +162,11 @@ export async function updateRestaurantProfile(
     hasPickup?: boolean;
     hasDelivery?: boolean;
   },
+  tenantSlug: string = e2eEnv.tenantSlug,
 ): Promise<void> {
   const { status, raw } = await api("/api/v1/admin/restaurants/profile", {
     method: "PUT",
-    tenant: e2eEnv.tenantSlug,
+    tenant: tenantSlug,
     token: ownerToken,
     body: JSON.stringify(patch),
   });
@@ -296,6 +298,20 @@ export function setTenantPlan(plan: "BASIC" | "PRO"): void {
       ? `UPDATE restaurants SET plan = 'PRO', payment_status = 'ACTIVE' WHERE subdomain = '${e2eEnv.tenantSlug}';`
       : `UPDATE restaurants SET plan = 'BASIC' WHERE subdomain = '${e2eEnv.tenantSlug}';`;
   runTenantPlanSql(sql);
+}
+
+/** Borra canje previo de un cupón para re-probar redeem en e2esmoke. */
+export function clearCouponRedemption(
+  code: string,
+  tenantSlug: string = e2eEnv.tenantSlug,
+): void {
+  const safeCode = code.replace(/'/g, "''");
+  const safeSlug = tenantSlug.replace(/'/g, "''");
+  runTenantPlanSql(`
+    DELETE FROM coupon_redemptions
+    WHERE restaurant_id = (SELECT id FROM restaurants WHERE subdomain = '${safeSlug}')
+      AND coupon_id = (SELECT id FROM coupons WHERE code = '${safeCode}');
+  `);
 }
 
 export async function ensureCategoryId(ownerToken: string): Promise<number> {
@@ -472,4 +488,171 @@ export async function deleteProductsByNamePrefix(
       await deleteAdminProduct(ownerToken, p.uuid);
     }
   }
+}
+
+export type RegisteredTenant = {
+  tenantSlug: string;
+  ownerEmail: string;
+  ownerPassword: string;
+  plan: string;
+  paymentStatus: string;
+};
+
+/** Registra un tenant desechable (sin cleanup API; orphan local OK). */
+export async function registerDisposableTenant(input?: {
+  plan?: "BASIC" | "PRO";
+  couponCode?: string;
+}): Promise<RegisteredTenant> {
+  const stamp = Date.now().toString(36);
+  const tenantSlug = `e2ereg${stamp}`.slice(0, 40);
+  const ownerEmail = `e2e-reg-${stamp}@platolisto.test`;
+  const ownerPassword = e2eEnv.ownerPassword;
+  const body: Record<string, string> = {
+    restaurantName: `E2E Reg ${stamp}`,
+    tenantSlug,
+    ownerEmail,
+    ownerName: "E2E Reg Owner",
+    ownerPassword,
+    plan: input?.plan ?? "BASIC",
+  };
+  if (input?.couponCode) body.couponCode = input.couponCode;
+
+  let lastError = "";
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const { status, body: res, raw } = await api<{
+      tenantSlug: string;
+      plan: string;
+      paymentStatus: string;
+    }>("/api/v1/tenants/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    if (status < 400 && res?.tenantSlug) {
+      return {
+        tenantSlug: res.tenantSlug,
+        ownerEmail,
+        ownerPassword,
+        plan: res.plan,
+        paymentStatus: res.paymentStatus,
+      };
+    }
+    lastError = `Registro tenant falló (${status}): ${raw}`;
+    if (status === 429 && attempt < 3) {
+      await new Promise((r) => setTimeout(r, 5_000 * (attempt + 1)));
+      continue;
+    }
+    throw new Error(lastError);
+  }
+  throw new Error(lastError);
+}
+
+export async function tenantOwnerLogin(
+  tenantSlug: string,
+  email: string,
+  password: string,
+): Promise<string> {
+  const { status, body, raw } = await api<{ token: string }>(
+    "/api/v1/auth/login",
+    {
+      method: "POST",
+      tenant: tenantSlug,
+      body: JSON.stringify({ email, password }),
+    },
+  );
+  if (status >= 400 || !body?.token) {
+    throw new Error(`Login owner ${email}@${tenantSlug} falló (${status}): ${raw}`);
+  }
+  return body.token;
+}
+
+export async function redeemCoupon(
+  ownerToken: string,
+  code: string,
+  tenantSlug: string,
+): Promise<{ message: string; plan: string; paymentStatus: string }> {
+  const { status, body, raw } = await api<{
+    message?: string;
+    plan: string;
+    paymentStatus: string;
+  }>("/api/v1/admin/billing/redeem-coupon", {
+    method: "POST",
+    tenant: tenantSlug,
+    token: ownerToken,
+    body: JSON.stringify({ code }),
+  });
+  if (status >= 400 || !body?.plan) {
+    throw new Error(`Redeem cupón falló (${status}): ${raw}`);
+  }
+  return {
+    message: body.message ?? "",
+    plan: body.plan,
+    paymentStatus: body.paymentStatus,
+  };
+}
+
+/**
+ * Resuelve contraseña SuperAdmin usable (env o candidatos locales).
+ * `null` → el test debe hacer skip (DB sin bootstrap / secret distinto).
+ */
+export async function resolveSuperadminPassword(): Promise<string | null> {
+  const candidates = [
+    e2eEnv.superadminPassword,
+    "LocalDevOnly!ChangeMe92",
+    // Hash legado en DBs locales anteriores al ban de bootstrap.
+    "SuperAdmin123!",
+  ].filter((p) => p.length > 0);
+
+  const tried = new Set<string>();
+  for (const password of candidates) {
+    if (tried.has(password)) continue;
+    tried.add(password);
+    const { status } = await api<{ token?: string }>(
+      "/api/v1/superadmin/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          email: e2eEnv.superadminEmail,
+          password,
+        }),
+      },
+    );
+    if (status < 400) return password;
+  }
+  return null;
+}
+
+/**
+ * El rate limit de registro es in-memory en el backend.
+ * Reinicia el contenedor para vaciar la ventana (solo local / docker compose).
+ */
+export async function resetRegistrationRateLimit(): Promise<void> {
+  const backendDir = path.resolve(process.cwd(), "../restaurant-backend");
+  try {
+    // restart vacía el ConcurrentHashMap in-memory (sin rebuild).
+    execFileSync("docker", ["compose", "restart", "backend"], {
+      cwd: backendDir,
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+  } catch (err) {
+    throw new Error(
+      `No se pudo reiniciar restaurant-backend para limpiar rate limit de registro: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${e2eEnv.apiUrl}/actuator/health`);
+      if (res.ok) return;
+    } catch {
+      // still booting
+    }
+    await new Promise((r) => setTimeout(r, 1_500));
+  }
+  throw new Error(
+    `Backend no recuperó health tras restart (${e2eEnv.apiUrl}/actuator/health).`,
+  );
 }

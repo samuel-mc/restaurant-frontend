@@ -205,6 +205,7 @@ export function AdminShell({
         {isSupportSession ? (
           <div
             role="status"
+            data-testid="admin-support-banner"
             className="border-b border-amber-700/30 bg-amber-100 px-4 py-2.5 text-sm text-amber-950 print:hidden"
           >
             <p className="font-semibold tracking-tight">

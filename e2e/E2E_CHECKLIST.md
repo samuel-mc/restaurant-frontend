@@ -35,11 +35,11 @@ Leyenda: `[x]` hecha · `[ ]` pendiente
 
 ## P2 — SaaS / calidad
 
-- [ ] **E2E-14** — Registro onboarding (landing → slug → login admin)
-- [ ] **E2E-15** — Cupón Pro (redeem → ACTIVE → pickup)
-- [ ] **E2E-16** — Pedido no encontrado (UUID inválido → empty/error)
-- [ ] **E2E-17** — Menú sin ordering (`orderingEnabled=false` → sin Agregar)
-- [ ] **E2E-18** — Impersonación SuperAdmin (handoff read-only)
+- [x] **E2E-14** — Registro onboarding (landing → slug → login admin)
+- [x] **E2E-15** — Cupón Pro (redeem → ACTIVE → pickup)
+- [x] **E2E-16** — Pedido no encontrado (UUID inválido → empty/error)
+- [x] **E2E-17** — Menú sin ordering (`orderingEnabled=false` → sin Agregar)
+- [x] **E2E-18** — Impersonación SuperAdmin (handoff read-only)
 
 ---
 

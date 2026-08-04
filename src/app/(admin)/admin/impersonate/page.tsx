@@ -10,6 +10,11 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const EXCHANGE_PATH = "/api/auth/impersonate";
+const CODE_STORAGE_KEY = "pl_impersonate_code";
+const DONE_STORAGE_PREFIX = "pl_impersonate_done:";
+
+/** Un canje por código (Strict Mode / remounts no deben POST duplicado). */
+const exchangesByCode = new Map<string, Promise<void>>();
 
 function tenantSlugFromHost(): string | null {
   if (typeof window === "undefined") return null;
@@ -26,18 +31,82 @@ function tenantSlugFromHost(): string | null {
   return null;
 }
 
+function exchangeImpersonationCode(code: string, tenantSlug: string): Promise<void> {
+  return fetch(EXCHANGE_PATH, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-tenant-slug": tenantSlug,
+    },
+    body: JSON.stringify({ code }),
+    credentials: "same-origin",
+  }).then(async (response) => {
+    if (!response.ok) {
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new Error(
+        data?.error || "No se pudo establecer la sesión de soporte.",
+      );
+    }
+  });
+}
+
+function getOrStartExchange(code: string, tenantSlug: string): Promise<void> {
+  const existing = exchangesByCode.get(code);
+  if (existing) return existing;
+
+  const started = exchangeImpersonationCode(code, tenantSlug).then(() => {
+    try {
+      sessionStorage.setItem(`${DONE_STORAGE_PREFIX}${code}`, "1");
+      sessionStorage.removeItem(CODE_STORAGE_KEY);
+    } catch {
+      // private mode
+    }
+  });
+  exchangesByCode.set(code, started);
+  return started;
+}
+
 function ImpersonateHandoff() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const code = searchParams.get("code")?.trim() ?? "";
-    window.history.replaceState(null, "", window.location.pathname);
+    const fromUrl = searchParams.get("code")?.trim() ?? "";
+    if (fromUrl) {
+      try {
+        sessionStorage.setItem(CODE_STORAGE_KEY, fromUrl);
+      } catch {
+        // private mode
+      }
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+
+    let code = fromUrl;
+    if (!code) {
+      try {
+        code = sessionStorage.getItem(CODE_STORAGE_KEY)?.trim() ?? "";
+      } catch {
+        code = "";
+      }
+    }
 
     if (!code) {
       setError("Falta el código de impersonación.");
       return;
+    }
+
+    try {
+      if (sessionStorage.getItem(`${DONE_STORAGE_PREFIX}${code}`) === "1") {
+        router.replace("/admin/dashboard");
+        router.refresh();
+        return;
+      }
+    } catch {
+      // continue to exchange
     }
 
     const tenantSlug = tenantSlugFromHost();
@@ -47,30 +116,13 @@ function ImpersonateHandoff() {
     }
 
     let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch(EXCHANGE_PATH, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            "x-tenant-slug": tenantSlug,
-          },
-          body: JSON.stringify({ code }),
-          credentials: "same-origin",
-        });
-        if (!response.ok) {
-          const data = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(
-            data?.error || "No se pudo establecer la sesión de soporte.",
-          );
-        }
+    void getOrStartExchange(code, tenantSlug)
+      .then(() => {
         if (cancelled) return;
         router.replace("/admin/dashboard");
         router.refresh();
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!cancelled) {
           setError(
             err instanceof Error
@@ -78,8 +130,7 @@ function ImpersonateHandoff() {
               : "No se pudo establecer la sesión de soporte.",
           );
         }
-      }
-    })();
+      });
 
     return () => {
       cancelled = true;

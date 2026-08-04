@@ -20,6 +20,7 @@ import {
 import { useKitchenAlertSound } from "@/hooks/useKitchenAlertSound";
 import {
   closeOrder,
+  fetchActiveOrders,
   updateOrderItemStatus,
   updateOrderStatus,
 } from "@/services/adminOrderService";
@@ -111,6 +112,24 @@ interface KitchenDashboardProps {
   restaurantInfo?: RestaurantTicketInfo;
 }
 
+interface UrgentReviewGate {
+  uuid: string;
+  status: OrderStatus;
+}
+
+type StatusUndo = {
+  previous: Order;
+  toStatus: OrderStatus;
+  expiresAt: number;
+};
+
+type ItemUndo = {
+  orderUuid: string;
+  detailId: number;
+  prevStatus: OrderItemStatus;
+  targetStatus: OrderItemStatus;
+};
+
 const FOCUS_PRIORITY: OrderStatus[] = [
   "PENDING",
   "IN_KITCHEN",
@@ -189,17 +208,6 @@ function pickFocusStatus(orders: Order[]): OrderStatus {
   return "PENDING";
 }
 
-type StatusUndo = {
-  previous: Order;
-  toStatus: OrderStatus;
-  expiresAt: number;
-};
-
-type UrgentReviewGate = {
-  uuid: string;
-  status: OrderStatus;
-};
-
 function sortByCreatedAt(orders: Order[]): Order[] {
   return [...orders].sort(
     (a, b) =>
@@ -236,6 +244,7 @@ export function KitchenDashboard({
   );
   const [connection, setConnection] =
     useState<KitchenConnectionState>("connecting");
+  const [isSyncing, setIsSyncing] = useState(false);
   const [flashUuid, setFlashUuid] = useState<string | null>(null);
   const [additionUuid, setAdditionUuid] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
@@ -269,6 +278,23 @@ export function KitchenDashboard({
   );
   const undoTimerRef = useRef<number | null>(null);
   const playNewOrderCue = useKitchenAlertSound();
+
+  // Callback de sincronización HTTP para comandas activas
+  const handleHttpSync = useCallback(async () => {
+    try {
+      setIsSyncing(true);
+      const active = await fetchActiveOrders(tenantSlug);
+      setOrders(sortByCreatedAt(active));
+      knownUuidsRef.current = new Set(active.map((o) => o.uuid));
+      batchByUuidRef.current = new Map(
+        active.map((o) => [o.uuid, maxBatchNumber(o)]),
+      );
+    } catch (err) {
+      console.error("Error al sincronizar comandas por HTTP:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [tenantSlug]);
 
   // Refs for keyboard handlers (avoid stale closures)
   const focusStatusRef = useRef(focusStatus);
@@ -388,6 +414,7 @@ export function KitchenDashboard({
     tenantSlug,
     onOrderEvent: handleOrderEvent,
     onConnectionChange: setConnection,
+    onSync: handleHttpSync,
   });
 
   useEffect(() => {
@@ -885,7 +912,12 @@ export function KitchenDashboard({
           </h1>
           <div className="flex shrink-0 items-center gap-1.5">
             <KitchenShortcutCheatsheet />
-            <AdminConnectionBadge state={connection} compact />
+            <AdminConnectionBadge
+              state={connection}
+              compact
+              onSyncRequest={handleHttpSync}
+              isSyncing={isSyncing}
+            />
             <span
               className="inline-flex min-h-11 items-center rounded-full bg-secondary px-2.5 text-xs font-semibold tabular-nums"
               aria-label={`${orders.length} comandas activas`}

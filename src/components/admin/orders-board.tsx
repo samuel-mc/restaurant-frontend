@@ -374,11 +374,16 @@ export function OrdersBoard({
     [playAlertCue],
   );
 
+  const handleHttpSync = useCallback(() => {
+    void refresh(filter, pageIndex);
+  }, [refresh, filter, pageIndex]);
+
   useKitchenOrdersSubscription({
     tenantSlug,
     onOrderEvent: handleOrderEvent,
     onTableCall: handleTableCall,
     onConnectionChange: setConnection,
+    onSync: handleHttpSync,
   });
 
   return (
@@ -392,7 +397,12 @@ export function OrdersBoard({
             Pedidos
           </h1>
           <div className="flex shrink-0 items-center gap-1.5">
-            <AdminConnectionBadge state={connection} compact />
+            <AdminConnectionBadge
+              state={connection}
+              compact
+              onSyncRequest={handleHttpSync}
+              isSyncing={loading}
+            />
             {salonHref ? (
               <Link
                 href={salonHref}

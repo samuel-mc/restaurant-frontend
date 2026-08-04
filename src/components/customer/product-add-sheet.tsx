@@ -235,6 +235,16 @@ export function ProductAddSheet({
             </span>
           </label>
 
+          {!product.isAvailable ? (
+            <div
+              role="alert"
+              data-testid="product-out-of-stock-alert"
+              className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-xs font-semibold text-amber-700 dark:text-amber-300"
+            >
+              Este platillo se acaba de agotar
+            </div>
+          ) : null}
+
           {error ? (
             <p role="alert" data-testid="product-add-error" className="text-sm text-destructive">
               {error}
@@ -246,12 +256,16 @@ export function ProductAddSheet({
           <button
             type="button"
             data-testid="product-add-confirm"
+            disabled={!product.isAvailable}
             onClick={handleConfirm}
-            className={`${focusRing} flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--menu-accent)] px-4 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.98]`}
+            className={`${focusRing} flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--menu-accent)] px-4 text-sm font-semibold text-[var(--menu-accent-fg)] transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            Agregar · {formatCurrency(unitPrice)}
+            {!product.isAvailable
+              ? "Agotado"
+              : `Agregar · ${formatCurrency(unitPrice)}`}
           </button>
         </div>
+
       </div>
     </div>
   );

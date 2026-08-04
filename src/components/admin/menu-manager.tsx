@@ -361,6 +361,11 @@ export function MenuManager({
           prev.map((p) => (p.uuid === updated.uuid ? updated : p)),
         );
       });
+      showBanner(
+        updated.isAvailable
+          ? "Producto marcado como En menú"
+          : "Producto marcado como Agotado",
+      );
     } catch (error) {
       startTransition(() => {
         setProducts((prev) =>

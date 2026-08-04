@@ -47,3 +47,9 @@ export function adminFeedbackTopic(tenantSlug: string): string {
 export function adminTableCallsTopic(tenantSlug: string): string {
   return `/topic/admin/${tenantSlug}/table-calls`;
 }
+
+/** Canal STOMP público de actualizaciones de platillos/menú. */
+export function menuUpdatesTopic(tenantSlug: string): string {
+  return `/topic/${tenantSlug}/menu-updates`;
+}
+

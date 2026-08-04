@@ -221,7 +221,16 @@ export function ProductCard({
               ) : null}
             </span>
 
-            {!orderingEnabled || unavailable ? null : quantity > 0 ? (
+            {!orderingEnabled ? null : unavailable ? (
+              <button
+                type="button"
+                data-testid="menu-add-product"
+                disabled
+                className={`${focusRing} inline-flex min-h-11 items-center gap-1 rounded-xl bg-muted px-3.5 text-sm font-semibold text-muted-foreground opacity-60 cursor-not-allowed`}
+              >
+                Agregar
+              </button>
+            ) : quantity > 0 ? (
               <div className={stepperEnter ? "stepper-enter" : undefined}>
                 <QuantityStepper
                   quantity={quantity}

@@ -21,6 +21,8 @@ import {
   useCartStore,
 } from "@/store/cartStore";
 import { getActiveOrderSession } from "@/services/orderService";
+import { useMenuAvailabilitySubscription } from "@/hooks/useMenuAvailabilitySubscription";
+
 import {
   clearStoredTable,
   formatTableLabel,
@@ -56,9 +58,26 @@ export function MenuView({
   tableTokenFromQuery = null,
 }: MenuViewProps) {
   const router = useRouter();
+  const [menuProducts, setMenuProducts] = useState<Product[]>(products);
+
+  useEffect(() => {
+    setMenuProducts(products);
+  }, [products]);
+
+  useMenuAvailabilitySubscription({
+    tenantSlug,
+    onAvailabilityChange: (evt) => {
+      setMenuProducts((prev) =>
+        prev.map((p) =>
+          p.uuid === evt.productId ? { ...p, isAvailable: evt.isAvailable } : p,
+        ),
+      );
+    },
+  });
+
   const sections = useMemo<MenuSection[]>(() => {
     const byCategory = new Map<string, MenuSection>();
-    for (const product of products) {
+    for (const product of menuProducts) {
       const id = String(product.categoryId);
       const existing = byCategory.get(id);
       if (existing) {
@@ -72,7 +91,7 @@ export function MenuView({
       }
     }
     return Array.from(byCategory.values());
-  }, [products]);
+  }, [menuProducts]);
 
   const categories = useMemo<CategoryTab[]>(
     () => sections.map(({ id, name }) => ({ id, name })),

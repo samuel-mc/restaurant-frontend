@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { QaEnvBadge } from "@/components/env-qa-badge";
 
 /**
  * Aviso de Privacidad — superficie de lectura legal (LFPDPPP).
@@ -222,8 +223,9 @@ export function PrivacyNotice() {
 
       <footer className="border-t border-slate-800/80 py-10">
         <div className="mx-auto flex max-w-3xl flex-col items-start justify-between gap-4 px-5 sm:flex-row sm:items-center sm:px-6">
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-slate-600 inline-flex flex-wrap items-center gap-2">
             © 2026 PlatoListo. Todos los derechos reservados.
+            <QaEnvBadge />
           </p>
           <div className="flex flex-wrap items-center gap-4">
             <Link

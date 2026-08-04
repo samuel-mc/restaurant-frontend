@@ -13,6 +13,7 @@ import {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { getPublicRootDomain, buildTenantSiteUrl } from "@/lib/qr-menu-url";
+import { QaEnvBadge } from "@/components/env-qa-badge";
 
 const RegisterForm = dynamic(
   () =>
@@ -1413,8 +1414,11 @@ function Footer() {
         </div>
 
         <div className="mt-8 border-t border-[var(--b2b-border)] pt-6 text-center text-xs text-slate-400">
-          © 2026 PlatoListo. Todos los derechos reservados. Hecho para
-          restauranteros mexicanos.
+          <span className="inline-flex flex-wrap items-center justify-center gap-2">
+            © 2026 PlatoListo. Todos los derechos reservados. Hecho para
+            restauranteros mexicanos.
+            <QaEnvBadge />
+          </span>
         </div>
       </div>
     </footer>

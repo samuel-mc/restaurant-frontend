@@ -9,6 +9,7 @@ import type {
   RefObject,
 } from "react";
 import Link from "next/link";
+import { QaEnvBadge } from "@/components/env-qa-badge";
 import {
   Search, ChevronDown, ChevronUp, Star, MapPin, Phone,
   Clock, Menu, X,
@@ -2479,9 +2480,10 @@ function Footer() {
         </div>
       </div>
       <div className={`${SHELL} pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-3`}>
-        <p className="font-nunito-sans text-xs">
+        <p className="font-nunito-sans text-xs inline-flex flex-wrap items-center gap-2">
           © {new Date().getFullYear()} {brand.name}. Todos los derechos
           reservados.
+          <QaEnvBadge />
         </p>
         <p className="font-nunito-sans text-xs flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
           <Link href="/aviso-de-privacidad" className="hover:text-[var(--brand-gold)]">

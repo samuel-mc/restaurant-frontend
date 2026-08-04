@@ -24,6 +24,7 @@ import { logoutPathForSession } from "@/lib/jwt-payload";
 import { clearToken } from "@/services/authService";
 import { fetchFeedbackSummary } from "@/services/adminFeedbackService";
 import { BadReviewToastBanner } from "@/components/admin/bad-review-toast-banner";
+import { QaEnvBadge } from "@/components/env-qa-badge";
 
 interface AdminShellProps {
   restaurantName: string;
@@ -193,7 +194,8 @@ export function AdminShell({
             urgentFeedbackCount={urgentFeedbackCount}
           />
         </nav>
-        <div className="border-t border-border p-3">
+        <div className="border-t border-border p-3 space-y-2">
+          <QaEnvBadge variant="block" />
           <LogoutButton
             busy={loggingOut}
             shiftMode={isStaffShift}
@@ -288,7 +290,8 @@ export function AdminShell({
                   urgentFeedbackCount={urgentFeedbackCount}
                 />
               </nav>
-              <div className="border-t border-border p-3">
+              <div className="border-t border-border p-3 space-y-2">
+                <QaEnvBadge variant="block" />
                 <LogoutButton
                   busy={loggingOut}
                   shiftMode={isStaffShift}

@@ -18,6 +18,7 @@ import {
 import { clearSuperAdminToken } from "@/services/superadminService";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { saFocus } from "@/components/superadmin/superadmin-ui";
+import { QaEnvBadge } from "@/components/env-qa-badge";
 
 const NAV = [
   { href: "/superadmin", label: "Panel", icon: LayoutDashboard, exact: true },
@@ -114,7 +115,11 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="border-t border-white/[0.06] p-3">
+        <div className="border-t border-white/[0.06] p-3 space-y-2">
+          <QaEnvBadge
+            variant="block"
+            className="border-amber-400/30 bg-amber-400/10 text-amber-300"
+          />
           <button
             type="button"
             disabled={loggingOut}

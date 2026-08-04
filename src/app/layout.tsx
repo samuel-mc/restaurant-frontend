@@ -1,12 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import { landingFontVariables } from "@/lib/fonts";
+import { isQa } from "@/lib/app-env";
 import { THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme";
 import { ThemeSync } from "@/components/theme-sync";
 import "./globals.css";
 
+const qa = isQa();
+
 export const metadata: Metadata = {
-  title: "PlatoListo",
+  title: qa ? "PlatoListo (QA)" : "PlatoListo",
   description: "SaaS multi-tenant para restaurantes: menú digital y gestión.",
+  icons: {
+    icon: [{ url: "/brand/platolisto-logo.png", type: "image/png" }],
+    apple: [{ url: "/brand/platolisto-logo.png", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {

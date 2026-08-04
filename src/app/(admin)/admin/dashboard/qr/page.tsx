@@ -38,12 +38,20 @@ export default async function AdminQrPage() {
   let restaurantName = prettifyTenantSlug(tenantSlug);
   let logoUrl: string | null = null;
   let primaryColor = "#171717";
+  let tableCount = 12;
 
   try {
     const profile = await getRestaurantProfile(tenantSlug);
     restaurantName = profile.name || restaurantName;
     logoUrl = profile.logoUrl;
     primaryColor = profile.primaryColor || primaryColor;
+    if (
+      typeof profile.tableCount === "number" &&
+      profile.tableCount >= 1 &&
+      profile.tableCount <= 99
+    ) {
+      tableCount = profile.tableCount;
+    }
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       redirect("/admin/login");
@@ -57,6 +65,7 @@ export default async function AdminQrPage() {
       restaurantName={restaurantName}
       logoUrl={logoUrl}
       primaryColor={primaryColor}
+      tableCount={tableCount}
     />
   );
 }

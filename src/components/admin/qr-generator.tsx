@@ -42,6 +42,8 @@ interface QrGeneratorProps {
   restaurantName: string;
   logoUrl?: string | null;
   primaryColor?: string;
+  /** Mesas configuradas en Ajustes (1…N). */
+  tableCount?: number;
 }
 
 const focusRing =
@@ -94,11 +96,13 @@ export function QrGenerator({
   restaurantName,
   logoUrl = null,
   primaryColor = "#171717",
+  tableCount = 12,
 }: QrGeneratorProps) {
+  const maxTable = Math.min(99, Math.max(1, tableCount));
   const [mode, setMode] = useState<QrMode>("general");
-  const [tableNumber, setTableNumber] = useState("4");
+  const [tableNumber, setTableNumber] = useState("1");
   const [bulkFrom, setBulkFrom] = useState(1);
-  const [bulkTo, setBulkTo] = useState(12);
+  const [bulkTo, setBulkTo] = useState(Math.min(12, maxTable));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -112,8 +116,34 @@ export function QrGenerator({
   const bulkTooLarge =
     mode === "bulk" && Math.abs(bulkTo - bulkFrom) + 1 > 48;
 
+  const tableRangeError = useMemo(() => {
+    if (mode === "table") {
+      const n = Number.parseInt(toQrTableParam(tableNumber) || "", 10);
+      if (!Number.isFinite(n) || n < 1) {
+        return "Indica un número de mesa válido.";
+      }
+      if (n > maxTable) {
+        return `La mesa no puede ser mayor a ${maxTable} (configurado en Ajustes).`;
+      }
+      return null;
+    }
+    if (mode === "bulk") {
+      const from = Math.min(bulkFrom, bulkTo);
+      const to = Math.max(bulkFrom, bulkTo);
+      if (from < 1 || to < 1) {
+        return "El rango de mesas debe empezar en 1.";
+      }
+      if (to > maxTable) {
+        return `El rango no puede superar la mesa ${maxTable} (configurado en Ajustes).`;
+      }
+      return null;
+    }
+    return null;
+  }, [mode, tableNumber, bulkFrom, bulkTo, maxTable]);
+
   const tableNumbersToSign = useMemo(() => {
     if (mode === "general") return [] as string[];
+    if (tableRangeError) return [] as string[];
     if (mode === "table") {
       const n = toQrTableParam(tableNumber);
       return n ? [n] : [];
@@ -124,7 +154,14 @@ export function QrGenerator({
     const list: string[] = [];
     for (let n = from; n <= to; n += 1) list.push(String(n));
     return list;
-  }, [mode, tableNumber, bulkFrom, bulkTo, bulkTooLarge]);
+  }, [
+    mode,
+    tableNumber,
+    bulkFrom,
+    bulkTo,
+    bulkTooLarge,
+    tableRangeError,
+  ]);
 
   useEffect(() => {
     if (mode === "general") {
@@ -292,14 +329,27 @@ export function QrGenerator({
                   onChange={(e) =>
                     setTableNumber(parseTableNumberInput(e.target.value))
                   }
-                  placeholder="4"
+                  placeholder="1"
                   aria-label="Número de mesa"
+                  aria-invalid={Boolean(tableRangeError)}
                   className={`min-w-0 flex-1 bg-transparent px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/20 ${focusRing}`}
                 />
               </div>
-              <span className="mt-2 block truncate text-xs text-muted-foreground">
-                URL: {signing ? "Firmando…" : (preview?.menuUrl ?? "—")}
+              <span className="mt-2 block text-xs text-muted-foreground">
+                Mesas válidas: 1 a {maxTable} (Ajustes → Total de mesas).
               </span>
+              {tableRangeError ? (
+                <p
+                  role="alert"
+                  className="mt-2 text-xs font-medium text-destructive"
+                >
+                  {tableRangeError}
+                </p>
+              ) : (
+                <span className="mt-2 block truncate text-xs text-muted-foreground">
+                  URL: {signing ? "Firmando…" : (preview?.menuUrl ?? "—")}
+                </span>
+              )}
             </div>
           ) : null}
 
@@ -313,11 +363,17 @@ export function QrGenerator({
                   <input
                     type="number"
                     min={1}
-                    max={999}
+                    max={maxTable}
                     value={bulkFrom}
                     onChange={(e) =>
-                      setBulkFrom(Math.max(1, Number(e.target.value) || 1))
+                      setBulkFrom(
+                        Math.min(
+                          maxTable,
+                          Math.max(1, Number(e.target.value) || 1),
+                        ),
+                      )
                     }
+                    aria-invalid={Boolean(tableRangeError)}
                     className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
                   />
                 </label>
@@ -328,19 +384,31 @@ export function QrGenerator({
                   <input
                     type="number"
                     min={1}
-                    max={999}
+                    max={maxTable}
                     value={bulkTo}
                     onChange={(e) =>
-                      setBulkTo(Math.max(1, Number(e.target.value) || 1))
+                      setBulkTo(
+                        Math.min(
+                          maxTable,
+                          Math.max(1, Number(e.target.value) || 1),
+                        ),
+                      )
                     }
+                    aria-invalid={Boolean(tableRangeError)}
                     className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
                   />
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                Se generarán {targets.length || 0} tarjetas (máx. 48 por lote).
+                Se generarán {targets.length || 0} tarjetas (máx. 48 por lote ·
+                hasta mesa {maxTable}).
                 {signing ? " Firmando tokens…" : ""}
               </p>
+              {tableRangeError ? (
+                <p className="text-xs font-medium text-destructive" role="alert">
+                  {tableRangeError}
+                </p>
+              ) : null}
               {bulkTooLarge ? (
                 <p className="text-xs font-medium text-destructive" role="alert">
                   Reduce el rango a 48 mesas o menos.

@@ -53,3 +53,27 @@ export interface AnalyticsSummaryResponse {
   }>;
   period: string;
 }
+
+export interface DailySummary {
+  totalSales: number;
+  totalClosedOrders: number;
+  averageTicket: number;
+  averageRating: number;
+  paymentMethods: Record<string, number>;
+  topProducts: AnalyticsTopProduct[];
+  date: string;
+}
+
+export interface ShiftCloseRecord {
+  id: string;
+  restaurantName: string;
+  closedAt: string;
+  closedBy: string;
+  totalSales: number;
+  totalClosedOrders: number;
+  averageTicket: number;
+  averageRating: number;
+  paymentMethods: Record<string, number>;
+  topProducts: AnalyticsTopProduct[];
+  status: string;
+}

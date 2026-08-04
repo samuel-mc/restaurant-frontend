@@ -50,6 +50,13 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
     roles: ADMIN_ONLY,
   },
   {
+    href: "/admin/dashboard/analytics",
+    label: "Corte Z",
+    description: "Cierre de caja diario y reporte Z",
+    icon: BarChart3,
+    roles: ADMIN_ONLY,
+  },
+  {
     href: "/admin/dashboard/kitchen",
     label: "Monitor de Cocina",
     description: "Comandas en vivo (KDS)",

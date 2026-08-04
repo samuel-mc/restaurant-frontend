@@ -53,3 +53,8 @@ export function menuUpdatesTopic(tenantSlug: string): string {
   return `/topic/${tenantSlug}/menu-updates`;
 }
 
+/** Canal STOMP de alertas urgentes de administración (bad reviews, avisos críticos). */
+export function adminAlertsTopic(tenantSlug: string): string {
+  return `/topic/${tenantSlug}/admin-alerts`;
+}
+

@@ -89,7 +89,7 @@ function nextReconnectDelay(attempt: number): number {
   return Math.round(Math.min(RECONNECT_MAX_MS, jitter));
 }
 
-async function fetchWsTicket(tenantSlug: string): Promise<string | null> {
+export async function fetchWsTicket(tenantSlug: string): Promise<string | null> {
   try {
     const response = await fetch(WS_TICKET_PATH, {
       method: "GET",

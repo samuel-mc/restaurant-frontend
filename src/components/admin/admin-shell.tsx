@@ -23,6 +23,7 @@ import { navItemsForRole } from "@/lib/admin-nav-access";
 import { logoutPathForSession } from "@/lib/jwt-payload";
 import { clearToken } from "@/services/authService";
 import { fetchFeedbackSummary } from "@/services/adminFeedbackService";
+import { BadReviewToastBanner } from "@/components/admin/bad-review-toast-banner";
 
 interface AdminShellProps {
   restaurantName: string;
@@ -299,6 +300,7 @@ export function AdminShell({
         ) : null}
 
         <main id="admin-main" className="min-w-0 flex-1" tabIndex={-1}>
+          <BadReviewToastBanner tenantSlug={tenantSlug} managerName={restaurantName} />
           {children}
         </main>
       </div>

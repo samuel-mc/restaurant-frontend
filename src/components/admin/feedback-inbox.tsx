@@ -168,7 +168,14 @@ export function FeedbackInbox({ tenantSlug }: { tenantSlug: string }) {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    {item.urgent && item.status === "OPEN" ? (
+                    {item.stars <= 2 || item.requiresManagerAttention ? (
+                      <span
+                        data-testid="bad-review-attention-badge"
+                        className="rounded-lg bg-rose-600 px-2.5 py-0.5 text-[0.68rem] font-black uppercase tracking-wide text-white shadow-sm"
+                      >
+                        ⚠️ Atención Requerida
+                      </span>
+                    ) : item.urgent && item.status === "OPEN" ? (
                       <span className="rounded-lg bg-destructive/15 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-destructive">
                         Urgente
                       </span>
@@ -197,11 +204,17 @@ export function FeedbackInbox({ tenantSlug }: { tenantSlug: string }) {
                     ))}
                   </div>
                 </div>
-                <span className="rounded-lg bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                <span className={`rounded-lg px-2.5 py-0.5 text-xs font-bold ${
+                  item.status === "RESOLVED"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300"
+                    : item.status === "DISMISSED"
+                      ? "bg-secondary text-muted-foreground"
+                      : "bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300"
+                }`}>
                   {item.status === "OPEN"
                     ? "Abierto"
                     : item.status === "RESOLVED"
-                      ? "Resuelto"
+                      ? "Atendido / Resuelto por equipo"
                       : "Descartado"}
                 </span>
               </div>

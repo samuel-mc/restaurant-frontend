@@ -508,9 +508,21 @@ export interface AdminFeedbackItem {
   outcome: FeedbackOutcome;
   status: FeedbackInboxStatus;
   urgent: boolean;
+  requiresManagerAttention?: boolean;
   tableNumber: string | null;
   createdAt: string;
   resolvedAt: string | null;
+}
+
+export interface CriticalFeedbackAlertEvent {
+  type: "CRITICAL_FEEDBACK_ALERT";
+  orderUuid: string;
+  tableNumber: string;
+  stars: number;
+  tags?: string[];
+  comment?: string | null;
+  timestamp: string;
+  requiresManagerAttention?: boolean;
 }
 
 export interface FeedbackSummary {

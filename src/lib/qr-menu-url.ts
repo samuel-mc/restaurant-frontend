@@ -2,7 +2,7 @@
  * URLs públicas del menú digital para códigos QR de mesa.
  */
 
-const DEFAULT_ROOT_DOMAIN = "platolisto.com";
+const DEFAULT_ROOT_DOMAIN = "platolistoapp.com";
 
 /** Dominio raíz de subdominios (ej. platolisto.com). */
 export function getPublicRootDomain(): string {

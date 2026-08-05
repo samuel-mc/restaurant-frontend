@@ -27,6 +27,7 @@ export interface RestaurantProfileFormPayload {
   websitePublished: boolean;
   logoFile: File | null;
   bannerFile: File | null;
+  faviconFile: File | null;
 }
 
 function buildFormData(payload: RestaurantProfileFormPayload): FormData {
@@ -50,6 +51,9 @@ function buildFormData(payload: RestaurantProfileFormPayload): FormData {
   }
   if (payload.bannerFile) {
     formData.append("banner", payload.bannerFile);
+  }
+  if (payload.faviconFile) {
+    formData.append("favicon", payload.faviconFile);
   }
   return formData;
 }

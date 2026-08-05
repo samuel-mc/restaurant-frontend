@@ -102,11 +102,15 @@ export function SettingsForm({
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(
     initialProfile.logoUrl,
   );
   const [bannerPreview, setBannerPreview] = useState<string | null>(
     initialProfile.bannerUrl,
+  );
+  const [faviconPreview, setFaviconPreview] = useState<string | null>(
+    initialProfile.faviconUrl,
   );
 
   const [submitting, setSubmitting] = useState(false);
@@ -127,13 +131,19 @@ export function SettingsForm({
   );
 
   function handleImageChange(
-    kind: "logo" | "banner",
+    kind: "logo" | "banner" | "favicon",
     fileList: FileList | null,
   ) {
     const file = fileList?.[0] ?? null;
+    const fileKey =
+      kind === "logo"
+        ? "logoFile"
+        : kind === "banner"
+          ? "bannerFile"
+          : "faviconFile";
     setErrors((prev) => {
       const next = { ...prev };
-      delete next[kind === "logo" ? "logoFile" : "bannerFile"];
+      delete next[fileKey];
       delete next.form;
       return next;
     });
@@ -145,11 +155,17 @@ export function SettingsForm({
           revokeIfBlob(prev);
           return profile.logoUrl;
         });
-      } else {
+      } else if (kind === "banner") {
         setBannerFile(null);
         setBannerPreview((prev) => {
           revokeIfBlob(prev);
           return profile.bannerUrl;
+        });
+      } else {
+        setFaviconFile(null);
+        setFaviconPreview((prev) => {
+          revokeIfBlob(prev);
+          return profile.faviconUrl;
         });
       }
       return;
@@ -158,16 +174,14 @@ export function SettingsForm({
     if (!ACCEPTED_TYPES.has(file.type)) {
       setErrors((prev) => ({
         ...prev,
-        [kind === "logo" ? "logoFile" : "bannerFile"]:
-          "Usa JPG, PNG, WEBP o GIF.",
+        [fileKey]: "Usa JPG, PNG, WEBP o GIF.",
       }));
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
       setErrors((prev) => ({
         ...prev,
-        [kind === "logo" ? "logoFile" : "bannerFile"]:
-          "La imagen no puede superar 5 MB.",
+        [fileKey]: "La imagen no puede superar 5 MB.",
       }));
       return;
     }
@@ -179,9 +193,15 @@ export function SettingsForm({
         revokeIfBlob(prev);
         return objectUrl;
       });
-    } else {
+    } else if (kind === "banner") {
       setBannerFile(file);
       setBannerPreview((prev) => {
+        revokeIfBlob(prev);
+        return objectUrl;
+      });
+    } else {
+      setFaviconFile(file);
+      setFaviconPreview((prev) => {
         revokeIfBlob(prev);
         return objectUrl;
       });
@@ -240,6 +260,7 @@ export function SettingsForm({
       websitePublished,
       logoFile,
       bannerFile,
+      faviconFile,
     };
   }
 
@@ -302,8 +323,10 @@ export function SettingsForm({
       setProfile(updated);
       setLogoFile(null);
       setBannerFile(null);
+      setFaviconFile(null);
       setLogoPreview(updated.logoUrl);
       setBannerPreview(updated.bannerUrl);
+      setFaviconPreview(updated.faviconUrl);
       setSavedBanner("Configuración de tu marca guardada.");
       window.setTimeout(() => {
         setSavedBanner((current) =>
@@ -363,7 +386,7 @@ export function SettingsForm({
       >
         <Section
           title="Identidad visual"
-          description="Logo, banner y colores de tu marca."
+          description="Logo, banner, favicon y colores de tu marca."
         >
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <ImagePicker
@@ -381,6 +404,15 @@ export function SettingsForm({
               disabled={submitting}
               aspect="wide"
               onChange={(files) => handleImageChange("banner", files)}
+            />
+            <ImagePicker
+              label="Favicon"
+              previewUrl={faviconPreview}
+              error={errors.faviconFile}
+              disabled={submitting}
+              aspect="square"
+              hint="Cuadrado · PNG recomendado · máx. 5 MB. Aparece en la pestaña del navegador."
+              onChange={(files) => handleImageChange("favicon", files)}
             />
           </div>
 
@@ -832,6 +864,7 @@ function ImagePicker({
   error,
   disabled,
   aspect,
+  hint = "JPG, PNG, WEBP o GIF · máx. 5 MB",
   onChange,
 }: {
   label: string;
@@ -839,6 +872,7 @@ function ImagePicker({
   error?: string;
   disabled?: boolean;
   aspect: "square" | "wide";
+  hint?: string;
   onChange: (files: FileList | null) => void;
 }) {
   const inputId = useId();
@@ -882,9 +916,7 @@ function ImagePicker({
       {error ? (
         <span className="text-xs font-medium text-destructive">{error}</span>
       ) : (
-        <span className="text-xs text-muted-foreground">
-          JPG, PNG, WEBP o GIF · máx. 5 MB
-        </span>
+        <span className="text-xs text-muted-foreground">{hint}</span>
       )}
     </div>
   );

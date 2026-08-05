@@ -12,6 +12,7 @@ interface TenantPageMetaInput {
 /**
  * Metadata pública por tenant con Open Graph / Twitter.
  * Usa identidad de marca del perfil cuando está disponible.
+ * Favicon: `faviconUrl` del tenant; si falta, hereda el de PlatoListo (root layout).
  */
 export function buildTenantPageMetadata({
   title,
@@ -26,10 +27,19 @@ export function buildTenantPageMetadata({
     undefined;
 
   const siteName = profile?.name?.trim() || undefined;
+  const favicon = profile?.faviconUrl?.trim() || undefined;
 
   return {
     title,
     description,
+    ...(favicon
+      ? {
+          icons: {
+            icon: [{ url: favicon }],
+            apple: [{ url: favicon }],
+          },
+        }
+      : {}),
     openGraph: {
       title,
       description,

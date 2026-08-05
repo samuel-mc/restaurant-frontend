@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { StaffPinLogin } from "@/components/staff/staff-pin-login";
 import { TenantUnavailable } from "@/components/customer/tenant-unavailable";
 import { prettifyTenantSlug } from "@/lib/admin-nav";
+import { buildTenantPageMetadata } from "@/lib/tenant-metadata";
 import { getPublicRestaurantProfileOrNull } from "@/services/publicRestaurantQueries";
 import { getPublicActiveStaffDirectory } from "@/services/publicStaffQueries";
 
@@ -21,10 +22,11 @@ export async function generateMetadata({
       description: `El restaurante ${name} no está disponible en este momento.`,
     };
   }
-  return {
+  return buildTenantPageMetadata({
     title: `Turno · ${name}`,
     description: `Elige tu nombre e ingresa tu PIN para entrar al turno de ${name}.`,
-  };
+    profile,
+  });
 }
 
 export default async function StaffLoginPage({ params }: StaffLoginPageProps) {

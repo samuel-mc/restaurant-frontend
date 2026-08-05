@@ -192,6 +192,7 @@ export interface RestaurantProfileResponse {
   subdomain: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  faviconUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
   description: string | null;
@@ -455,6 +456,7 @@ export interface RestaurantProfile {
   subdomain: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  faviconUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
   description: string | null;

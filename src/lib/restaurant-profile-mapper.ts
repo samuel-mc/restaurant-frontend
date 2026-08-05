@@ -32,6 +32,7 @@ export function toRestaurantProfile(
     subdomain: dto.subdomain,
     logoUrl: dto.logoUrl ?? null,
     bannerUrl: dto.bannerUrl ?? null,
+    faviconUrl: dto.faviconUrl ?? null,
     primaryColor: dto.primaryColor?.trim() || DEFAULT_PRIMARY,
     secondaryColor: dto.secondaryColor?.trim() || DEFAULT_SECONDARY,
     description: dto.description ?? null,

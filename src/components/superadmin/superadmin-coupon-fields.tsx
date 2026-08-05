@@ -40,6 +40,17 @@ export function usagesDraftLabel(maxRaw: string): string {
   return trimmed;
 }
 
+export function formatGrantDuration(days: number | null | undefined): string {
+  if (days == null) return "Sin período";
+  return days === 1 ? "1 día de plan" : `${days} días de plan`;
+}
+
+export function grantDurationDraftLabel(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === "") return "Sin período";
+  return formatGrantDuration(Number.parseInt(trimmed, 10));
+}
+
 export function CouponSummaryFacts({
   coupon,
   showMeta = true,
@@ -63,6 +74,9 @@ export function CouponSummaryFacts({
           <span className="text-zinc-400">
             {formatCouponExpires(coupon.expiresAt)}
           </span>
+          <span className="text-zinc-400">
+            {formatGrantDuration(coupon.grantDurationDays)}
+          </span>
           <span
             className={coupon.active ? "text-emerald-300" : "text-zinc-400"}
           >
@@ -79,11 +93,13 @@ export function CouponEditFields({
   plan,
   max,
   expires,
+  grantDays,
   busy,
   onDescription,
   onPlan,
   onMax,
   onExpires,
+  onGrantDays,
   onSave,
   onCancel,
 }: {
@@ -91,11 +107,13 @@ export function CouponEditFields({
   plan: SuperAdminPlan;
   max: string;
   expires: string;
+  grantDays: string;
   busy: boolean;
   onDescription: (v: string) => void;
   onPlan: (v: SuperAdminPlan) => void;
   onMax: (v: string) => void;
   onExpires: (v: string) => void;
+  onGrantDays: (v: string) => void;
   onSave: () => void;
   onCancel: () => void;
 }) {
@@ -138,14 +156,30 @@ export function CouponEditFields({
           disabled={busy}
         />
       </label>
-      <label className="block space-y-1.5 sm:col-span-2">
-        <span className="text-xs font-medium text-zinc-400">Expira</span>
+      <label className="block space-y-1.5">
+        <span className="text-xs font-medium text-zinc-400">Expira (canje)</span>
         <input
           type="datetime-local"
           value={expires}
           onChange={(e) => onExpires(e.target.value)}
           className={saField}
           disabled={busy}
+        />
+      </label>
+      <label className="block space-y-1.5">
+        <span className="text-xs font-medium text-zinc-400">
+          Días de plan (vacío = sin fecha de renovación)
+        </span>
+        <input
+          type="number"
+          min={1}
+          max={3650}
+          value={grantDays}
+          onChange={(e) => onGrantDays(e.target.value)}
+          className={saField}
+          disabled={busy}
+          placeholder="30"
+          aria-label="Días de plan al canjear"
         />
       </label>
       <div className="flex flex-wrap gap-2 sm:col-span-2">

@@ -213,6 +213,9 @@ export interface RestaurantProfileResponse {
   plan?: string | null;
   /** ACTIVE | PENDING_PAYMENT (omitido en perfil público). */
   paymentStatus?: string | null;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  billingInterval?: string | null;
   updatedAt: string;
 }
 
@@ -477,6 +480,9 @@ export interface RestaurantProfile {
   plan: string;
   /** ACTIVE | PENDING_PAYMENT */
   paymentStatus: string;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  billingInterval?: string | null;
   updatedAt: string;
 }
 

@@ -5,4 +5,5 @@ export interface RedeemCouponResponse {
   paymentStatus: string;
   websitePublished: boolean;
   redeemedCode: string;
+  currentPeriodEnd?: string | null;
 }

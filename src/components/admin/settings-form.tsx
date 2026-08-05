@@ -276,6 +276,7 @@ export function SettingsForm({
         plan: result.plan,
         paymentStatus: result.paymentStatus,
         websitePublished: result.websitePublished,
+        currentPeriodEnd: result.currentPeriodEnd ?? prev.currentPeriodEnd ?? null,
       }));
       setWebsitePublished(result.websitePublished);
       setCouponCode("");
@@ -557,6 +558,17 @@ export function SettingsForm({
                 {paymentStatusLabel(profile.paymentStatus)}
               </span>
             </p>
+            {profile.currentPeriodEnd ? (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Renovación:{" "}
+                <span className="font-semibold text-foreground">
+                  {new Date(profile.currentPeriodEnd).toLocaleString("es-MX", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
+              </p>
+            ) : null}
             <p className="mt-1 text-sm text-muted-foreground">
               Landing custom:{" "}
               <span className="font-semibold text-foreground">

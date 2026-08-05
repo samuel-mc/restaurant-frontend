@@ -140,7 +140,12 @@ export async function updateTenantActiveStatus(
 
 export async function updateTenantSubscription(
   id: number,
-  payload: { plan: SuperAdminPlan; paymentStatus: SuperAdminPaymentStatus },
+  payload: {
+    plan: SuperAdminPlan;
+    paymentStatus: SuperAdminPaymentStatus;
+    /** ISO-8601; cadena vacía limpia el período. Omitir para no cambiar. */
+    currentPeriodEnd?: string | null;
+  },
 ): Promise<SuperAdminTenant> {
   return bffJson<SuperAdminTenant>(
     `/api/superadmin/tenants/${id}/subscription`,

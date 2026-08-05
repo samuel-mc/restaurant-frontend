@@ -12,6 +12,11 @@ export interface SuperAdminTenant {
   subdomain: string;
   plan: string;
   paymentStatus: string;
+  /** ISO inicio del período; null si aún no se fijó. */
+  currentPeriodStart?: string | null;
+  /** ISO fecha de renovación (fuente de verdad). */
+  currentPeriodEnd?: string | null;
+  billingInterval?: string | null;
   active: boolean;
   websitePublished: boolean;
   createdAt: string | null;
@@ -92,6 +97,8 @@ export interface SuperAdminCoupon {
   redemptionCount: number;
   active: boolean;
   expiresAt: string | null;
+  /** Días de entitlement al canjear; null = no fija período. */
+  grantDurationDays: number | null;
   createdAt: string | null;
 }
 
@@ -101,6 +108,7 @@ export interface SuperAdminCouponCreateInput {
   grantsPlan?: SuperAdminPlan;
   maxRedemptions?: number | null;
   expiresAt?: string | null;
+  grantDurationDays?: number | null;
 }
 
 export interface SuperAdminCouponUpdateInput {
@@ -109,5 +117,7 @@ export interface SuperAdminCouponUpdateInput {
   maxRedemptions?: number | null;
   clearMaxRedemptions?: boolean;
   expiresAt?: string | null;
+  grantDurationDays?: number | null;
+  clearGrantDurationDays?: boolean;
   active?: boolean;
 }

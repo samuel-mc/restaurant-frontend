@@ -49,6 +49,9 @@ export function toRestaurantProfile(
     plan: dto.plan === "PRO" ? "PRO" : "BASIC",
     paymentStatus:
       dto.paymentStatus === "PENDING_PAYMENT" ? "PENDING_PAYMENT" : "ACTIVE",
+    currentPeriodStart: dto.currentPeriodStart ?? null,
+    currentPeriodEnd: dto.currentPeriodEnd ?? null,
+    billingInterval: dto.billingInterval ?? null,
     updatedAt: dto.updatedAt,
   };
 }

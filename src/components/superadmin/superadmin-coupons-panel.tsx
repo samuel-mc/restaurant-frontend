@@ -38,6 +38,8 @@ import {
   CouponSummaryFacts,
   formatCouponExpires,
   formatCouponUsages,
+  formatGrantDuration,
+  grantDurationDraftLabel,
   planGrantLabel,
   usagesDraftLabel,
 } from "@/components/superadmin/superadmin-coupon-fields";
@@ -62,6 +64,7 @@ type PendingCreate = {
   grantsPlan: SuperAdminPlan;
   maxRedemptions: string;
   expiresLocal: string;
+  grantDays: string;
 };
 
 type PendingEdit = {
@@ -70,6 +73,7 @@ type PendingEdit = {
   grantsPlan: SuperAdminPlan;
   max: string;
   expiresLocal: string;
+  grantDays: string;
 };
 
 function parseRiskFilter(raw: string | null): CouponRiskFilter {
@@ -101,6 +105,15 @@ function parsePositiveMax(raw: string): number | undefined {
     throw new Error("El máximo de usos debe ser un número positivo.");
   }
   return max;
+}
+
+function parseOptionalGrantDays(raw: string): number | undefined {
+  if (raw.trim() === "") return undefined;
+  const days = Number.parseInt(raw, 10);
+  if (!Number.isFinite(days) || days < 1 || days > 3650) {
+    throw new Error("Los días de plan deben ser un número entre 1 y 3650.");
+  }
+  return days;
 }
 
 function buildEditReviewRows(pending: PendingEdit) {
@@ -135,13 +148,22 @@ function buildEditReviewRows(pending: PendingEdit) {
   const prevExp = isoToLocalInput(coupon.expiresAt);
   if (pending.expiresLocal.trim() !== prevExp) {
     rows.push({
-      label: "Expira",
+      label: "Expira (canje)",
       from: formatCouponExpires(coupon.expiresAt),
       to: pending.expiresLocal.trim()
         ? formatCouponExpires(
             localInputToIso(pending.expiresLocal) ?? pending.expiresLocal,
           )
         : "Sin expiración",
+    });
+  }
+  const prevGrant =
+    coupon.grantDurationDays == null ? "" : String(coupon.grantDurationDays);
+  if (pending.grantDays.trim() !== prevGrant) {
+    rows.push({
+      label: "Días de plan",
+      from: formatGrantDuration(coupon.grantDurationDays),
+      to: grantDurationDraftLabel(pending.grantDays),
     });
   }
   return rows;
@@ -174,12 +196,14 @@ export function SuperAdminCouponsPanel({
   const [grantsPlan, setGrantsPlan] = useState<SuperAdminPlan>("PRO");
   const [maxRedemptions, setMaxRedemptions] = useState("");
   const [expiresLocal, setExpiresLocal] = useState("");
+  const [grantDays, setGrantDays] = useState("30");
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editPlan, setEditPlan] = useState<SuperAdminPlan>("PRO");
   const [editMax, setEditMax] = useState("");
   const [editExpires, setEditExpires] = useState("");
+  const [editGrantDays, setEditGrantDays] = useState("");
   const [statusFilter, setStatusFilter] = useState<CouponStatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<CouponRiskFilter>(() =>
     parseRiskFilter(searchParams.get("risk")),
@@ -263,8 +287,11 @@ export function SuperAdminCouponsPanel({
     setError(null);
     try {
       parsePositiveMax(maxRedemptions);
+      parseOptionalGrantDays(grantDays);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Revisa el máximo de usos.");
+      setError(
+        err instanceof Error ? err.message : "Revisa máximo de usos o días de plan.",
+      );
       return;
     }
     setDialogError(null);
@@ -274,6 +301,7 @@ export function SuperAdminCouponsPanel({
       grantsPlan,
       maxRedemptions,
       expiresLocal,
+      grantDays,
     });
   }
 
@@ -285,12 +313,14 @@ export function SuperAdminCouponsPanel({
     try {
       const max = parsePositiveMax(pendingCreate.maxRedemptions);
       const expiresAt = localInputToIso(pendingCreate.expiresLocal);
+      const grantDurationDays = parseOptionalGrantDays(pendingCreate.grantDays);
       const created = await createSuperAdminCoupon({
         code: pendingCreate.code,
         description: pendingCreate.description || undefined,
         grantsPlan: pendingCreate.grantsPlan,
         maxRedemptions: max,
         expiresAt: expiresAt ?? undefined,
+        grantDurationDays: grantDurationDays ?? undefined,
       });
       setCoupons((prev) => [created, ...prev]);
       setCode("");
@@ -298,6 +328,7 @@ export function SuperAdminCouponsPanel({
       setGrantsPlan("PRO");
       setMaxRedemptions("");
       setExpiresLocal("");
+      setGrantDays("30");
       setCreateOpen(false);
       setPendingCreate(null);
       flashSuccess(`Cupón ${created.code} creado.`);
@@ -323,6 +354,9 @@ export function SuperAdminCouponsPanel({
       coupon.maxRedemptions == null ? "" : String(coupon.maxRedemptions),
     );
     setEditExpires(isoToLocalInput(coupon.expiresAt));
+    setEditGrantDays(
+      coupon.grantDurationDays == null ? "" : String(coupon.grantDurationDays),
+    );
     setError(null);
   }
 
@@ -331,8 +365,11 @@ export function SuperAdminCouponsPanel({
     setError(null);
     try {
       parsePositiveMax(editMax);
+      parseOptionalGrantDays(editGrantDays);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Revisa el máximo de usos.");
+      setError(
+        err instanceof Error ? err.message : "Revisa máximo de usos o días de plan.",
+      );
       return;
     }
     const draft: PendingEdit = {
@@ -341,6 +378,7 @@ export function SuperAdminCouponsPanel({
       grantsPlan: editPlan,
       max: editMax,
       expiresLocal: editExpires,
+      grantDays: editGrantDays,
     };
     const rows = buildEditReviewRows(draft);
     if (rows.length === 0) {
@@ -361,6 +399,10 @@ export function SuperAdminCouponsPanel({
       const clearMax = pendingEdit.max.trim() === "";
       const max = clearMax ? undefined : parsePositiveMax(pendingEdit.max);
       const expiresRaw = pendingEdit.expiresLocal.trim();
+      const clearGrant = pendingEdit.grantDays.trim() === "";
+      const grantDurationDays = clearGrant
+        ? undefined
+        : parseOptionalGrantDays(pendingEdit.grantDays);
       const updated = await updateSuperAdminCoupon(couponId, {
         description: pendingEdit.description.trim(),
         grantsPlan: pendingEdit.grantsPlan,
@@ -368,6 +410,9 @@ export function SuperAdminCouponsPanel({
           ? { clearMaxRedemptions: true }
           : { maxRedemptions: max }),
         expiresAt: expiresRaw === "" ? "" : (localInputToIso(expiresRaw) ?? ""),
+        ...(clearGrant
+          ? { clearGrantDurationDays: true }
+          : { grantDurationDays }),
       });
       setCoupons((prev) =>
         prev.map((c) => (c.id === updated.id ? updated : c)),
@@ -427,11 +472,13 @@ export function SuperAdminCouponsPanel({
         plan={editPlan}
         max={editMax}
         expires={editExpires}
+        grantDays={editGrantDays}
         busy={busy}
         onDescription={setEditDescription}
         onPlan={setEditPlan}
         onMax={setEditMax}
         onExpires={setEditExpires}
+        onGrantDays={setEditGrantDays}
         onSave={() => requestSaveEdit(coupon)}
         onCancel={() => setEditingId(null)}
       />
@@ -453,7 +500,7 @@ export function SuperAdminCouponsPanel({
           to: usagesDraftLabel(pendingCreate.maxRedemptions),
         },
         {
-          label: "Expira",
+          label: "Expira (canje)",
           from: "—",
           to: pendingCreate.expiresLocal.trim()
             ? formatCouponExpires(
@@ -461,6 +508,11 @@ export function SuperAdminCouponsPanel({
                   pendingCreate.expiresLocal,
               )
             : "Sin expiración",
+        },
+        {
+          label: "Días de plan",
+          from: "—",
+          to: grantDurationDraftLabel(pendingCreate.grantDays),
         },
         ...(pendingCreate.description
           ? [
@@ -646,7 +698,7 @@ export function SuperAdminCouponsPanel({
             </label>
             <label className="block space-y-1.5">
               <span className="text-xs font-medium text-zinc-400">
-                Expira (opcional)
+                Expira canje (opcional)
               </span>
               <input
                 type="datetime-local"
@@ -654,6 +706,21 @@ export function SuperAdminCouponsPanel({
                 onChange={(e) => setExpiresLocal(e.target.value)}
                 className={saField}
                 disabled={busyId != null}
+              />
+            </label>
+            <label className="block space-y-1.5 sm:col-span-2">
+              <span className="text-xs font-medium text-zinc-400">
+                Días de plan al canjear (vacío = sin fecha de renovación)
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                value={grantDays}
+                onChange={(e) => setGrantDays(e.target.value)}
+                className={saField}
+                disabled={busyId != null}
+                placeholder="30"
               />
             </label>
             <div className="sm:col-span-2">
@@ -749,6 +816,7 @@ export function SuperAdminCouponsPanel({
                     <th className="px-4 py-3">Plan</th>
                     <th className="px-4 py-3">Usos</th>
                     <th className="px-4 py-3">Expira</th>
+                    <th className="px-4 py-3">Días plan</th>
                     <th className="px-4 py-3">Estado</th>
                     <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
@@ -777,6 +845,9 @@ export function SuperAdminCouponsPanel({
                           </td>
                           <td className="px-4 py-3.5 text-xs text-zinc-400">
                             {formatCouponExpires(coupon.expiresAt)}
+                          </td>
+                          <td className="px-4 py-3.5 text-xs text-zinc-400">
+                            {formatGrantDuration(coupon.grantDurationDays)}
                           </td>
                           <td className="px-4 py-3.5">
                             <CouponActiveBadge active={coupon.active} />

@@ -43,7 +43,9 @@ import {
   saChipOff,
   saChipOn,
   saDangerBtn,
+  saField,
   saFocus,
+  saPrimaryBtn,
   saSecondaryBtn,
   saSelect,
   saSoftSuccessBtn,
@@ -81,6 +83,33 @@ function planLabel(plan: SuperAdminPlan): string {
 
 function paymentLabel(status: SuperAdminPaymentStatus): string {
   return status === "PENDING_PAYMENT" ? "Pago pendiente" : "Al corriente";
+}
+
+function formatPeriodEnd(iso: string | null | undefined): string {
+  if (!iso) return "Sin fecha de renovación";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+/** datetime-local (local) → ISO-8601. */
+function localInputToIso(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 type StatusFilter = "all" | "active" | "suspended" | "pending_payment";
@@ -151,6 +180,12 @@ type PendingAction =
       tenant: SuperAdminTenant;
       paymentStatus: SuperAdminPaymentStatus;
     }
+  | {
+      kind: "period";
+      tenant: SuperAdminTenant;
+      /** ISO o "" para limpiar. */
+      currentPeriodEnd: string;
+    }
   | { kind: "impersonate"; tenant: SuperAdminTenant };
 
 function TenantStatusBadge({ active }: { active: boolean }) {
@@ -196,6 +231,9 @@ function TenantSummaryFacts({
           <TenantStatusBadge active={tenant.active} />
         </div>
         <p className="mt-1 text-xs text-zinc-400">{published}</p>
+        <p className="mt-1 text-xs text-zinc-400">
+          Renueva: {formatPeriodEnd(tenant.currentPeriodEnd)}
+        </p>
       </div>
     );
   }
@@ -229,6 +267,7 @@ function TenantManageFields({
   pendingPayment,
   onPlanChange,
   onPaymentChange,
+  onPeriodChange,
   onSuspend,
   onActivate,
   onImpersonate,
@@ -239,6 +278,7 @@ function TenantManageFields({
   pendingPayment: SuperAdminPaymentStatus | null;
   onPlanChange: (plan: SuperAdminPlan) => void;
   onPaymentChange: (status: SuperAdminPaymentStatus) => void;
+  onPeriodChange: (currentPeriodEnd: string) => void;
   onSuspend: () => void;
   onActivate: () => void;
   onImpersonate: () => void;
@@ -281,6 +321,48 @@ function TenantManageFields({
               <option value="ACTIVE">Al corriente</option>
               <option value="PENDING_PAYMENT">Pago pendiente</option>
             </select>
+          </label>
+          <label className="block space-y-1.5 sm:col-span-2">
+            <span className="text-xs font-medium text-zinc-400">
+              Renueva el
+            </span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="datetime-local"
+                aria-label={`Fecha de renovación de ${tenant.name}`}
+                className={`${saField} w-full`}
+                disabled={busy}
+                defaultValue={isoToLocalInput(tenant.currentPeriodEnd)}
+                key={tenant.currentPeriodEnd ?? "none"}
+                id={`sa-period-${tenant.id}`}
+              />
+              <button
+                type="button"
+                disabled={busy}
+                className={`${saPrimaryBtn} ${saFocus} shrink-0`}
+                onClick={() => {
+                  const el = document.getElementById(
+                    `sa-period-${tenant.id}`,
+                  ) as HTMLInputElement | null;
+                  const raw = el?.value?.trim() ?? "";
+                  const prev = isoToLocalInput(tenant.currentPeriodEnd);
+                  if (raw === prev) return;
+                  if (raw === "") {
+                    onPeriodChange("");
+                    return;
+                  }
+                  const iso = localInputToIso(raw);
+                  if (!iso) return;
+                  onPeriodChange(iso);
+                }}
+              >
+                Guardar fecha
+              </button>
+            </div>
+            <span className="text-[11px] text-zinc-500">
+              Vacío + guardar limpia la renovación. Independiente de la
+              expiración del cupón.
+            </span>
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -501,14 +583,22 @@ export function SuperAdminTenantsTable({
 
   async function applySubscription(
     tenant: SuperAdminTenant,
-    next: { plan?: SuperAdminPlan; paymentStatus?: SuperAdminPaymentStatus },
+    next: {
+      plan?: SuperAdminPlan;
+      paymentStatus?: SuperAdminPaymentStatus;
+      currentPeriodEnd?: string | null;
+      /** true si el payload incluye currentPeriodEnd (incluso vacío). */
+      periodTouched?: boolean;
+    },
   ) {
     if (isRowBusy(tenant.id)) return;
     const plan = next.plan ?? asPlan(tenant.plan);
     const paymentStatus = next.paymentStatus ?? asPayment(tenant.paymentStatus);
+    const periodTouched = Boolean(next.periodTouched);
     if (
       plan === asPlan(tenant.plan) &&
-      paymentStatus === asPayment(tenant.paymentStatus)
+      paymentStatus === asPayment(tenant.paymentStatus) &&
+      !periodTouched
     ) {
       setPending(null);
       return;
@@ -521,12 +611,19 @@ export function SuperAdminTenantsTable({
       const updated = await updateTenantSubscription(tenant.id, {
         plan,
         paymentStatus,
+        ...(periodTouched
+          ? { currentPeriodEnd: next.currentPeriodEnd ?? "" }
+          : {}),
       });
       setTenants((prev) =>
         prev.map((t) => (t.id === updated.id ? updated : t)),
       );
       setPending(null);
-      if (next.plan != null) {
+      if (periodTouched) {
+        flashSuccess(
+          `Renovación de ${updated.name} → ${formatPeriodEnd(updated.currentPeriodEnd)}.`,
+        );
+      } else if (next.plan != null) {
         flashSuccess(
           `Plan de ${updated.name} → ${planLabel(asPlan(updated.plan))}.`,
         );
@@ -599,6 +696,12 @@ export function SuperAdminTenantsTable({
       case "payment":
         void applySubscription(pending.tenant, {
           paymentStatus: pending.paymentStatus,
+        });
+        break;
+      case "period":
+        void applySubscription(pending.tenant, {
+          currentPeriodEnd: pending.currentPeriodEnd,
+          periodTouched: true,
         });
         break;
       case "impersonate":
@@ -703,6 +806,29 @@ export function SuperAdminTenantsTable({
             />
           ),
         };
+      case "period":
+        return {
+          title: `¿Actualizar renovación de ${name}?`,
+          description:
+            "La fecha de renovación vive en el restaurante, no en el cupón.",
+          confirmLabel: "Guardar renovación",
+          busyLabel: "Guardando…",
+          tone: "neutral",
+          detail: (
+            <MutationReviewDetail
+              rows={[
+                {
+                  label: "Renueva",
+                  from: formatPeriodEnd(pending.tenant.currentPeriodEnd),
+                  to: pending.currentPeriodEnd
+                    ? formatPeriodEnd(pending.currentPeriodEnd)
+                    : "Sin fecha de renovación",
+                },
+              ]}
+              note={name}
+            />
+          ),
+        };
       case "impersonate": {
         const destination = buildTenantAdminUrl(slug, "/admin/dashboard");
         return {
@@ -732,6 +858,10 @@ export function SuperAdminTenantsTable({
       onPaymentChange: (paymentStatus: SuperAdminPaymentStatus) => {
         setDialogError(null);
         setPending({ kind: "payment", tenant, paymentStatus });
+      },
+      onPeriodChange: (currentPeriodEnd: string) => {
+        setDialogError(null);
+        setPending({ kind: "period", tenant, currentPeriodEnd });
       },
       onSuspend: () => {
         setDialogError(null);

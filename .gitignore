@@ -49,5 +49,9 @@ FRONTEND_ROADMAP.md
 B2B_Landing/
 .cursor/
 .impeccable/
+.agents/
+.claude/
+.gemini/
+.opencode/
 DESIGN.md
 public/brand/.gitkeep

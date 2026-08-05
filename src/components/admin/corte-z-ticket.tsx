@@ -30,6 +30,19 @@ export function CorteZTicket({ record, onClose }: CorteZTicketProps) {
     };
   }, []);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && onClose) {
+        onClose();
+      } else if ((e.key === "p" || e.key === "P") && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        handlePrint();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   function handlePrint() {
     if (typeof window === "undefined") return;
     beginThermalPrint();

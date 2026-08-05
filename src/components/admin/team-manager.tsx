@@ -1808,8 +1808,8 @@ function MemberFormModal({
                       clearFieldErrors();
                     }}
                     inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
+                    pattern={`\\d{${STAFF_PIN_LENGTH}}`}
+                    maxLength={STAFF_PIN_LENGTH}
                     disabled={busy}
                     autoComplete="new-password"
                     placeholder="••••"
@@ -1831,8 +1831,8 @@ function MemberFormModal({
                       clearFieldErrors();
                     }}
                     inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
+                    pattern={`\\d{${STAFF_PIN_LENGTH}}`}
+                    maxLength={STAFF_PIN_LENGTH}
                     disabled={busy}
                     autoComplete="new-password"
                     placeholder="••••"
@@ -2068,8 +2068,8 @@ function PinFormModal({
                   clearErrors();
                 }}
                 inputMode="numeric"
-                pattern="\d{6}"
-                maxLength={6}
+                pattern={`\\d{${STAFF_PIN_LENGTH}}`}
+                maxLength={STAFF_PIN_LENGTH}
                 autoComplete="new-password"
                 autoFocus
                 disabled={busy}

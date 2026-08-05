@@ -227,7 +227,7 @@ export function StaffPinLogin({
 
   const submitPin = useCallback(
     async (value: string, member: PublicStaffMember) => {
-      if (submittingRef.current || value.length !== 6) return;
+      if (submittingRef.current || value.length !== STAFF_PIN_LENGTH) return;
       submittingRef.current = true;
       const attempt = ++attemptRef.current;
       setBusy(true);
@@ -307,7 +307,7 @@ export function StaffPinLogin({
     });
   }, []);
 
-  // Dispara el login cuando el PIN llega a 6 dígitos (fuera del updater de estado).
+  // Dispara el login cuando el PIN llega a 4 dígitos (fuera del updater de estado).
   useEffect(() => {
     const member = selectedRef.current;
     if (!member || pin.length !== STAFF_PIN_LENGTH || submittingRef.current) return;

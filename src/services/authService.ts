@@ -8,6 +8,7 @@
 
 import type { LoginRequest, LoginResponse, StaffPinLoginRequest, StaffPinLoginResponse } from "@/types/api";
 import { resolveTenantSlug } from "@/lib/tenant";
+import { STAFF_PIN_LENGTH, isStaffPinFormat } from "@/lib/staff-pin";
 import { apiClient, ApiError } from "@/services/apiClient";
 
 /** Cabecera que el backend (`TenantFilter`) usa para aislar el restaurante. */
@@ -80,7 +81,7 @@ export async function login(
 }
 
 /**
- * Login rápido del equipo: empleado seleccionado + PIN de 6 dígitos.
+ * Login rápido del equipo: empleado seleccionado + PIN de 4 dígitos.
  */
 export async function loginWithPin(
   staffId: string,
@@ -96,9 +97,9 @@ export async function loginWithPin(
     });
   }
 
-  if (!/^\d{6}$/.test(pin)) {
+  if (!isStaffPinFormat(pin)) {
     throw new ApiError({
-      message: "El PIN son 6 dígitos.",
+      message: `El PIN son ${STAFF_PIN_LENGTH} dígitos.`,
       status: 0,
       statusText: "Bad Request",
       url: PIN_LOGIN_PATH,

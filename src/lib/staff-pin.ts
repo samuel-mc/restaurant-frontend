@@ -2,37 +2,45 @@
  * Política de PIN de personal (alineada con StaffPinPolicy.java).
  */
 
-export const STAFF_PIN_LENGTH = 6;
+export const STAFF_PIN_LENGTH = 4;
 
 const BANNED = new Set([
-  "000000",
-  "111111",
-  "222222",
-  "333333",
-  "444444",
-  "555555",
-  "666666",
-  "777777",
-  "888888",
-  "999999",
-  "123456",
-  "654321",
-  "012345",
-  "987654",
-  "112233",
-  "121212",
-  "123123",
-  "111222",
-  "112211",
-  "123321",
-  "121121",
+  "0000",
+  "1111",
+  "2222",
+  "3333",
+  "4444",
+  "5555",
+  "6666",
+  "7777",
+  "8888",
+  "9999",
+  "1234",
+  "4321",
+  "0123",
+  "9876",
+  "1212",
+  "2121",
+  "1122",
+  "2211",
+  "1221",
+  "2112",
+  "1232",
+  "2345",
+  "3456",
+  "4567",
+  "5678",
+  "6789",
+  "0987",
+  "1357",
+  "2468",
 ]);
 
 export const WEAK_PIN_MESSAGE =
-  "Ese PIN es muy fácil de adivinar. Elige 6 dígitos que no sean consecutivos ni repetidos.";
+  "Ese PIN es muy fácil de adivinar. Elige 4 dígitos que no sean consecutivos ni repetidos.";
 
 export function isStaffPinFormat(pin: string): boolean {
-  return /^\d{6}$/.test(pin);
+  return /^\d{4}$/.test(pin);
 }
 
 export function isWeakStaffPin(pin: string): boolean {
@@ -70,7 +78,7 @@ export function isWeakStaffPin(pin: string): boolean {
 
 export function staffPinCreateError(pin: string): string | null {
   if (!isStaffPinFormat(pin)) {
-    return "El PIN debe ser exactamente 6 dígitos.";
+    return "El PIN debe ser exactamente 4 dígitos.";
   }
   if (isWeakStaffPin(pin)) {
     return WEAK_PIN_MESSAGE;

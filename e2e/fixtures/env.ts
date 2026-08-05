@@ -22,11 +22,11 @@ export const e2eEnv = {
   ownerName: env("E2E_OWNER_NAME", "E2E Owner"),
   restaurantName: env("E2E_RESTAURANT_NAME", "E2E Smoke Kitchen"),
   productName: env("E2E_PRODUCT_NAME", "E2E Plato Smoke"),
-  /** PINs fuertes (no secuencias / repetidos). */
+  /** PINs fuertes de 4 dígitos (no secuencias / repetidos). */
   meseroName: env("E2E_MESERO_NAME", "E2E Mesero"),
-  meseroPin: env("E2E_MESERO_PIN", "582917"),
+  meseroPin: env("E2E_MESERO_PIN", "5829"),
   cocinaName: env("E2E_COCINA_NAME", "E2E Cocina"),
-  cocinaPin: env("E2E_COCINA_PIN", "749382"),
+  cocinaPin: env("E2E_COCINA_PIN", "7493"),
   /** Vacío = E2E-18 intenta defaults locales; si ninguno entra → skip. */
   superadminEmail: env("E2E_SUPERADMIN_EMAIL", "superadmin@platolisto.com"),
   superadminPassword: process.env.E2E_SUPERADMIN_PASSWORD?.trim() ?? "",

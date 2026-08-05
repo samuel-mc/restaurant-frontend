@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   title: qa ? "PlatoListo (QA)" : "PlatoListo",
   description: "SaaS multi-tenant para restaurantes: menú digital y gestión.",
   icons: {
-    icon: [{ url: "/brand/platolisto-logo.png", type: "image/png" }],
-    apple: [{ url: "/brand/platolisto-logo.png", type: "image/png" }],
+    icon: [{ url: "/brand/pl_favicon.png", type: "image/png" }],
+    apple: [{ url: "/brand/pl_favicon.png", type: "image/png" }],
   },
 };
 

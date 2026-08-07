@@ -8,7 +8,7 @@ import { getAdminCatalog } from "@/services/adminCatalogQueries";
 import { getRestaurantProfile } from "@/services/adminRestaurantQueries";
 import { ApiError } from "@/services/apiClient";
 import type { Category, Product } from "@/types/api";
-import type { SubscriptionPlan } from "@/lib/subscription-plan";
+import type { PaymentStatus, SubscriptionPlan } from "@/lib/subscription-plan";
 
 export const metadata: Metadata = {
   title: "Menú · Panel",
@@ -42,6 +42,8 @@ export default async function AdminMenuManagementPage() {
   let categories: Category[] = [];
   let products: Product[] = [];
   let plan: SubscriptionPlan = "BASIC";
+  let paymentStatus: PaymentStatus = "ACTIVE";
+  let currentPeriodEnd: string | null = null;
   let restaurantName = prettifyTenantSlug(tenantSlug);
   let loadError: string | null = null;
 
@@ -53,6 +55,11 @@ export default async function AdminMenuManagementPage() {
     categories = catalog.categories;
     products = catalog.products;
     plan = profile.plan === "PRO" ? "PRO" : "BASIC";
+    paymentStatus =
+      profile.paymentStatus === "PENDING_PAYMENT"
+        ? "PENDING_PAYMENT"
+        : "ACTIVE";
+    currentPeriodEnd = profile.currentPeriodEnd ?? null;
     const name = profile.name?.trim();
     if (name) restaurantName = name;
   } catch (error) {
@@ -83,6 +90,8 @@ export default async function AdminMenuManagementPage() {
       initialCategories={categories}
       initialProducts={products}
       plan={plan}
+      paymentStatus={paymentStatus}
+      currentPeriodEnd={currentPeriodEnd}
     />
   );
 }

@@ -34,7 +34,9 @@ npm run test:e2e
 | **E2E-10** | Delivery | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | Canal **A domicilio** + dirección → ticket cocina con Dir. → Accept → **Confirmado**. |
 | **E2E-11** | ABM menú | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | API crea → visible en `/menu` → toggle Agotado/En menú → delete → desaparece. |
 | **E2E-12** | Modificadores | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | Grupo obligatorio → error sin opción → Grande (+delta) → subtotal base+delta. |
-| **E2E-13** | Límite Basic | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | SQL BASIC → 31.º POST 400 + mensaje · UI `30/30` + Nuevo disabled · restaura PRO. |
+| **E2E-13** | Límite Basic | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | SQL BASIC → 21.º POST 400 + mensaje · UI `20/20` + Nuevo disabled · restaura PRO. |
+| **E2E-13b** | Pro sin pago (tope free) | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | SQL PRO+PENDING_PAYMENT → 21.º POST 400 · UI `Pro sin activar: 20/20` · restaura PRO. |
+| **E2E-13c** | Pro vencido (period end) | [`smoke-ops-loop.spec.ts`](./smoke-ops-loop.spec.ts) | Verde (local) | SQL PRO+ACTIVE + period pasado → 21.º 400 · UI `Pro vencido: 20/20` · restaura PRO. |
 | **E2E-14** | Registro onboarding | [`smoke-saas.spec.ts`](./smoke-saas.spec.ts) | Verde (local) | Landing `#registro` → slug nuevo → success → login admin. Reinicia backend si rate-limit in-memory. |
 | **E2E-15** | Cupón Pro | [`smoke-saas.spec.ts`](./smoke-saas.spec.ts) | Verde (local) | Demote BASIC + clear cupón → redeem UI → success · restaura PRO. |
 | **E2E-16** | Pedido no encontrado | [`smoke-saas.spec.ts`](./smoke-saas.spec.ts) | Verde (local) | UUID inválido → empty `order-unavailable` (sin Reintentar) → link menú. |
@@ -152,9 +154,27 @@ npm run test:e2e
 | Paso | Actor | Acción / assert |
 |---|---|---|
 | 1 | SQL | `plan=BASIC` (restore PRO en `finally`) |
-| 2 | API | Rellena hasta 30 activos · 31.º → **400** + mensaje límite |
-| 3 | Admin | Banner `30/30` · **Nuevo platillo** disabled |
+| 2 | API | Rellena hasta 20 activos · 21.º → **400** + mensaje límite |
+| 3 | Admin | Banner `20/20` · **Nuevo platillo** disabled |
 | 4 | Cleanup | Borra fillers `E2E Limit *` · SQL PRO+ACTIVE |
+
+### Detalle E2E-13b
+
+| Paso | Actor | Acción / assert |
+|---|---|---|
+| 1 | SQL | `plan=PRO` + `payment_status=PENDING_PAYMENT` |
+| 2 | API | Rellena hasta 20 · 21.º → **400** (sin cupón no hay menú ilimitado) |
+| 3 | Admin | Banner `Pro sin activar: 20/20` · **Nuevo platillo** disabled |
+| 4 | Cleanup | Borra fillers · SQL PRO+ACTIVE |
+
+### Detalle E2E-13c
+
+| Paso | Actor | Acción / assert |
+|---|---|---|
+| 1 | SQL | `plan=PRO` + `ACTIVE` + `current_period_end` en el pasado |
+| 2 | API | 21.º → **400** (período vencido = tope free) |
+| 3 | Admin | Banner `Pro vencido: 20/20` · **Nuevo platillo** disabled |
+| 4 | Cleanup | Borra fillers · SQL PRO+ACTIVE + period NULL |
 
 **Última corrida documentada:** 2026-08-03 — `13 passed` (P0 + P1 completo).
 
@@ -186,6 +206,8 @@ Checklist para ir tachando: [`E2E_CHECKLIST.md`](./E2E_CHECKLIST.md).
 | ~~**E2E-11**~~ | ~~ABM menú~~ | Cubierta en suite |
 | ~~**E2E-12**~~ | ~~Modificadores~~ | Cubierta en suite |
 | ~~**E2E-13**~~ | ~~Límite Basic~~ | Cubierta en suite |
+| ~~**E2E-13b**~~ | ~~Pro sin pago (tope free)~~ | Cubierta en suite |
+| ~~**E2E-13c**~~ | ~~Pro vencido (period end)~~ | Cubierta en suite |
 
 ### P2 — SaaS / calidad
 

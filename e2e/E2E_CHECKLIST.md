@@ -31,7 +31,9 @@ Leyenda: `[x]` hecha · `[ ]` pendiente
 
 - [x] **E2E-11** — ABM menú (crear / toggle / borrar → reflejo en `/menu`)
 - [x] **E2E-12** — Modificadores (obligatorio + subtotal)
-- [x] **E2E-13** — Límite Basic (31.º platillo rechazado)
+- [x] **E2E-13** — Límite Basic (21.º platillo rechazado)
+- [x] **E2E-13b** — Pro sin pago: tope free 20 platillos
+- [x] **E2E-13c** — Pro vencido: tope free tras current_period_end
 
 ## P2 — SaaS / calidad
 

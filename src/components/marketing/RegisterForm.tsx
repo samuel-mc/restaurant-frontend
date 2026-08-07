@@ -313,7 +313,7 @@ export function RegisterForm({
             {
               id: "BASIC" as const,
               title: "Básico",
-              hint: "Gratis · menú QR hasta 30 platillos",
+              hint: "Gratis · menú QR hasta 20 platillos",
             },
             {
               id: "PRO" as const,
@@ -658,7 +658,7 @@ export function RegisterForm({
           </span>{" "}
           con el correo y la contraseña que acabas de registrar.
           {createdPlan === "PRO" && createdPaymentStatus === "PENDING_PAYMENT"
-            ? " Tu Plan Pro quedó con pago pendiente: coordina el cobro y canjea el cupón en Configuración para publicar el sitio."
+            ? " Tu Plan Pro quedó con pago pendiente: el menú sigue con el tope del Plan Básico (20 platillos) hasta que canjees el cupón o confirmemos el cobro en Configuración."
             : null}
           {createdPlan === "PRO" && createdPaymentStatus === "ACTIVE"
             ? " Tu Plan Pro ya está activo (cupón aplicado)."

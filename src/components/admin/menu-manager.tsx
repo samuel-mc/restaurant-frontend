@@ -30,7 +30,8 @@ import {
   BASIC_MAX_PRODUCTS,
   BASIC_PRODUCT_LIMIT_UPGRADE_MESSAGE,
   basicProductOverLimitMessage,
-  isProPlan,
+  hasUnlimitedMenu,
+  type PaymentStatus,
   type SubscriptionPlan,
 } from "@/lib/subscription-plan";
 
@@ -47,6 +48,8 @@ interface MenuManagerProps {
   initialCategories: Category[];
   initialProducts: Product[];
   plan: SubscriptionPlan;
+  paymentStatus: PaymentStatus;
+  currentPeriodEnd: string | null;
 }
 
 type ModalState =
@@ -76,11 +79,14 @@ export function MenuManager({
   initialCategories,
   initialProducts,
   plan,
+  paymentStatus,
+  currentPeriodEnd,
 }: MenuManagerProps) {
   const [categories, setCategories] = useState(initialCategories);
   const [products, setProducts] = useState(initialProducts);
   const atProductLimit =
-    !isProPlan(plan) && products.length >= BASIC_MAX_PRODUCTS;
+    !hasUnlimitedMenu(plan, paymentStatus, currentPeriodEnd) &&
+    products.length >= BASIC_MAX_PRODUCTS;
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     () => initialCategories[0]?.id ?? null,
   );
@@ -521,17 +527,21 @@ export function MenuManager({
             </button>
           </div>
         </div>
-        {!isProPlan(plan) ? (
+        {!hasUnlimitedMenu(plan, paymentStatus, currentPeriodEnd) ? (
           <p
             role="status"
             data-testid="menu-plan-limit-banner"
             className="mt-4 rounded-xl border border-warn/25 bg-warn-muted px-4 py-2.5 text-sm text-warn-ink"
           >
-            Plan Básico: {products.length}/{BASIC_MAX_PRODUCTS} platillos
+            {plan === "PRO" && paymentStatus === "PENDING_PAYMENT"
+              ? `Pro sin activar: ${products.length}/${BASIC_MAX_PRODUCTS} platillos`
+              : plan === "PRO" && paymentStatus === "ACTIVE"
+                ? `Pro vencido: ${products.length}/${BASIC_MAX_PRODUCTS} platillos`
+                : `Plan Básico: ${products.length}/${BASIC_MAX_PRODUCTS} platillos`}
             {products.length > BASIC_MAX_PRODUCTS
               ? ` · ${basicProductOverLimitMessage(products.length)}`
               : atProductLimit
-                ? " · Límite alcanzado. Actualiza al Plan Pro para agregar o importar más."
+                ? " · Límite alcanzado. Activa o renueva el Plan Pro para agregar o importar más."
                 : "."}
           </p>
         ) : null}
@@ -657,7 +667,7 @@ export function MenuManager({
         tenantSlug={tenantSlug}
         busy={false}
         remainingSlots={
-          isProPlan(plan)
+          hasUnlimitedMenu(plan, paymentStatus, currentPeriodEnd)
             ? null
             : Math.max(0, BASIC_MAX_PRODUCTS - products.length)
         }

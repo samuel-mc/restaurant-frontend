@@ -12,6 +12,8 @@ import {
   ownerApiLogin,
   replaceProductModifiers,
   setTenantPlan,
+  setTenantProPendingPayment,
+  setTenantCurrentPeriodEnd,
   signTableQr,
   tryCreateAdminProduct,
 } from "./fixtures/api";
@@ -564,7 +566,7 @@ test.describe("smoke ops loop", () => {
     }
   });
 
-  test("E2E-13 Límite Basic: 31.º platillo rechazado", async ({
+  test("E2E-13 Límite Basic: 21.º platillo rechazado", async ({
     browser,
     baseURL,
   }) => {
@@ -600,7 +602,102 @@ test.describe("smoke ops loop", () => {
       await kitchenLogin(adminPage);
       await adminPage.goto("/admin/dashboard/menu");
       await expect(adminPage.getByTestId("menu-plan-limit-banner")).toContainText(
-        /30\/30/,
+        /20\/20/,
+        { timeout: 20_000 },
+      );
+      await expect(adminPage.getByTestId("menu-new-product")).toBeDisabled();
+      await admin.close();
+    } finally {
+      await deleteProductsByNamePrefix(ownerToken, prefix);
+      setTenantPlan("PRO");
+    }
+  });
+
+  test("E2E-13b Pro sin pago: tope free 20 platillos", async ({
+    browser,
+    baseURL,
+  }) => {
+    expect(baseURL).toContain(e2eEnv.tenantSlug);
+
+    const prefix = "E2E Pending ";
+    const ownerToken = await ownerApiLogin();
+    await deleteProductsByNamePrefix(ownerToken, prefix);
+
+    try {
+      setTenantProPendingPayment();
+
+      const existing = await listAdminProducts(ownerToken);
+      const need = Math.max(0, BASIC_MAX_PRODUCTS - existing.length);
+      for (let i = 0; i < need; i += 1) {
+        await createAdminProduct(ownerToken, {
+          name: `${prefix}${String(i).padStart(2, "0")}`,
+          price: 10,
+        });
+      }
+
+      const attempt = await tryCreateAdminProduct(ownerToken, {
+        name: `${prefix}overflow`,
+        price: 10,
+      });
+      expect(attempt.status).toBe(400);
+      expect(attempt.error ?? attempt.raw).toContain(BASIC_PRODUCT_LIMIT_MESSAGE);
+
+      const admin = await browser.newContext({
+        baseURL: e2eEnv.tenantBaseUrl,
+      });
+      const adminPage = await admin.newPage();
+      await kitchenLogin(adminPage);
+      await adminPage.goto("/admin/dashboard/menu");
+      await expect(adminPage.getByTestId("menu-plan-limit-banner")).toContainText(
+        /Pro sin activar:\s*20\/20/,
+        { timeout: 20_000 },
+      );
+      await expect(adminPage.getByTestId("menu-new-product")).toBeDisabled();
+      await admin.close();
+    } finally {
+      await deleteProductsByNamePrefix(ownerToken, prefix);
+      setTenantPlan("PRO");
+    }
+  });
+
+  test("E2E-13c Pro vencido: tope free tras current_period_end", async ({
+    browser,
+    baseURL,
+  }) => {
+    expect(baseURL).toContain(e2eEnv.tenantSlug);
+
+    const prefix = "E2E Expired ";
+    const ownerToken = await ownerApiLogin();
+    await deleteProductsByNamePrefix(ownerToken, prefix);
+
+    try {
+      setTenantPlan("PRO");
+      setTenantCurrentPeriodEnd(new Date(Date.now() - 60_000).toISOString());
+
+      const existing = await listAdminProducts(ownerToken);
+      const need = Math.max(0, BASIC_MAX_PRODUCTS - existing.length);
+      for (let i = 0; i < need; i += 1) {
+        await createAdminProduct(ownerToken, {
+          name: `${prefix}${String(i).padStart(2, "0")}`,
+          price: 10,
+        });
+      }
+
+      const attempt = await tryCreateAdminProduct(ownerToken, {
+        name: `${prefix}overflow`,
+        price: 10,
+      });
+      expect(attempt.status).toBe(400);
+      expect(attempt.error ?? attempt.raw).toContain(BASIC_PRODUCT_LIMIT_MESSAGE);
+
+      const admin = await browser.newContext({
+        baseURL: e2eEnv.tenantBaseUrl,
+      });
+      const adminPage = await admin.newPage();
+      await kitchenLogin(adminPage);
+      await adminPage.goto("/admin/dashboard/menu");
+      await expect(adminPage.getByTestId("menu-plan-limit-banner")).toContainText(
+        /Pro vencido:\s*20\/20/,
         { timeout: 20_000 },
       );
       await expect(adminPage.getByTestId("menu-new-product")).toBeDisabled();

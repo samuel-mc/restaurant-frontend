@@ -21,6 +21,7 @@ import { redeemCoupon } from "@/services/adminBillingService";
 import {
   canPublishWebsite,
   canUseProServiceModules,
+  isPeriodExpired,
   isProPlan,
   paymentStatusLabel,
   planLabel,
@@ -76,17 +77,29 @@ export function SettingsForm({
     initialProfile.businessHours ?? "",
   );
   const [hasDelivery, setHasDelivery] = useState(
-    canUseProServiceModules(initialProfile.plan, initialProfile.paymentStatus)
+    canUseProServiceModules(
+      initialProfile.plan,
+      initialProfile.paymentStatus,
+      initialProfile.currentPeriodEnd,
+    )
       ? initialProfile.hasDelivery
       : false,
   );
   const [hasPickup, setHasPickup] = useState(
-    canUseProServiceModules(initialProfile.plan, initialProfile.paymentStatus)
+    canUseProServiceModules(
+      initialProfile.plan,
+      initialProfile.paymentStatus,
+      initialProfile.currentPeriodEnd,
+    )
       ? initialProfile.hasPickup
       : false,
   );
   const [hasReservations, setHasReservations] = useState(
-    canUseProServiceModules(initialProfile.plan, initialProfile.paymentStatus)
+    canUseProServiceModules(
+      initialProfile.plan,
+      initialProfile.paymentStatus,
+      initialProfile.currentPeriodEnd,
+    )
       ? initialProfile.hasReservations
       : false,
   );
@@ -124,10 +137,12 @@ export function SettingsForm({
   const proServiceModulesAllowed = canUseProServiceModules(
     profile.plan,
     profile.paymentStatus,
+    profile.currentPeriodEnd,
   );
   const websiteFieldsEditable = canPublishWebsite(
     profile.plan,
     profile.paymentStatus,
+    profile.currentPeriodEnd,
   );
 
   function handleImageChange(
@@ -641,9 +656,15 @@ export function SettingsForm({
           <ModuleSwitch
             label="Publicar sitio web"
             description={
-              !canPublishWebsite(profile.plan, profile.paymentStatus)
+              !canPublishWebsite(
+                profile.plan,
+                profile.paymentStatus,
+                profile.currentPeriodEnd,
+              )
                 ? profile.paymentStatus === "PENDING_PAYMENT"
                   ? "Disponible cuando el pago Pro esté activo (cupón)."
+                  : isPeriodExpired(profile.currentPeriodEnd)
+                    ? "Tu período Pro venció. Renueva o canjea un cupón para publicar."
                   : "Disponible solo en Plan Pro con pago activo."
                 : !landingDelivered
                   ? "Activado: los visitantes verán “en preparación” hasta que entreguemos tu landing."
@@ -654,7 +675,11 @@ export function SettingsForm({
             checked={websitePublished}
             disabled={
               submitting ||
-              !canPublishWebsite(profile.plan, profile.paymentStatus)
+              !canPublishWebsite(
+                profile.plan,
+                profile.paymentStatus,
+                profile.currentPeriodEnd,
+              )
             }
             onChange={setWebsitePublished}
           />

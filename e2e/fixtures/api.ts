@@ -254,9 +254,9 @@ export async function ensureE2eStaff(ownerToken: string): Promise<void> {
   });
 }
 
-export const BASIC_MAX_PRODUCTS = 30;
+export const BASIC_MAX_PRODUCTS = 20;
 export const BASIC_PRODUCT_LIMIT_MESSAGE =
-  "El Plan Básico permite hasta 30 platillos. Actualiza al Plan Pro para menú ilimitado.";
+  "El Plan Básico permite hasta 20 platillos. Actualiza al Plan Pro para menú ilimitado.";
 
 export type AdminProduct = {
   uuid: string;
@@ -292,13 +292,35 @@ function runTenantPlanSql(sql: string): void {
   }
 }
 
-/** Cambia plan vía SQL (mismo patrón que global-setup). Restaura PRO tras E2E-13. */
+/** Cambia plan/pago vía SQL (mismo patrón que global-setup). Restaura PRO tras límites. */
 export function setTenantPlan(plan: "BASIC" | "PRO"): void {
   const sql =
     plan === "PRO"
-      ? `UPDATE restaurants SET plan = 'PRO', payment_status = 'ACTIVE' WHERE subdomain = '${e2eEnv.tenantSlug}';`
-      : `UPDATE restaurants SET plan = 'BASIC' WHERE subdomain = '${e2eEnv.tenantSlug}';`;
+      ? `UPDATE restaurants SET plan = 'PRO', payment_status = 'ACTIVE', current_period_end = NULL WHERE subdomain = '${e2eEnv.tenantSlug}';`
+      : `UPDATE restaurants SET plan = 'BASIC', payment_status = 'ACTIVE', current_period_end = NULL WHERE subdomain = '${e2eEnv.tenantSlug}';`;
   runTenantPlanSql(sql);
+}
+
+/** Pro elegido sin cupón/pago: plan PRO + PENDING_PAYMENT (tope free de menú). */
+export function setTenantProPendingPayment(): void {
+  runTenantPlanSql(
+    `UPDATE restaurants SET plan = 'PRO', payment_status = 'PENDING_PAYMENT' WHERE subdomain = '${e2eEnv.tenantSlug}';`,
+  );
+}
+
+/** Fija o limpia current_period_end (ISO-8601). Cadena vacía → NULL. */
+export function setTenantCurrentPeriodEnd(isoOrEmpty: string): void {
+  const safeSlug = e2eEnv.tenantSlug.replace(/'/g, "''");
+  if (!isoOrEmpty.trim()) {
+    runTenantPlanSql(
+      `UPDATE restaurants SET current_period_end = NULL WHERE subdomain = '${safeSlug}';`,
+    );
+    return;
+  }
+  const safeIso = isoOrEmpty.replace(/'/g, "''");
+  runTenantPlanSql(
+    `UPDATE restaurants SET current_period_end = '${safeIso}'::timestamptz WHERE subdomain = '${safeSlug}';`,
+  );
 }
 
 /** Borra canje previo de un cupón para re-probar redeem en e2esmoke. */

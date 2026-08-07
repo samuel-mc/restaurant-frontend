@@ -89,7 +89,7 @@ const PRICING: PricingPlan[] = [
     badge: null,
     color: "#94A3B8",
     features: [
-      "Menú QR hasta 30 platillos",
+      "Menú QR hasta 20 platillos",
       "Monitor de cocina en vivo",
       "Panel de administración",
       "Subdominio platolisto.com",

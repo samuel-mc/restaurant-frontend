@@ -37,7 +37,7 @@ interface SettingsFormProps {
 }
 
 const HEX_PATTERN = /^#[0-9A-Fa-f]{6}$/;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const ACCEPTED_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -196,7 +196,7 @@ export function SettingsForm({
     if (file.size > MAX_IMAGE_BYTES) {
       setErrors((prev) => ({
         ...prev,
-        [fileKey]: "La imagen no puede superar 5 MB.",
+        [fileKey]: "La imagen no puede superar 4 MB.",
       }));
       return;
     }
@@ -427,7 +427,7 @@ export function SettingsForm({
               error={errors.faviconFile}
               disabled={submitting}
               aspect="square"
-              hint="Cuadrado · PNG recomendado · máx. 5 MB. Aparece en la pestaña del navegador."
+              hint="Cuadrado · PNG recomendado · máx. 4 MB. Aparece en la pestaña del navegador."
               onChange={(files) => handleImageChange("favicon", files)}
             />
           </div>
@@ -901,7 +901,7 @@ function ImagePicker({
   error,
   disabled,
   aspect,
-  hint = "JPG, PNG, WEBP o GIF · máx. 5 MB",
+  hint = "JPG, PNG, WEBP o GIF · máx. 4 MB",
   onChange,
 }: {
   label: string;

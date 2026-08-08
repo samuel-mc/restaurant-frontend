@@ -1,5 +1,8 @@
 /**
  * Mutaciones del perfil/settings vía BFF (JWT HttpOnly + multipart).
+ *
+ * En Vercel el body de una Serverless Function ~4.5MB. Por eso, si hay varias
+ * imágenes (logo/banner/favicon), se suben en peticiones separadas.
  */
 
 import type {
@@ -30,6 +33,14 @@ export interface RestaurantProfileFormPayload {
   faviconFile: File | null;
 }
 
+type BrandImageKey = "logoFile" | "bannerFile" | "faviconFile";
+
+const BRAND_IMAGE_KEYS: BrandImageKey[] = [
+  "logoFile",
+  "bannerFile",
+  "faviconFile",
+];
+
 function buildFormData(payload: RestaurantProfileFormPayload): FormData {
   const formData = new FormData();
   formData.append("name", payload.name);
@@ -58,11 +69,35 @@ function buildFormData(payload: RestaurantProfileFormPayload): FormData {
   return formData;
 }
 
-export async function updateRestaurantProfile(
+function payloadWithSingleImage(
   payload: RestaurantProfileFormPayload,
-  tenantSlug: string,
+  imageKey: BrandImageKey | null,
+): RestaurantProfileFormPayload {
+  return {
+    ...payload,
+    logoFile: imageKey === "logoFile" ? payload.logoFile : null,
+    bannerFile: imageKey === "bannerFile" ? payload.bannerFile : null,
+    faviconFile: imageKey === "faviconFile" ? payload.faviconFile : null,
+  };
+}
+
+function errorMessageForStatus(
+  status: number,
+  fallbackFromBody: string | null,
+): string {
+  if (status === 413) {
+    return (
+      "La imagen es demasiado pesada para subirla de una vez. " +
+      "Usa archivos de menos de 4 MB (o súbelas de una en una)."
+    );
+  }
+  return fallbackFromBody ?? "No se pudo guardar la configuración.";
+}
+
+async function putProfileOnce(
+  payload: RestaurantProfileFormPayload,
+  slug: string,
 ): Promise<RestaurantProfile> {
-  const slug = resolveTenantSlug(tenantSlug);
   const formData = buildFormData(payload);
 
   const response = await fetch("/api/admin/restaurants/profile", {
@@ -82,12 +117,12 @@ export async function updateRestaurantProfile(
     | null;
 
   if (!response.ok) {
-    const message =
+    const fromBody =
       body && typeof body === "object" && "error" in body && body.error
         ? String(body.error)
-        : "No se pudo guardar la configuración.";
+        : null;
     throw new ApiError({
-      message,
+      message: errorMessageForStatus(response.status, fromBody),
       status: response.status,
       statusText: response.statusText,
       url: "/api/admin/restaurants/profile",
@@ -96,4 +131,24 @@ export async function updateRestaurantProfile(
   }
 
   return toRestaurantProfile(body as RestaurantProfileResponse);
+}
+
+export async function updateRestaurantProfile(
+  payload: RestaurantProfileFormPayload,
+  tenantSlug: string,
+): Promise<RestaurantProfile> {
+  const slug = resolveTenantSlug(tenantSlug);
+  const pendingImages = BRAND_IMAGE_KEYS.filter((key) => payload[key] != null);
+
+  // Sin imágenes o una sola: un request basta.
+  if (pendingImages.length <= 1) {
+    return putProfileOnce(payload, slug);
+  }
+
+  // Varias imágenes: una petición por archivo (límite de body en Vercel ~4.5MB).
+  let updated: RestaurantProfile | null = null;
+  for (const imageKey of pendingImages) {
+    updated = await putProfileOnce(payloadWithSingleImage(payload, imageKey), slug);
+  }
+  return updated!;
 }

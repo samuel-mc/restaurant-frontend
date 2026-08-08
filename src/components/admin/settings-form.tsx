@@ -104,7 +104,13 @@ export function SettingsForm({
       : false,
   );
   const [orderingEnabled, setOrderingEnabled] = useState(
-    initialProfile.orderingEnabled,
+    canUseProServiceModules(
+      initialProfile.plan,
+      initialProfile.paymentStatus,
+      initialProfile.currentPeriodEnd,
+    )
+      ? initialProfile.orderingEnabled
+      : false,
   );
   const [tableCount, setTableCount] = useState(
     String(initialProfile.tableCount ?? 12),
@@ -270,7 +276,7 @@ export function SettingsForm({
       hasDelivery: proServiceModulesAllowed ? hasDelivery : false,
       hasPickup: proServiceModulesAllowed ? hasPickup : false,
       hasReservations: proServiceModulesAllowed ? hasReservations : false,
-      orderingEnabled,
+      orderingEnabled: proServiceModulesAllowed ? orderingEnabled : false,
       tableCount: resolvedTableCount,
       websitePublished,
       logoFile,
@@ -693,12 +699,18 @@ export function SettingsForm({
             <ModuleSwitch
               label="Ordenar desde el menú digital"
               description={
-                orderingEnabled
-                  ? "Los comensales pueden armar pedidos desde /menu."
-                  : "Menú en modo consulta: se ve el catálogo sin carrito ni checkout."
+                !proServiceModulesAllowed
+                  ? profile.paymentStatus === "PENDING_PAYMENT"
+                    ? "Disponible cuando el pago Pro esté activo (cupón)."
+                    : isPeriodExpired(profile.currentPeriodEnd)
+                      ? "Tu período Pro venció. Renueva o canjea un cupón para aceptar pedidos."
+                      : "Disponible solo en Plan Pro con pago activo."
+                  : orderingEnabled
+                    ? "Los comensales pueden armar pedidos desde /menu."
+                    : "Menú en modo consulta: se ve el catálogo sin carrito ni checkout."
               }
-              checked={orderingEnabled}
-              disabled={submitting}
+              checked={proServiceModulesAllowed && orderingEnabled}
+              disabled={submitting || !proServiceModulesAllowed}
               onChange={(next) => {
                 setOrderingEnabled(next);
                 if (!next) {
@@ -710,7 +722,7 @@ export function SettingsForm({
                 }
               }}
             />
-            {orderingEnabled ? (
+            {proServiceModulesAllowed && orderingEnabled ? (
               <label className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-4 py-3">
                 <span className="text-sm font-semibold">Total de mesas</span>
                 <span className="text-xs text-muted-foreground">

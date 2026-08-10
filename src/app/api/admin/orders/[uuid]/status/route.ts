@@ -1,22 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAdminAccessToken } from "@/lib/auth-server";
-import type { OrderStatus } from "@/types/api";
-
-const VALID_STATUSES = new Set<OrderStatus>([
-  "PENDING",
-  "ACCEPTED",
-  "IN_KITCHEN",
-  "DELIVERED",
-  "CLOSED",
-  "CANCELLED",
-]);
+import { orderStatusRequestSchema } from "@/lib/validation/schemas";
+import { parseJsonBody } from "@/lib/validation/route";
 
 type RouteContext = {
   params: Promise<{ uuid: string }>;
-};
-
-type StatusBody = {
-  status?: unknown;
 };
 
 /**
@@ -44,21 +32,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  let body: StatusBody;
-  try {
-    body = (await request.json()) as StatusBody;
-  } catch {
-    return NextResponse.json({ error: "Cuerpo inválido." }, { status: 400 });
-  }
-
-  const status =
-    typeof body.status === "string" ? (body.status as OrderStatus) : null;
-  if (!status || !VALID_STATUSES.has(status)) {
-    return NextResponse.json(
-      { error: "Estado de pedido no válido." },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody(request, orderStatusRequestSchema);
+  if (!parsed.ok) return parsed.response;
+  const { status } = parsed.data;
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
   if (!apiUrl) {

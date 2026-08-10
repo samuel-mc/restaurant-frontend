@@ -8,6 +8,8 @@ import type {
   SubmitFeedbackResponse,
 } from "@/types/api";
 import { resolveTenantSlug } from "@/lib/tenant";
+import { submitFeedbackSchema } from "@/lib/validation/schemas";
+import { assertValid } from "@/lib/validation/parse";
 import { apiClient, ApiError } from "@/services/apiClient";
 
 const TENANT_HEADER = "X-Tenant";
@@ -33,7 +35,8 @@ export async function submitOrderFeedback(
   tenantSlug?: string | null,
 ): Promise<SubmitFeedbackResponse> {
   const slug = resolveTenantSlug(tenantSlug);
-  return apiClient.post<SubmitFeedbackResponse>(feedbackPath(orderUuid), body, {
+  const validated = assertValid(submitFeedbackSchema, body, feedbackPath(orderUuid));
+  return apiClient.post<SubmitFeedbackResponse>(feedbackPath(orderUuid), validated, {
     headers: { [TENANT_HEADER]: slug },
     cache: "no-store",
   });

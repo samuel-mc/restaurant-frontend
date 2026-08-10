@@ -1,4 +1,6 @@
 import { proxyAdminMultipart, proxyAdminRequest } from "@/lib/admin-api-proxy";
+import { restaurantProfileRequestSchema } from "@/lib/validation/schemas";
+import { parseJsonBody } from "@/lib/validation/route";
 
 const UPSTREAM = "/api/v1/admin/restaurants/profile";
 
@@ -14,14 +16,10 @@ export async function PUT(request: Request) {
     return proxyAdminMultipart(request, UPSTREAM, "PUT");
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Cuerpo inválido." }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, restaurantProfileRequestSchema);
+  if (!parsed.ok) return parsed.response;
   return proxyAdminRequest(request, UPSTREAM, {
     method: "PUT",
-    body,
+    body: parsed.data,
   });
 }

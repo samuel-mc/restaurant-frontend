@@ -23,6 +23,7 @@
     "recharts": "^3.9.2",
     "server-only": "^0.0.1",
     "sockjs-client": "^1.6.1",
+    "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

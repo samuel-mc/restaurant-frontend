@@ -1,4 +1,6 @@
 import { proxyAdminRequest } from "@/lib/admin-api-proxy";
+import { replaceProductModifiersRequestSchema } from "@/lib/validation/schemas";
+import { parseJsonBody } from "@/lib/validation/route";
 
 type RouteContext = {
   params: Promise<{ uuid: string }>;
@@ -7,15 +9,11 @@ type RouteContext = {
 /** PUT /api/admin/products/[uuid]/modifier-groups */
 export async function PUT(request: Request, context: RouteContext) {
   const { uuid } = await context.params;
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Cuerpo inválido." }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, replaceProductModifiersRequestSchema);
+  if (!parsed.ok) return parsed.response;
   return proxyAdminRequest(
     request,
     `/api/v1/admin/products/${uuid}/modifier-groups`,
-    { method: "PUT", body },
+    { method: "PUT", body: parsed.data },
   );
 }

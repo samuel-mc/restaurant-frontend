@@ -8,6 +8,8 @@
 
 import type { LoginRequest, LoginResponse, StaffPinLoginRequest, StaffPinLoginResponse } from "@/types/api";
 import { resolveTenantSlug } from "@/lib/tenant";
+import { loginRequestSchema, staffPinLoginRequestSchema } from "@/lib/validation/schemas";
+import { assertValid } from "@/lib/validation/parse";
 import { STAFF_PIN_LENGTH, isStaffPinFormat } from "@/lib/staff-pin";
 import { apiClient, ApiError } from "@/services/apiClient";
 
@@ -60,12 +62,12 @@ export async function login(
   }
 
   const body: LoginRequest = { email, password };
+  assertValid(loginRequestSchema, body, LOGIN_PATH);
 
   const response = await apiClient.post<LoginResponse>(LOGIN_PATH, body, {
     headers: { [TENANT_HEADER]: slug },
     cache: "no-store",
   });
-
   const token = response?.token?.trim();
   if (!token) {
     throw new ApiError({
@@ -126,6 +128,7 @@ export async function loginWithPin(
     staffId: staffId.trim(),
     pin,
   };
+  assertValid(staffPinLoginRequestSchema, body, PIN_LOGIN_PATH);
 
   const response = await apiClient.post<StaffPinLoginResponse>(
     PIN_LOGIN_PATH,

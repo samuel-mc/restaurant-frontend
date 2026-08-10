@@ -1,5 +1,6 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
+import react from "eslint-plugin-react";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -12,6 +13,13 @@ const eslintConfig = defineConfig([
     "base/**",
     "next-env.d.ts",
   ]),
+  {
+    plugins: { react },
+    rules: {
+      // Defensa en profundidad XSS: ningún dato de usuario puede renderizarse como HTML.
+      "react/no-danger": "error",
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -5,6 +5,8 @@
 
 import type { TableCallRequest, TableCallResponse } from "@/types/api";
 import { resolveTenantSlug } from "@/lib/tenant";
+import { tableCallRequestSchema } from "@/lib/validation/schemas";
+import { assertValid } from "@/lib/validation/parse";
 import { apiClient, ApiError } from "@/services/apiClient";
 
 const TENANT_HEADER = "X-Tenant";
@@ -31,7 +33,8 @@ export async function createTableCall(
   body: TableCallRequest,
 ): Promise<TableCallResponse> {
   const slug = requireTenantSlug(tenantSlug);
-  return apiClient.post<TableCallResponse>(TABLE_CALLS_PATH, body, {
+  const validated = assertValid(tableCallRequestSchema, body, TABLE_CALLS_PATH);
+  return apiClient.post<TableCallResponse>(TABLE_CALLS_PATH, validated, {
     headers: { [TENANT_HEADER]: slug },
   });
 }

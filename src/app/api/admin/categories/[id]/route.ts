@@ -1,4 +1,6 @@
 import { proxyAdminRequest } from "@/lib/admin-api-proxy";
+import { categoryRequestSchema } from "@/lib/validation/schemas";
+import { parseJsonBody } from "@/lib/validation/route";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -7,15 +9,11 @@ type RouteContext = {
 /** PUT /api/admin/categories/[id] → Spring `/api/v1/admin/categories/{id}` */
 export async function PUT(request: Request, context: RouteContext) {
   const { id } = await context.params;
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Cuerpo inválido." }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, categoryRequestSchema);
+  if (!parsed.ok) return parsed.response;
   return proxyAdminRequest(request, `/api/v1/admin/categories/${id}`, {
     method: "PUT",
-    body,
+    body: parsed.data,
   });
 }
 

@@ -1,4 +1,6 @@
 import { proxySuperAdminRequest } from "@/lib/superadmin-api-proxy";
+import { superAdminCouponCreateRequestSchema } from "@/lib/validation/schemas";
+import { parseJsonBody } from "@/lib/validation/route";
 
 export async function GET(request: Request) {
   return proxySuperAdminRequest(request, "/api/v1/superadmin/coupons", {
@@ -7,14 +9,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Cuerpo inválido." }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, superAdminCouponCreateRequestSchema);
+  if (!parsed.ok) return parsed.response;
   return proxySuperAdminRequest(request, "/api/v1/superadmin/coupons", {
     method: "POST",
-    body,
+    body: parsed.data,
   });
 }

@@ -30,7 +30,10 @@ export default function RootLayout({
   return (
     <html lang="es" className={landingFontVariables} suppressHydrationWarning>
       <head>
+        {/* THEME_BOOTSTRAP_SCRIPT es una constante estática de compilación (tema dark),
+            sin datos de usuario; por eso se permite dangerouslySetInnerHTML. */}
         <script
+          /* eslint-disable-next-line react/no-danger */
           dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }}
         />
       </head>

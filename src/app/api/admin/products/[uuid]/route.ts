@@ -1,4 +1,6 @@
 import { proxyAdminMultipart, proxyAdminRequest } from "@/lib/admin-api-proxy";
+import { productRequestSchema } from "@/lib/validation/schemas";
+import { parseJsonBody } from "@/lib/validation/route";
 
 type RouteContext = {
   params: Promise<{ uuid: string }>;
@@ -17,15 +19,11 @@ export async function PUT(request: Request, context: RouteContext) {
     );
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Cuerpo inválido." }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, productRequestSchema);
+  if (!parsed.ok) return parsed.response;
   return proxyAdminRequest(request, `/api/v1/admin/products/${uuid}`, {
     method: "PUT",
-    body,
+    body: parsed.data,
   });
 }
 

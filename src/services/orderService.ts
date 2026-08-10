@@ -17,6 +17,8 @@ import type {
 } from "@/types/api";
 import { toOrder } from "@/lib/order-mapper";
 import { resolveTenantSlug } from "@/lib/tenant";
+import { orderRequestSchema } from "@/lib/validation/schemas";
+import { assertValid } from "@/lib/validation/parse";
 import { apiClient, ApiError } from "@/services/apiClient";
 
 /**
@@ -99,7 +101,7 @@ export async function createOrder(
   }
 
   const slug = requireTenantSlug(tenantSlug);
-  const body = toOrderRequest(orderData);
+  const body = assertValid(orderRequestSchema, toOrderRequest(orderData), ORDERS_PATH);
 
   const response = await apiClient.post<OrderResponse>(ORDERS_PATH, body, {
     headers: { [TENANT_HEADER]: slug },

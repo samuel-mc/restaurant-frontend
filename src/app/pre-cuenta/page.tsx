@@ -15,6 +15,7 @@ import { buildTicketReceiptProps, resolveTicketKind } from "@/lib/ticket-from-or
 const DEMO_ORDER: Order = {
   id: 1084,
   uuid: "demo-pre-cuenta-0001",
+  trackingToken: null,
   customerName: "Comensal",
   customerPhone: "5512345678",
   orderType: "IN_TABLE",

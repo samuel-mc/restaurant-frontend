@@ -13,6 +13,7 @@ import type { Order } from "@/types/api";
 
 type OrderTrackingPageProps = {
   params: Promise<{ tenant: string; uuid: string }>;
+  searchParams?: Promise<{ token?: string | string[] }>;
 };
 
 export async function generateMetadata({
@@ -42,9 +43,10 @@ type OrderLoadResult =
 async function loadOrder(
   tenant: string,
   uuid: string,
+  token?: string | null,
 ): Promise<OrderLoadResult> {
   try {
-    const order = await getOrderByUuid(uuid, tenant);
+    const order = await getOrderByUuid(uuid, tenant, token);
     return { status: "ok", order };
   } catch (error) {
     if (error instanceof ApiError && (error.status === 404 || error.status === 400)) {
@@ -80,8 +82,11 @@ async function loadOrder(
  */
 export default async function OrderTrackingPage({
   params,
+  searchParams,
 }: OrderTrackingPageProps) {
   const { tenant, uuid } = await params;
+  const query = searchParams ? await searchParams : {};
+  const token = Array.isArray(query.token) ? query.token[0] : query.token;
   const profile = await getPublicRestaurantProfileOrNull(tenant);
   const restaurantName = profile?.name?.trim() || prettifyTenantSlug(tenant);
 
@@ -93,7 +98,7 @@ export default async function OrderTrackingPage({
 
   const brand = brandFromProfile(profile);
   const hasBrandFill = Boolean(brand.accent);
-  const result = await loadOrder(tenant, uuid);
+  const result = await loadOrder(tenant, uuid, token);
 
   const supportLine =
     result.status === "ok"
@@ -102,7 +107,7 @@ export default async function OrderTrackingPage({
 
   return (
     <main
-      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-[var(--menu-accent-wash,var(--background))] font-jakarta-sans text-foreground"
+      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-(--menu-accent-wash,var(--background)) font-jakarta-sans text-foreground"
       style={brand.style}
     >
       {result.status === "ok" ? (

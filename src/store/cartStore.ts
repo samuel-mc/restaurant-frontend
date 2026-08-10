@@ -31,6 +31,7 @@ export interface CartLine {
 /** Sesión de mesa: permite enviar adiciones al mismo ticket. */
 export interface ActiveOrderSession {
   activeOrderId: string;
+  trackingToken?: string | null;
   tableNumber: string;
   customerName: string;
   tableToken?: string | null;
@@ -40,6 +41,7 @@ interface CartState {
   tenantSlug: string | null;
   lines: Record<string, CartLine>;
   activeOrderId: string | null;
+  activeOrderTrackingToken: string | null;
   tableNumber: string | null;
   tableToken: string | null;
   customerName: string | null;
@@ -69,6 +71,7 @@ interface CartState {
 const emptySession = {
   lines: {} as Record<string, CartLine>,
   activeOrderId: null as string | null,
+  activeOrderTrackingToken: null as string | null,
   tableNumber: null as string | null,
   tableToken: null as string | null,
   customerName: null as string | null,
@@ -298,6 +301,7 @@ export const useCartStore = create<CartState>()(
       setActiveOrderSession: (session) =>
         set({
           activeOrderId: session.activeOrderId,
+          activeOrderTrackingToken: session.trackingToken ?? null,
           tableNumber: session.tableNumber,
           customerName: session.customerName,
           tableToken:
@@ -309,6 +313,7 @@ export const useCartStore = create<CartState>()(
       clearActiveOrderSession: () =>
         set({
           activeOrderId: null,
+          activeOrderTrackingToken: null,
           tableNumber: null,
           tableToken: null,
           customerName: null,
@@ -317,6 +322,7 @@ export const useCartStore = create<CartState>()(
       releaseActiveOrder: () =>
         set({
           activeOrderId: null,
+          activeOrderTrackingToken: null,
           customerName: null,
         }),
 
@@ -359,6 +365,7 @@ export const useCartStore = create<CartState>()(
           lines?: Record<string, CartLine>;
           tenantSlug?: string | null;
           activeOrderId?: string | null;
+          activeOrderTrackingToken?: string | null;
           tableNumber?: string | null;
           tableToken?: string | null;
           customerName?: string | null;
@@ -373,6 +380,7 @@ export const useCartStore = create<CartState>()(
         tenantSlug: state.tenantSlug,
         lines: state.lines,
         activeOrderId: state.activeOrderId,
+        activeOrderTrackingToken: state.activeOrderTrackingToken,
         tableNumber: state.tableNumber,
         tableToken: state.tableToken,
         customerName: state.customerName,

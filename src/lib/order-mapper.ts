@@ -24,6 +24,7 @@ export function toOrder(dto: OrderResponse): Order {
   return {
     id: dto.id ?? null,
     uuid: dto.uuid,
+    trackingToken: dto.trackingToken?.trim() || null,
     customerName: dto.customerName,
     customerPhone: dto.customerPhone ?? null,
     orderType: dto.orderType,

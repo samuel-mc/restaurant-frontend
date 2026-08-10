@@ -125,6 +125,7 @@ export async function createOrder(
 export async function getOrderByUuid(
   orderUuid: string,
   tenantSlug?: string | null,
+  trackingToken?: string | null,
 ): Promise<Order> {
   const uuid = orderUuid.trim();
   if (!uuid) {
@@ -137,8 +138,12 @@ export async function getOrderByUuid(
   }
 
   const slug = requireTenantSlug(tenantSlug, `${ORDERS_PATH}/${uuid}`);
+  const token = trackingToken?.trim();
+  const path = token
+    ? `${ORDERS_PATH}/${uuid}?token=${encodeURIComponent(token)}`
+    : `${ORDERS_PATH}/${uuid}`;
 
-  const response = await apiClient.get<OrderResponse>(`${ORDERS_PATH}/${uuid}`, {
+  const response = await apiClient.get<OrderResponse>(path, {
     headers: { [TENANT_HEADER]: slug },
     cache: "no-store",
   });

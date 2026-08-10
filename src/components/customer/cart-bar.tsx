@@ -46,6 +46,7 @@ interface CartBarProps {
   pendingTableChange?: string | null;
   /** Pedido ya enviado a cocina en la mesa actual (para explicar el desligue). */
   openOrderId?: string | null;
+  openOrderTrackingToken?: string | null;
   onDraftTableChange?: (value: string) => void;
   onChangeTable?: () => void;
   /** Liberar QR y seguir con el carrito (pickup / explore). */
@@ -150,6 +151,7 @@ export function CartBar({
   tableEditError = null,
   pendingTableChange = null,
   openOrderId = null,
+  openOrderTrackingToken = null,
   onDraftTableChange,
   onChangeTable,
   onLeaveWrongTable,
@@ -460,6 +462,7 @@ export function CartBar({
       if (order.orderType === "IN_TABLE" && order.tableNumber) {
         setActiveOrderSession({
           activeOrderId: order.uuid,
+          trackingToken: order.trackingToken,
           tableNumber: order.tableNumber,
           customerName: order.customerName,
           tableToken: sessionTableToken,
@@ -467,7 +470,10 @@ export function CartBar({
       }
       clearCart();
       setIsOpen(false);
-      router.push(`/orders/${order.uuid}`);
+      const trackingPath = order.trackingToken
+        ? `/orders/${order.uuid}?token=${encodeURIComponent(order.trackingToken)}`
+        : `/orders/${order.uuid}`;
+      router.push(trackingPath);
     } catch (error) {
       setErrorMessage(getCreateOrderErrorMessage(error));
     } finally {
@@ -478,6 +484,12 @@ export function CartBar({
   if (count === 0) return null;
 
   const isMesaEditView = isEditingTable;
+  const openOrderHref =
+    openOrderId && openOrderTrackingToken
+      ? `/orders/${openOrderId}?token=${encodeURIComponent(openOrderTrackingToken)}`
+      : openOrderId
+        ? `/orders/${openOrderId}`
+        : null;
   const rawMesa = (tableNumber || sessionTable || draftTable || "").trim();
   const currentMesaLabel = rawMesa ? formatTableLabel(rawMesa) : "";
 
@@ -683,9 +695,9 @@ export function CartBar({
                       actual; no se cancela. Los platillos de este carrito pasan
                       a la mesa nueva.
                     </p>
-                    {openOrderId ? (
+                    {openOrderHref ? (
                       <Link
-                        href={`/orders/${openOrderId}`}
+                        href={openOrderHref}
                         className={`${focusRing} inline-flex min-h-11 items-center text-xs font-medium text-foreground underline underline-offset-2`}
                       >
                         Ver pedido de la mesa actual

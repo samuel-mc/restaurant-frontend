@@ -305,6 +305,7 @@ export function OrderTracker({
     if (order.orderType === "IN_TABLE" && order.tableNumber) {
       setActiveOrderSession({
         activeOrderId: order.uuid,
+        trackingToken: order.trackingToken,
         tableNumber: order.tableNumber,
         customerName: order.customerName,
       });
@@ -316,6 +317,7 @@ export function OrderTracker({
     order.customerName,
     order.orderType,
     order.tableNumber,
+    order.trackingToken,
     order.uuid,
     setActiveOrderSession,
   ]);
@@ -332,7 +334,7 @@ export function OrderTracker({
     setIsRefreshing(true);
     setRefreshMessage(null);
     try {
-      const next = await getOrderByUuid(order.uuid, tenantSlug);
+      const next = await getOrderByUuid(order.uuid, tenantSlug, order.trackingToken);
       applyOrderUpdate(next);
       setRefreshMessage(`Pedido actualizado · ${formatClock(Date.now())}`);
     } catch {

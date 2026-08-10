@@ -317,6 +317,7 @@ export interface OrderDetailModifierResponse {
 export interface OrderResponse {
   id?: number | null;
   uuid: string;
+  trackingToken?: string | null;
   customerName: string;
   customerPhone: string | null;
   orderType: OrderType;
@@ -410,6 +411,7 @@ export interface OrderItem {
 export interface Order {
   id: number | null;
   uuid: string;
+  trackingToken: string | null;
   customerName: string;
   customerPhone: string | null;
   orderType: OrderType;

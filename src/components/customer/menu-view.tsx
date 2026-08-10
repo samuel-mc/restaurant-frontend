@@ -127,6 +127,7 @@ export function MenuView({
   const cartTable = useCartStore((s) => s.tableNumber);
   const cartTableToken = useCartStore((s) => s.tableToken);
   const activeOrderId = useCartStore((s) => s.activeOrderId);
+  const activeOrderTrackingToken = useCartStore((s) => s.activeOrderTrackingToken);
   const cartCount = useCartCount();
   const hasOpenAccount = Boolean(sessionOrder) || Boolean(activeOrderId);
 
@@ -335,6 +336,7 @@ export function MenuView({
       "";
     setActiveOrderSession({
       activeOrderId: sessionOrder.uuid,
+      trackingToken: sessionOrder.trackingToken,
       tableNumber: table,
       customerName: sessionOrder.customerName,
       tableToken: cartTableToken,
@@ -491,6 +493,9 @@ export function MenuView({
           tableEditError={tableEditError}
           pendingTableChange={pendingTableChange}
           openOrderId={sessionOrder?.uuid ?? activeOrderId}
+          openOrderTrackingToken={
+            sessionOrder?.trackingToken ?? activeOrderTrackingToken
+          }
           onDraftTableChange={setDraftTable}
           onChangeTable={handleChangeTable}
           onLeaveWrongTable={handleLeaveWrongTable}
@@ -668,7 +673,11 @@ function MenuContextStrip({
           </p>
           <div className="flex shrink-0 flex-wrap items-center gap-x-3">
             <Link
-              href={`/orders/${sessionOrder.uuid}`}
+              href={
+                sessionOrder.trackingToken
+                  ? `/orders/${sessionOrder.uuid}?token=${encodeURIComponent(sessionOrder.trackingToken)}`
+                  : `/orders/${sessionOrder.uuid}`
+              }
               className={`${stripAction} text-foreground`}
             >
               Ver pedido

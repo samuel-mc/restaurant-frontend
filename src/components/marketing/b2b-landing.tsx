@@ -85,35 +85,38 @@ const PRICING: PricingPlan[] = [
   {
     name: "Plan Básico",
     price: "$0",
-    period: "Gratis para empezar",
+    period: "Gratis para siempre · sin tarjeta",
     badge: null,
     color: "#94A3B8",
     features: [
-      "Menú QR hasta 20 platillos",
-      "Monitor de cocina en vivo",
-      "Panel de administración",
-      "Subdominio platolisto.com",
+      "Menú QR vitrina hasta 20 platillos",
+      "Panel admin: marca, horarios y catálogo",
+      "Fotos, categorías y modificadores",
+      "Subdominio en platolisto.com",
+      "Ideal para armar tu carta antes de operar",
     ],
-    cta: "Crear con Básico",
+    cta: "Empezar gratis",
     highlight: false,
   },
   {
     name: "Plan Pro",
-    price: "$1,000",
+    price: "$1,299",
     period: "por mes / restaurante",
-    badge: "Sitio a medida",
+    badge: "Operación en vivo",
     color: "#34D399",
-    setupFee: "+$2,000 MXN de creación de sitio web (pago único)",
+    setupFee: "+$2,000 MXN de sitio web a medida (pago único)",
     features: [
       {
         label: "Sitio web a medida (diseño propio por local)",
         highlight: true,
       },
-      "Menú QR ilimitado",
-      "Pedidos Pickup y Delivery",
-      "Soporte prioritario",
+      "Pedidos por QR en mesa, en tiempo real",
+      "Monitor de cocina (KDS) + alertas",
+      "Menú ilimitado, pickup y delivery",
+      "Smart Rating, pre-cuenta y corte de turno",
+      "Soporte prioritario por WhatsApp",
     ],
-    cta: "Crear con Pro",
+    cta: "Activar Pro",
     highlight: true,
   },
 ];
@@ -1161,8 +1164,8 @@ function PricingSection({
             <span className="accent-text">para tu operación</span>
           </h2>
           <p className="text-lg text-[var(--b2b-muted)]">
-            Empieza gratis con Básico. Pasa a Pro cuando quieras sitio a medida y
-            menú sin límite.
+            Empieza gratis para armar tu carta. Activa Pro cuando quieras
+            pedidos en vivo, cocina y tu sitio a medida.
           </p>
         </div>
 
@@ -1298,6 +1301,11 @@ function PricingSection({
             </div>
           ))}
         </div>
+
+        <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-slate-400">
+          En Básico armas y publicas tu carta. Los pedidos en mesa, el monitor de
+          cocina y el sitio a medida se activan con Plan Pro vigente.
+        </p>
 
         <div className="mx-auto mt-10 max-w-4xl rounded-2xl border border-amber-400/25 bg-amber-500/5 px-6 py-5 text-center">
           <p className="text-sm font-semibold text-amber-200">

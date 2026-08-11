@@ -313,12 +313,12 @@ export function RegisterForm({
             {
               id: "BASIC" as const,
               title: "Básico",
-              hint: "Gratis · menú QR hasta 20 platillos",
+              hint: "Gratis · vitrina hasta 20 platillos",
             },
             {
               id: "PRO" as const,
               title: "Pro",
-              hint: "Sitio a medida + menú ilimitado",
+              hint: "$1,299/mes · pedidos en vivo + sitio",
             },
           ] as const
         ).map((option) => {
@@ -387,11 +387,12 @@ export function RegisterForm({
         role="note"
       >
         <p className={isB2b ? "font-semibold text-amber-200" : "font-semibold"}>
-          Pro: $1,000 MXN/mes + $2,000 MXN de setup (pago único)
+          Pro: $1,299 MXN/mes + $2,000 MXN de setup (pago único)
         </p>
         <p className={isB2b ? "mt-1 text-amber-100/75" : "mt-1 opacity-80"}>
-          Menú QR y cocina operan desde hoy. El sitio a medida se publica cuando
-          lo entregamos. Cobro por transferencia o efectivo; cupón al activar.
+          Con pago activo: pedidos por QR, cocina en vivo y menú ilimitado. El
+          sitio a medida se publica cuando lo entregamos. Cobro por
+          transferencia o efectivo; cupón al activar.
         </p>
       </div>
     ) : (
@@ -403,8 +404,8 @@ export function RegisterForm({
         }
         role="note"
       >
-        Básico es gratis para empezar. Puedes pasar a Pro después, cuando quieras
-        tu sitio a medida.
+        Básico es gratis para armar tu carta (hasta 20 platillos). Pedidos en
+        vivo, cocina y sitio a medida se activan con Pro.
       </div>
     );
 

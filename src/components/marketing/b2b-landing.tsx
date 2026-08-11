@@ -90,7 +90,7 @@ const PRICING: PricingPlan[] = [
     color: "#94A3B8",
     features: [
       "Menú QR vitrina hasta 20 platillos",
-      "Panel admin: marca, horarios y catálogo",
+      "Panel admin: marca, colores y catálogo",
       "Fotos, categorías y modificadores",
       "Subdominio en platolisto.com",
       "Ideal para armar tu carta antes de operar",
